@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "colloids"
+readme = "README.md"
+requires-python = ">=3.12"
+version = "0.0.1"
+dependencies = [
+    "numpy >= 1.26",
+    "openmm >= 8.0"
+]
+
+[tool.setuptools.packages.find]
+exclude = ["Literature", "jupyter-scripts"]

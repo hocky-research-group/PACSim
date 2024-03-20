@@ -29,9 +29,7 @@ class ColloidForces(object):
     r = r_1 + r_2 / 2.0 for the prefactor [see eq. (1)], whereas the electrostatic force from DLVO theory uses
     r = 2.0 / (1.0 / r_1 + 1.0 / r_2) for the prefactor.
 
-    TODO Implement the forces in a different class based on lookup tables.
-
-    TODO Implement alternative force according to Kangxin.
+    TODO Implement the forces in a different class based on lookup tables and benchmark.
 
     :param brush_density:
         The polymer surface density in the Alexander-de Gennes polymer brush model [i.e., sigma in eq. (1)].
@@ -57,6 +55,13 @@ class ColloidForces(object):
         The dielectric constant of the solvent [i.e., epsilon] and the value must be greater than zero.
         Defaults to 80.0 (i.e., water).
     :type dielectric_constant: float
+    :param use_log:
+        If True, the electrostatic force uses the more accurate equation involving a logarithm [i.e., eq. (12.5.2) in
+        Hunter, Foundations of Colloid Science (Oxford University Press, 2001), 2nd edition] instead of the simpler
+        equation that only involves an exponential [i.e., eq. (12.5.5) in Hunter, Foundations of Colloid Science
+        (Oxford University Press, 2001), 2nd edition].
+        Defaults to True.
+    :type use_log: bool
 
     :raises TypeError:
         If the brush_density, brush_length, debye_length, or temperature is not a Quantity with a proper unit.
@@ -70,7 +75,7 @@ class ColloidForces(object):
                  brush_length: unit.Quantity = 10.0 * unit.nanometer,
                  debye_length: unit.Quantity = 5.0 * unit.nanometer,
                  temperature: unit.Quantity = 298.0 * unit.kelvin,
-                 dielectric_constant: float = 80.0) -> None:
+                 dielectric_constant: float = 80.0, use_log: bool = True) -> None:
         """Constructor of the ColloidForces class."""
         if not brush_density.unit.is_compatible(unit.nanometer ** -2):
             raise TypeError("argument brush_density must have a unit that is compatible with 1/nanometer^2")
@@ -96,6 +101,7 @@ class ColloidForces(object):
         self._debye_length = debye_length.in_units_of(unit.nanometer)
         self._temperature = temperature.in_units_of(unit.kelvin)
         self._dielectric_constant = dielectric_constant
+        self._use_log = use_log
 
         self._steric_force = self._set_up_steric_force()
         self._electrostatic_force = self._set_up_electrostatic_force()
@@ -128,12 +134,20 @@ class ColloidForces(object):
 
     def _set_up_electrostatic_force(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the electrostatic force from DLVO theory."""
-        electrostatic_force = CustomNonbondedForce(
-            "electrostatic_prefactor * radius * psi1 * psi2 * exp(-h / debye_length); "
-            "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
-            "h = r - rs;"
-            "rs = radius1 + radius2"
-        )
+        if self._use_log:
+            electrostatic_force = CustomNonbondedForce(
+                "electrostatic_prefactor * radius * psi1 * psi2 * log(1.0 + exp(-h / debye_length)); "
+                "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
+                "h = r - rs;"
+                "rs = radius1 + radius2"
+            )
+        else:
+            electrostatic_force = CustomNonbondedForce(
+                "electrostatic_prefactor * radius * psi1 * psi2 * exp(-h / debye_length); "
+                "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
+                "h = r - rs;"
+                "rs = radius1 + radius2"
+            )
         # Prefactor is 2 * pi * epsilon
         electrostatic_force.addGlobalParameter(
             "electrostatic_prefactor",

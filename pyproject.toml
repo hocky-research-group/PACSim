@@ -8,8 +8,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 version = "0.0.1"
 dependencies = [
+    "jupyterlab >= 4.1",
+    "matplotlib >= 3.8",
     "numpy >= 1.26",
-    "openmm >= 8.0"
+    "openmm >= 8.0",
+    "pytest >= 7.4"
 ]
 
 [tool.setuptools.packages.find]

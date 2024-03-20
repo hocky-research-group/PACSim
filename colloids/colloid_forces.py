@@ -30,6 +30,10 @@ class ColloidForces(object):
 
     TODO Implement alternative force according to Kangxin.
 
+    TODO Check potential function again in original paper.
+
+    TODO Switch on smooth cutoff for electrostatic force.
+
     :param brush_density:
         The polymer surface density in the Alexander-de Gennes polymer brush model [i.e., sigma in eq. (1)].
         The unit of the brush_density must be compatible with 1/nanometer^2 and the value must be greater than zero.

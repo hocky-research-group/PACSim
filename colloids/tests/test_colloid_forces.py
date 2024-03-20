@@ -18,7 +18,7 @@ class TestParameters(object):
 
     @pytest.fixture(scope="class")
     def surface_potential_two(self):
-        return -50.0 * (unit.milli * unit.volt)
+        return -40.0 * (unit.milli * unit.volt)
 
     @pytest.fixture(scope="class")
     def brush_density(self):
@@ -111,7 +111,7 @@ class TestExceptions(object):
             _ = forces.electrostatic_force
 
 
-class TestForcesForPair(TestParameters):
+class TestPotentialsForTwoParticles(TestParameters):
     @pytest.fixture(autouse=True, scope="class")
     def add_two_particles(self, openmm_system, colloid_forces,
                           radius_one, radius_two, surface_potential_one, surface_potential_two):
@@ -122,11 +122,105 @@ class TestForcesForPair(TestParameters):
         openmm_system.addForce(colloid_forces.steric_force)
         openmm_system.addForce(colloid_forces.electrostatic_force)
 
+    # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
+    # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
     @pytest.fixture(scope="class")
     def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
         return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
 
-    def test_force(self, openmm_context):
-        openmm_context.setPositions([[600.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+    # noinspection DuplicatedCode
+    def test_potential_parameters(self, openmm_context, radius_one, radius_two, brush_length, debye_length):
+        assert len(openmm_context.getSystem().getForces()) == 2
+        steric_force = openmm_context.getSystem().getForce(0)
+        electrostatic_force = openmm_context.getSystem().getForce(1)
+
+        assert steric_force.usesPeriodicBoundaryConditions()
+        assert electrostatic_force.usesPeriodicBoundaryConditions()
+
+        assert not steric_force.getUseLongRangeCorrection()
+        assert not electrostatic_force.getUseLongRangeCorrection()
+
+        assert not steric_force.getUseSwitchingFunction()
+
+        assert steric_force.getNonbondedMethod() == steric_force.CutoffPeriodic
+        assert electrostatic_force.getNonbondedMethod() == electrostatic_force.CutoffPeriodic
+
+        assert steric_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 2.0 * brush_length
+        assert electrostatic_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 20.0 * debye_length
+
+    @pytest.mark.parametrize("surface_separation,expected",
+                             [   # Test at h=0.
+                                 (10.0 * unit.nanometer, 1505.829355134808 * unit.kilojoule_per_mole),
+                                 # Test at h=2L.
+                                 (20.0 * unit.nanometer, -10.63613061419315 * unit.kilojoule_per_mole),
+                                 # Test slightly below h=2L where steric potential is not zero.
+                                 ((20.0 - 0.1) * unit.nanometer, -10.84996692702675 * unit.kilojoule_per_mole),
+                                 # Test slightly above h=2L where steric potential is strictly zero.
+                                 ((20.0 + 0.1) * unit.nanometer, -10.42552111714948 * unit.kilojoule_per_mole),
+                                 # Test at h=3L.
+                                 (30.0 * unit.nanometer, -1.439443749213437 * unit.kilojoule_per_mole),
+                                 # Test at h=20*debye_length, where electrostatic potential should not yet be cutoff.
+                                 (100.0 * unit.nanometer, -1.196938817005087e-6 * unit.kilojoule_per_mole)
+                             ])
+    def test_potential(self, openmm_context, radius_one, radius_two, surface_separation, expected):
+        openmm_context.setPositions([[radius_one + radius_two + surface_separation, 0.0, 0.0],
+                                     [0.0, 0.0, 0.0]])
         openmm_state = openmm_context.getState(getEnergy=True)
-        print(openmm_state.getPotentialEnergy())
+        assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+                == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-8, abs=1.0e-13))
+
+
+class TestPotentialsForFourParticles(TestParameters):
+    @pytest.fixture(autouse=True, scope="class")
+    def add_four_particles(self, openmm_system, colloid_forces,
+                           radius_one, radius_two, surface_potential_one, surface_potential_two):
+        for _ in range(2):
+            openmm_system.addParticle(mass=1.0)
+            colloid_forces.add_particle(radius=radius_one, surface_potential=surface_potential_one)
+        for _ in range(2):
+            openmm_system.addParticle(mass=1.0)
+            colloid_forces.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        openmm_system.addForce(colloid_forces.steric_force)
+        openmm_system.addForce(colloid_forces.electrostatic_force)
+
+    # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
+    # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
+    @pytest.fixture(scope="class")
+    def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
+        return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
+
+    # noinspection DuplicatedCode
+    def test_potential_parameters(self, openmm_context, radius_one, radius_two, brush_length, debye_length):
+        assert len(openmm_context.getSystem().getForces()) == 2
+        steric_force = openmm_context.getSystem().getForce(0)
+        electrostatic_force = openmm_context.getSystem().getForce(1)
+
+        assert steric_force.usesPeriodicBoundaryConditions()
+        assert electrostatic_force.usesPeriodicBoundaryConditions()
+
+        assert not steric_force.getUseLongRangeCorrection()
+        assert not electrostatic_force.getUseLongRangeCorrection()
+
+        assert not steric_force.getUseSwitchingFunction()
+
+        assert steric_force.getNonbondedMethod() == steric_force.CutoffPeriodic
+        assert electrostatic_force.getNonbondedMethod() == electrostatic_force.CutoffPeriodic
+
+        assert steric_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 2.0 * brush_length
+        assert electrostatic_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 20.0 * debye_length
+
+    def test_potential(self, openmm_context, radius_one, radius_two):
+        openmm_context.setPositions([[0.0, 0.0, 0.0],
+                                     # Place at h=30 with reference to first particle.
+                                     [2.0 * radius_one + 30.0 * unit.nanometer, 0.0, 0.0],
+                                     # Place at h=20 with reference to first particle.
+                                     [0.0, radius_one + radius_two + 20.0 * unit.nanometer, 0.0],
+                                     # Place at h=10 with reference to first particle.
+                                     [0.0, 0.0, radius_one + radius_two + 10.0 * unit.nanometer]])
+        openmm_state = openmm_context.getState(getEnergy=True)
+        assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+                == pytest.approx(1500.591138580165, rel=1.0e-8, abs=1.0e-13))
+
+
+if __name__ == '__main__':
+    pytest.main([__file__])

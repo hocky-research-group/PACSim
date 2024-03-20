@@ -28,6 +28,8 @@ class ColloidForces(object):
 
     TODO Implement the forces in a different class based on lookup tables.
 
+    TODO Implement alternative force according to Kangxin.
+
     :param brush_density:
         The polymer surface density in the Alexander-de Gennes polymer brush model [i.e., sigma in eq. (1)].
         The unit of the brush_density must be compatible with 1/nanometer^2 and the value must be greater than zero.

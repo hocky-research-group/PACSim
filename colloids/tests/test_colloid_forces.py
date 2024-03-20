@@ -4,51 +4,50 @@ from colloids.colloid_forces import ColloidForces
 
 
 class TestParameters(object):
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def radius_one(self):
         return 325.0 * unit.nanometer
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def radius_two(self):
         return 65.0 * unit.nanometer
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def surface_potential_one(self):
         return 50.0 * (unit.milli * unit.volt)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def surface_potential_two(self):
         return -50.0 * (unit.milli * unit.volt)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def brush_density(self):
         return 0.09 / (unit.nanometer ** 2)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def brush_length(self):
         return 10.0 * unit.nanometer
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def debye_length(self):
         return 5.0 * unit.nanometer
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def dielectric_constant(self):
         return 80.0
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def temperature(self):
         return 298.0 * unit.kelvin
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def maximum_surface_separation(self, radius_one, radius_two, debye_length):
         return 2.0 * max(radius_one, radius_two) + 21.0 * debye_length
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def side_length(self, radius_one, radius_two, maximum_surface_separation):
         # Make system very large so that we do not care about periodic boundaries.
-        return 20.0 * (maximum_surface_separation
-                       + radius_one.value_in_unit(unit.nanometer) + radius_two.value_in_unit(unit.nanometer))
+        return 20.0 * (maximum_surface_separation + 2.0 * max(radius_one, radius_two))
 
     @pytest.fixture(scope="class")
     def openmm_system(self, side_length):
@@ -126,3 +125,8 @@ class TestForcesForPair(TestParameters):
     @pytest.fixture(scope="class")
     def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
         return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
+
+    def test_force(self, openmm_context):
+        openmm_context.setPositions([[600.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+        openmm_state = openmm_context.getState(getEnergy=True)
+        print(openmm_state.getPotentialEnergy())

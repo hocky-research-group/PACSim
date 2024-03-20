@@ -30,8 +30,6 @@ class ColloidForces(object):
 
     TODO Implement alternative force according to Kangxin.
 
-    TODO Check potential function again in original paper.
-
     TODO Switch on smooth cutoff for electrostatic force.
 
     :param brush_density:

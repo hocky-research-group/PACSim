@@ -17,10 +17,13 @@ class ColloidForces(object):
     electrostatic_force properties, the add_particle method has to be called for each colloid in the system to define
     its radius and surface potential.
 
-    The cutoff of the electrostatic force is set to 2.0 * r_max + 20.0 * debye_length, where r_max is the largest radius
+    The cutoff of the electrostatic force is set to 2.0 * r_max + 21.0 * debye_length, where r_max is the largest radius
     of the colloids in the system and debye_length is the Debye screening length. The largest r_max is automatically
-    determined when the add_particle method is called. The cutoff of the steric force is set to
-    2.0 * r_max + 2.0 * brush_length, where brush_length is the thickness of the polymer brush.
+    determined when the add_particle method is called. A switching function reduces the interaction at distances larger
+    than 2.0 * r_max + 20.0 * debye_length to make the potential and forces go smoothly to 0 at the cutoff distance.
+
+    The cutoff of the steric force is set to 2.0 * r_max + 2.0 * brush_length, where brush_length is the thickness of
+    the polymer brush.
 
     Note that the steric force from the Alexander-de Gennes polymer brush model uses the mixing rule
     r = r_1 + r_2 / 2.0 for the prefactor [see eq. (1)], whereas the electrostatic force from DLVO theory uses
@@ -29,8 +32,6 @@ class ColloidForces(object):
     TODO Implement the forces in a different class based on lookup tables.
 
     TODO Implement alternative force according to Kangxin.
-
-    TODO Switch on smooth cutoff for electrostatic force.
 
     :param brush_density:
         The polymer surface density in the Alexander-de Gennes polymer brush model [i.e., sigma in eq. (1)].
@@ -216,9 +217,11 @@ class ColloidForces(object):
                                "electrostatic_force can be accessed")
         self._electrostatic_force.setNonbondedMethod(self._electrostatic_force.CutoffPeriodic)
         self._electrostatic_force.setCutoffDistance(
-            (2.0 * self._max_radius + 20.0 * self._debye_length).value_in_unit(unit.nanometer))
+            (2.0 * self._max_radius + 21.0 * self._debye_length).value_in_unit(unit.nanometer))
         self._electrostatic_force.setUseLongRangeCorrection(False)
-        self._electrostatic_force.setUseSwitchingFunction(False)
+        self._electrostatic_force.setUseSwitchingFunction(True)
+        self._electrostatic_force.setSwitchingDistance(
+            (2.0 * self._max_radius + 20.0 * self._debye_length).value_in_unit(unit.nanometer))
         return self._electrostatic_force
 
 

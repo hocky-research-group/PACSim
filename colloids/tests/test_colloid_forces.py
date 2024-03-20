@@ -141,12 +141,14 @@ class TestPotentialsForTwoParticles(TestParameters):
         assert not electrostatic_force.getUseLongRangeCorrection()
 
         assert not steric_force.getUseSwitchingFunction()
+        assert electrostatic_force.getUseSwitchingFunction()
+        assert electrostatic_force.getSwitchingDistance() == 2.0 * max(radius_one, radius_two) + 20.0 * debye_length
 
         assert steric_force.getNonbondedMethod() == steric_force.CutoffPeriodic
         assert electrostatic_force.getNonbondedMethod() == electrostatic_force.CutoffPeriodic
 
         assert steric_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 2.0 * brush_length
-        assert electrostatic_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 20.0 * debye_length
+        assert electrostatic_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 21.0 * debye_length
 
     @pytest.mark.parametrize("surface_separation,expected",
                              [   # Test at h=0.
@@ -202,12 +204,14 @@ class TestPotentialsForFourParticles(TestParameters):
         assert not electrostatic_force.getUseLongRangeCorrection()
 
         assert not steric_force.getUseSwitchingFunction()
+        assert electrostatic_force.getUseSwitchingFunction()
+        assert electrostatic_force.getSwitchingDistance() == 2.0 * max(radius_one, radius_two) + 20.0 * debye_length
 
         assert steric_force.getNonbondedMethod() == steric_force.CutoffPeriodic
         assert electrostatic_force.getNonbondedMethod() == electrostatic_force.CutoffPeriodic
 
         assert steric_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 2.0 * brush_length
-        assert electrostatic_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 20.0 * debye_length
+        assert electrostatic_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 21.0 * debye_length
 
     def test_potential(self, openmm_context, radius_one, radius_two):
         openmm_context.setPositions([[0.0, 0.0, 0.0],

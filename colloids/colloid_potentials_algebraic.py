@@ -3,10 +3,10 @@ from openmm import CustomNonbondedForce, unit
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
 
-class ColloidPotentials(object):
+class ColloidPotentialsAlgebraic(object):
     """
     This class sets up the steric and electrostatic pair potentials between colloids in a solution with periodic
-    boundary conditions using the CustomNonbondedForces class of openmm.
+    boundary conditions using the CustomNonbondedForces class of openmm with an algebraic expression.
 
     The potentials are given in Hueckel, Hocky, Palacci & Sacanna, Nature 580, 487--490 (2020)
     (see https://doi.org/10.1038/s41586-020-2205-0). Any references to equations or symbols in the code refer to this
@@ -48,7 +48,7 @@ class ColloidPotentials(object):
 
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
                  use_log: bool = True) -> None:
-        """Constructor of the ColloidPotentials class."""
+        """Constructor of the ColloidPotentialsAlgebraic class."""
         self._parameters = colloid_potentials_parameters
         self._use_log = use_log
         self._steric_potential = self._set_up_steric_potential()
@@ -189,4 +189,4 @@ class ColloidPotentials(object):
 
 
 if __name__ == '__main__':
-    ColloidPotentials()
+    ColloidPotentialsAlgebraic()

@@ -86,12 +86,31 @@ class TestParameters(object):
 
 
 class TestColloidPotentialsAlgebraicExceptions(object):
-    def test_exceptions_no_particles_added(self):
+    def test_exception_radius(self):
+        potentials = ColloidPotentialsAlgebraic()
+        with pytest.raises(TypeError):
+            potentials.add_particle(radius=1.0 / unit.nanometer, surface_potential=1.0 * (unit.milli * unit.volt))
+        with pytest.raises(ValueError):
+            potentials.add_particle(radius=-1.0 * unit.nanometer, surface_potential=1.0 * (unit.milli * unit.volt))
+
+    def test_exception_surface_potential(self):
+        potentials = ColloidPotentialsAlgebraic()
+        with pytest.raises(TypeError):
+            potentials.add_particle(radius=1.0 * unit.nanometer, surface_potential=1.0 / (unit.milli * unit.volt))
+
+    def test_exception_no_particles_added(self):
         potentials = ColloidPotentialsAlgebraic()
         with pytest.raises(RuntimeError):
-            _ = potentials.steric_potential
+            for _ in potentials.yield_potentials():
+                pass
+
+    def test_exception_add_particle_after_yield_potentials(self):
+        potentials = ColloidPotentialsAlgebraic()
+        potentials.add_particle(radius=1.0 * unit.nanometer, surface_potential=1.0 * (unit.milli * unit.volt))
+        for _ in potentials.yield_potentials():
+            pass
         with pytest.raises(RuntimeError):
-            _ = potentials.electrostatic_potential
+            potentials.add_particle(radius=1.0 * unit.nanometer, surface_potential=1.0 * (unit.milli * unit.volt))
 
 
 # noinspection DuplicatedCode
@@ -103,8 +122,8 @@ class TestColloidPotentialsAlgebraicForTwoParticles(TestParameters):
         colloid_potentials_algebraic.add_particle(radius=radius_one, surface_potential=surface_potential_one)
         openmm_system.addParticle(mass=1.0)
         colloid_potentials_algebraic.add_particle(radius=radius_two, surface_potential=surface_potential_two)
-        openmm_system.addForce(colloid_potentials_algebraic.steric_potential)
-        openmm_system.addForce(colloid_potentials_algebraic.electrostatic_potential)
+        for potential in colloid_potentials_algebraic.yield_potentials():
+            openmm_system.addForce(potential)
 
     # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
     # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
@@ -165,8 +184,8 @@ class TestColloidPotentialsAlgebraicWithLogForTwoParticles(TestParameters):
         colloid_potentials_algebraic_log.add_particle(radius=radius_one, surface_potential=surface_potential_one)
         openmm_system.addParticle(mass=1.0)
         colloid_potentials_algebraic_log.add_particle(radius=radius_two, surface_potential=surface_potential_two)
-        openmm_system.addForce(colloid_potentials_algebraic_log.steric_potential)
-        openmm_system.addForce(colloid_potentials_algebraic_log.electrostatic_potential)
+        for potential in colloid_potentials_algebraic_log.yield_potentials():
+            openmm_system.addForce(potential)
 
     # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
     # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
@@ -229,8 +248,8 @@ class TestColloidPotentialsAlgebraicForFourParticles(TestParameters):
         for _ in range(2):
             openmm_system.addParticle(mass=1.0)
             colloid_potentials_algebraic.add_particle(radius=radius_two, surface_potential=surface_potential_two)
-        openmm_system.addForce(colloid_potentials_algebraic.steric_potential)
-        openmm_system.addForce(colloid_potentials_algebraic.electrostatic_potential)
+        for potential in colloid_potentials_algebraic.yield_potentials():
+            openmm_system.addForce(potential)
 
     # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
     # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
@@ -284,8 +303,8 @@ class TestColloidPotentialsAlgebraicWithLogForFourParticles(TestParameters):
         for _ in range(2):
             openmm_system.addParticle(mass=1.0)
             colloid_potentials_algebraic_log.add_particle(radius=radius_two, surface_potential=surface_potential_two)
-        openmm_system.addForce(colloid_potentials_algebraic_log.steric_potential)
-        openmm_system.addForce(colloid_potentials_algebraic_log.electrostatic_potential)
+        for potential in colloid_potentials_algebraic_log.yield_potentials():
+            openmm_system.addForce(potential)
 
     # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
     # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).

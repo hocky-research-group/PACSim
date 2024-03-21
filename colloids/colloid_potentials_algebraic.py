@@ -1,9 +1,11 @@
 import math
+from typing import Iterator
 from openmm import CustomNonbondedForce, unit
+from colloids.colloid_potentials_abstract import ColloidPotentialsAbstract
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
 
-class ColloidPotentialsAlgebraic(object):
+class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
     """
     This class sets up the steric and electrostatic pair potentials between colloids in a solution with periodic
     boundary conditions using the CustomNonbondedForces class of openmm with an algebraic expression.
@@ -12,11 +14,11 @@ class ColloidPotentialsAlgebraic(object):
     (see https://doi.org/10.1038/s41586-020-2205-0). Any references to equations or symbols in the code refer to this
     paper.
 
-    The steric potential from the Alexander-de Gennes polymer brush model between two colloids depends their radii r_1
-    and r_2. Similarly, the electrostatic potential from DLVO theory between two colloids depends on their radii r_1 and
-    r_2 and their surface potentials psi_1 and psi_2. Before the potentials can be accessed via the steric_potential and
-    the electrostatic_potential properties, the add_particle method has to be called for each colloid in the system to
-    define its radius and surface potential.
+    The steric potential from the Alexander-de Gennes polymer brush model between two colloids depends on their radii
+    r_1 and r_2. Similarly, the electrostatic potential from DLVO theory between two colloids depends on their radii r_1
+    and r_2 and their surface potentials psi_1 and psi_2. Before the finalized potentials are generated via the
+    yield_potentials method in order to add them to the openmm system (using the system.addForce method), the
+    add_particle method has to be called for each colloid in the system to define its radius and surface potential.
 
     The cutoff of the electrostatic potential is set to 2.0 * r_max + 21.0 * debye_length, where r_max is the largest
     radius of the colloids in the system and debye_length is the Debye screening length that is stored in the
@@ -30,8 +32,6 @@ class ColloidPotentialsAlgebraic(object):
     Note that the steric potential from the Alexander-de Gennes polymer brush model uses the mixing rule
     r = r_1 + r_2 / 2.0 for the prefactor [see eq. (1)], whereas the electrostatic potential from DLVO theory uses
     r = 2.0 / (1.0 / r_1 + 1.0 / r_2) for the prefactor.
-
-    TODO Implement the forces in a different class based on lookup tables and benchmark.
 
     :param colloid_potentials_parameters:
         The parameters of the steric and electrostatic pair potentials between colloidal particles.
@@ -49,7 +49,7 @@ class ColloidPotentialsAlgebraic(object):
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
                  use_log: bool = True) -> None:
         """Constructor of the ColloidPotentialsAlgebraic class."""
-        self._parameters = colloid_potentials_parameters
+        super().__init__(colloid_potentials_parameters)
         self._use_log = use_log
         self._steric_potential = self._set_up_steric_potential()
         self._electrostatic_potential = self._set_up_electrostatic_potential()
@@ -113,7 +113,7 @@ class ColloidPotentialsAlgebraic(object):
         """
         Add a colloid with a given radius and surface potential to the system.
 
-        This function has to be called for every particle in the system.
+        This method has to be called for every particle in the system before the method yield_potentials is used.
 
         :param radius:
             The radius of the colloid.
@@ -125,16 +125,13 @@ class ColloidPotentialsAlgebraic(object):
         :type surface_potential: unit.Quantity
 
         :raises TypeError:
-            If the radius or surface_potential is not a Quantity with a proper unit.
+            If the radius or surface_potential is not a Quantity with a proper unit (via the abstract base class).
         :raises ValueError:
-            If the radius is not greater than zero.
+            If the radius is not greater than zero (via the abstract base class).
+        :raises RuntimeError:
+            If the method yield_potentials was called before this method (via the abstract base class).
         """
-        if not radius.unit.is_compatible(unit.nanometer):
-            raise TypeError("argument radius must have a unit that is compatible with nanometers")
-        if not radius.value_in_unit(unit.nanometer) > 0.0:
-            raise ValueError("argument radius must have a value greater than zero")
-        if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
-            raise TypeError("argument surface_potential must have a unit that is compatible with volts")
+        super().add_particle(radius, surface_potential)
 
         if radius.in_units_of(unit.nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(unit.nanometer)
@@ -143,41 +140,29 @@ class ColloidPotentialsAlgebraic(object):
         self._electrostatic_potential.addParticle([radius.value_in_unit(unit.nanometer),
                                                    surface_potential.value_in_unit(unit.milli * unit.volt)])
 
-    @property
-    def steric_potential(self) -> CustomNonbondedForce:
+    def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """
-        Return the steric potential/force between the colloids in the system.
+        Generate all potentials in the systems that are necessary to properly include the steric and electrostatic pair
+        potentials between colloids in a solution in an openmm system.
 
-        :return: The steric potential/force.
-        :rtype: CustomNonbondedForce
+        This method has to be called after the method add_particle was called for every particle in the system.
+
+        :return:
+            A generator that yields the steric and electrostatic potentials handled by this class.
+        :rtype: Iterator[CustomNonbondedForce]
 
         :raises RuntimeError:
-            If no particles have been added to the system via the add_particle method.
+            If the method add_particle was not called before this method (via the abstract base class).
         """
-        if math.isinf(self._max_radius.value_in_unit(unit.nanometer)):
-            raise RuntimeError("particles have to be added to the system via the add_particle method before the "
-                               "steric_force can be accessed")
+        super().yield_potentials()
+        assert not math.isinf(self._max_radius.value_in_unit(unit.nanometer))
+
         self._steric_potential.setNonbondedMethod(self._steric_potential.CutoffPeriodic)
         self._steric_potential.setCutoffDistance(
             (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(unit.nanometer))
         self._steric_potential.setUseLongRangeCorrection(False)
         self._steric_potential.setUseSwitchingFunction(False)
-        return self._steric_potential
 
-    @property
-    def electrostatic_potential(self) -> CustomNonbondedForce:
-        """
-        Return the electrostatic potential/force between the colloids in the system.
-
-        :return: The electrostatic potential/force.
-        :rtype: CustomNonbondedForce
-
-        :raises RuntimeError:
-            If no particles have been added to the system via the add_particle method.
-        """
-        if math.isinf(self._max_radius.value_in_unit(unit.nanometer)):
-            raise RuntimeError("particles have to be added to the system via the add_particle method before the "
-                               "electrostatic_force can be accessed")
         self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffPeriodic)
         self._electrostatic_potential.setCutoffDistance(
             (2.0 * self._max_radius + 21.0 * self._parameters.debye_length).value_in_unit(unit.nanometer))
@@ -185,7 +170,9 @@ class ColloidPotentialsAlgebraic(object):
         self._electrostatic_potential.setUseSwitchingFunction(True)
         self._electrostatic_potential.setSwitchingDistance(
             (2.0 * self._max_radius + 20.0 * self._parameters.debye_length).value_in_unit(unit.nanometer))
-        return self._electrostatic_potential
+
+        yield self._steric_potential
+        yield self._electrostatic_potential
 
 
 if __name__ == '__main__':

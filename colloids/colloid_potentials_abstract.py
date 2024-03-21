@@ -18,17 +18,17 @@ class ColloidPotentialsAbstract(ABC):
     The steric potential from the Alexander-de Gennes polymer brush model between two colloids depends on their radii
     r_1 and r_2. Similarly, the electrostatic potential from DLVO theory between two colloids depends on their radii r_1
     and r_2 and their surface potentials psi_1 and psi_2. Before the finalized potentials are generated via the
-    yield_potentials method in order to the openmm system (using the system.addForce method), the add_particle method
-    has to be called for each colloid in the system to define its radius and surface potential.
+    yield_potentials method in order to add them to the openmm system (using the system.addForce method), the
+    add_particle method has to be called for each colloid in the system to define its radius and surface potential.
 
     :param colloid_potentials_parameters:
         The parameters of the steric and electrostatic pair potentials between colloidal particles.
-        Defaults to the default parameters of the ColloidPotentialsParameters class.
     :type colloid_potentials_parameters: ColloidPotentialsParameters
     """
 
-    def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters()):
-        self._colloid_potentials_parameters = colloid_potentials_parameters
+    def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters):
+        """Constructor of the ColloidPotentialsAbstract class."""
+        self._parameters = colloid_potentials_parameters
         self._add_particle_called = False
         self._yield_potentials_called = False
 
@@ -37,7 +37,7 @@ class ColloidPotentialsAbstract(ABC):
         """
         Add a colloid with a given radius and surface potential to the system.
 
-        This function has to be called for every particle in the system.
+        This method has to be called for every particle in the system before the method yield_potentials is used.
 
         Note that the overriding method in the inheriting class should call this method first because it checks the
         input arguments and that the method yield_potentials was not called before.

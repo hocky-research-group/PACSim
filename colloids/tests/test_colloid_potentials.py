@@ -1,6 +1,7 @@
 from openmm import Context, LangevinIntegrator, Platform, System, unit
 import pytest
-from colloids.colloid_forces import ColloidForces
+from colloids.colloid_potentials import ColloidPotentials
+from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
 
 class TestParameters(object):
@@ -41,8 +42,15 @@ class TestParameters(object):
         return 298.0 * unit.kelvin
 
     @pytest.fixture(scope="class")
+    def colloid_potentials_parameters(self, brush_density, brush_length, debye_length, temperature,
+                                      dielectric_constant):
+        return ColloidPotentialsParameters(brush_density=brush_density, brush_length=brush_length,
+                                           debye_length=debye_length, temperature=temperature,
+                                           dielectric_constant=dielectric_constant)
+
+    @pytest.fixture(scope="class")
     def maximum_surface_separation(self, radius_one, radius_two, debye_length):
-        return 2.0 * max(radius_one, radius_two) + 21.0 * debye_length
+        return 100.0 * unit.nanometer
 
     @pytest.fixture(scope="class")
     def side_length(self, radius_one, radius_two, maximum_surface_separation):
@@ -61,14 +69,12 @@ class TestParameters(object):
         return system
 
     @pytest.fixture(scope="class")
-    def colloid_forces(self, brush_density, brush_length, debye_length, temperature, dielectric_constant):
-        return ColloidForces(brush_density=brush_density, brush_length=brush_length, debye_length=debye_length,
-                             temperature=temperature, dielectric_constant=dielectric_constant, use_log=False)
+    def colloid_potentials(self, colloid_potentials_parameters):
+        return ColloidPotentials(colloid_potentials_parameters=colloid_potentials_parameters, use_log=False)
 
     @pytest.fixture(scope="class")
-    def colloid_forces_log(self, brush_density, brush_length, debye_length, temperature, dielectric_constant):
-        return ColloidForces(brush_density=brush_density, brush_length=brush_length, debye_length=debye_length,
-                             temperature=temperature, dielectric_constant=dielectric_constant, use_log=True)
+    def colloid_potentials_log(self, colloid_potentials_parameters):
+        return ColloidPotentials(colloid_potentials_parameters=colloid_potentials_parameters, use_log=True)
 
     @pytest.fixture(scope="class")
     def openmm_platform(self):
@@ -79,54 +85,26 @@ class TestParameters(object):
         return LangevinIntegrator(0.0, 0.0, 0.0)
 
 
-class TestExceptions(object):
-    def test_exceptions_brush_density(self):
-        with pytest.raises(TypeError):
-            ColloidForces(brush_density=0.09 / unit.nanometer)
-        with pytest.raises(ValueError):
-            ColloidForces(brush_density=-0.09 / unit.nanometer ** 2)
-
-    def test_exceptions_brush_length(self):
-        with pytest.raises(TypeError):
-            ColloidForces(brush_length=10.0 / unit.nanometer)
-        with pytest.raises(ValueError):
-            ColloidForces(brush_length=-10.0 * unit.nanometer)
-
-    def test_exceptions_debye_length(self):
-        with pytest.raises(TypeError):
-            ColloidForces(debye_length=5.0 / unit.nanometer)
-        with pytest.raises(ValueError):
-            ColloidForces(debye_length=-5.0 * unit.nanometer)
-
-    def test_exceptions_temperature(self):
-        with pytest.raises(TypeError):
-            ColloidForces(temperature=298.0 / unit.kelvin)
-        with pytest.raises(ValueError):
-            ColloidForces(temperature=-298.0 * unit.kelvin)
-
-    def test_exceptions_dielectric_constant(self):
-        with pytest.raises(ValueError):
-            ColloidForces(dielectric_constant=-80.0)
-
+class TestColloidPotentialsExceptions(object):
     def test_exceptions_no_particles_added(self):
-        forces = ColloidForces()
+        potentials = ColloidPotentials()
         with pytest.raises(RuntimeError):
-            _ = forces.steric_force
+            _ = potentials.steric_potential
         with pytest.raises(RuntimeError):
-            _ = forces.electrostatic_force
+            _ = potentials.electrostatic_potential
 
 
 # noinspection DuplicatedCode
 class TestPotentialForTwoParticles(TestParameters):
     @pytest.fixture(autouse=True, scope="class")
-    def add_two_particles(self, openmm_system, colloid_forces,
+    def add_two_particles(self, openmm_system, colloid_potentials,
                           radius_one, radius_two, surface_potential_one, surface_potential_two):
         openmm_system.addParticle(mass=1.0)
-        colloid_forces.add_particle(radius=radius_one, surface_potential=surface_potential_one)
+        colloid_potentials.add_particle(radius=radius_one, surface_potential=surface_potential_one)
         openmm_system.addParticle(mass=1.0)
-        colloid_forces.add_particle(radius=radius_two, surface_potential=surface_potential_two)
-        openmm_system.addForce(colloid_forces.steric_force)
-        openmm_system.addForce(colloid_forces.electrostatic_force)
+        colloid_potentials.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        openmm_system.addForce(colloid_potentials.steric_potential)
+        openmm_system.addForce(colloid_potentials.electrostatic_potential)
 
     # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
     # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
@@ -181,14 +159,14 @@ class TestPotentialForTwoParticles(TestParameters):
 # noinspection DuplicatedCode
 class TestPotentialWithLogForTwoParticles(TestParameters):
     @pytest.fixture(autouse=True, scope="class")
-    def add_two_particles(self, openmm_system, colloid_forces_log,
+    def add_two_particles(self, openmm_system, colloid_potentials_log,
                           radius_one, radius_two, surface_potential_one, surface_potential_two):
         openmm_system.addParticle(mass=1.0)
-        colloid_forces_log.add_particle(radius=radius_one, surface_potential=surface_potential_one)
+        colloid_potentials_log.add_particle(radius=radius_one, surface_potential=surface_potential_one)
         openmm_system.addParticle(mass=1.0)
-        colloid_forces_log.add_particle(radius=radius_two, surface_potential=surface_potential_two)
-        openmm_system.addForce(colloid_forces_log.steric_force)
-        openmm_system.addForce(colloid_forces_log.electrostatic_force)
+        colloid_potentials_log.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        openmm_system.addForce(colloid_potentials_log.steric_potential)
+        openmm_system.addForce(colloid_potentials_log.electrostatic_potential)
 
     # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
     # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
@@ -243,16 +221,16 @@ class TestPotentialWithLogForTwoParticles(TestParameters):
 # noinspection DuplicatedCode
 class TestPotentialForFourParticles(TestParameters):
     @pytest.fixture(autouse=True, scope="class")
-    def add_four_particles(self, openmm_system, colloid_forces,
+    def add_four_particles(self, openmm_system, colloid_potentials,
                            radius_one, radius_two, surface_potential_one, surface_potential_two):
         for _ in range(2):
             openmm_system.addParticle(mass=1.0)
-            colloid_forces.add_particle(radius=radius_one, surface_potential=surface_potential_one)
+            colloid_potentials.add_particle(radius=radius_one, surface_potential=surface_potential_one)
         for _ in range(2):
             openmm_system.addParticle(mass=1.0)
-            colloid_forces.add_particle(radius=radius_two, surface_potential=surface_potential_two)
-        openmm_system.addForce(colloid_forces.steric_force)
-        openmm_system.addForce(colloid_forces.electrostatic_force)
+            colloid_potentials.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        openmm_system.addForce(colloid_potentials.steric_potential)
+        openmm_system.addForce(colloid_potentials.electrostatic_potential)
 
     # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
     # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
@@ -298,16 +276,16 @@ class TestPotentialForFourParticles(TestParameters):
 # noinspection DuplicatedCode
 class TestPotentialWithLogForFourParticles(TestParameters):
     @pytest.fixture(autouse=True, scope="class")
-    def add_four_particles(self, openmm_system, colloid_forces_log,
+    def add_four_particles(self, openmm_system, colloid_potentials_log,
                            radius_one, radius_two, surface_potential_one, surface_potential_two):
         for _ in range(2):
             openmm_system.addParticle(mass=1.0)
-            colloid_forces_log.add_particle(radius=radius_one, surface_potential=surface_potential_one)
+            colloid_potentials_log.add_particle(radius=radius_one, surface_potential=surface_potential_one)
         for _ in range(2):
             openmm_system.addParticle(mass=1.0)
-            colloid_forces_log.add_particle(radius=radius_two, surface_potential=surface_potential_two)
-        openmm_system.addForce(colloid_forces_log.steric_force)
-        openmm_system.addForce(colloid_forces_log.electrostatic_force)
+            colloid_potentials_log.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        openmm_system.addForce(colloid_potentials_log.steric_potential)
+        openmm_system.addForce(colloid_potentials_log.electrostatic_potential)
 
     # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
     # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).

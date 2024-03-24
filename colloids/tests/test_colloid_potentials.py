@@ -1,8 +1,6 @@
 from openmm import Context, LangevinIntegrator, Platform, System, unit, Vec3
 import pytest
-from colloids.colloid_potentials_algebraic import ColloidPotentialsAlgebraic
-from colloids.colloid_potentials_tabulated import ColloidPotentialsTabulated
-from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
+from colloids import ColloidPotentialsParameters, ColloidPotentialsAlgebraic, ColloidPotentialsTabulated
 
 
 class TestParameters(object):

@@ -35,6 +35,8 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
     r = r_1 + r_2 / 2.0 for the prefactor [see eq. (1)], whereas the electrostatic potential from DLVO theory uses
     r = 2.0 / (1.0 / r_1 + 1.0 / r_2) for the prefactor.
 
+    # TODO: Compare smoothing to Michael's way, benchmark.
+
     :param radius_one:
         The radius of the first type of colloid.
         The unit of the radius_one must be compatible with nanometers and the value must be greater than zero.
@@ -54,6 +56,13 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         The parameters of the steric and electrostatic pair potentials between colloidal particles.
         Defaults to the default parameters of the ColloidPotentialsParameters class.
     :type colloid_potentials_parameters: ColloidPotentialsParameters
+    :param use_log:
+        If True, the electrostatic force uses the more accurate equation involving a logarithm [i.e., eq. (12.5.2) in
+        Hunter, Foundations of Colloid Science (Oxford University Press, 2001), 2nd edition] instead of the simpler
+        equation that only involves an exponential [i.e., eq. (12.5.5) in Hunter, Foundations of Colloid Science
+        (Oxford University Press, 2001), 2nd edition].
+        Defaults to True.
+    :type use_log: bool
 
     :raises TypeError:
         If the radius_one, radius_two, surface_potential_one, or surface_potential_two is not a Quantity with a proper
@@ -64,7 +73,8 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
     def __init__(self, radius_one: unit.Quantity, radius_two: unit.Quantity,
                  surface_potential_one: unit.Quantity, surface_potential_two: unit.Quantity,
-                 colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters()) -> None:
+                 colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
+                 use_log: bool = True) -> None:
         """Constructor of the ColloidPotentialsTabulated class."""
         super().__init__(colloid_potentials_parameters)
 
@@ -85,7 +95,9 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         self._radius_two = radius_two.in_units_of(unit.nanometer)
         self._surface_potential_one = surface_potential_one.in_units_of(unit.milli * unit.volt)
         self._surface_potential_two = surface_potential_two.in_units_of(unit.milli * unit.volt)
-        self._maximum_surface_separation = 20.0 * self._parameters.debye_length
+        self._use_log = use_log
+        self._maximum_surface_separation = 21.0 * self._parameters.debye_length
+        self._switch_off_distance = 20.0 * self._parameters.debye_length
         self._number_samples = 5000
         self._potential_11, self._potential_22, self._potential_12 = self._set_up_potentials()
         self._current_particle_index = 0
@@ -108,9 +120,11 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
     def _electrostatic_potential(self, prefactor: float, h_values: npt.NDArray[float]) -> npt.NDArray[float]:
         """Return the electrostatic potential from DLVO theory for the given surface-to-surface separations."""
-        # TODO: Smooth cutoff. Allow for log.
         debye_length = self._parameters.debye_length.value_in_unit(unit.nanometer)
-        return prefactor * np.exp(-h_values / debye_length)
+        if self._use_log:
+            return prefactor * np.log(1.0 + np.exp(-h_values / debye_length))
+        else:
+            return prefactor * np.exp(-h_values / debye_length)
 
     def _set_up_potentials(self) -> (CustomNonbondedForce, CustomNonbondedForce, CustomNonbondedForce):
         """Set up the CustomNonbondedForce instances based on tabulated functions."""
@@ -178,21 +192,27 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         potential_11.addTabulatedFunction("tabulated_function_11", tabulated_function_11)
         potential_11.setNonbondedMethod(potential_11.CutoffPeriodic)
         potential_11.setCutoffDistance(r_values_11[-1])
-        potential_11.setUseSwitchingFunction(False)
+        potential_11.setUseSwitchingFunction(True)
+        potential_11.setSwitchingDistance((self._switch_off_distance
+                                          + 2.0 * self._radius_one).value_in_unit(unit.nanometer))
         potential_11.setUseLongRangeCorrection(False)
 
         potential_22 = CustomNonbondedForce("tabulated_function_22(r)")
         potential_22.addTabulatedFunction("tabulated_function_22", tabulated_function_22)
         potential_22.setNonbondedMethod(potential_22.CutoffPeriodic)
         potential_22.setCutoffDistance(r_values_22[-1])
-        potential_22.setUseSwitchingFunction(False)
+        potential_22.setUseSwitchingFunction(True)
+        potential_22.setSwitchingDistance((self._switch_off_distance
+                                          + 2.0 * self._radius_two).value_in_unit(unit.nanometer))
         potential_22.setUseLongRangeCorrection(False)
 
         potential_12 = CustomNonbondedForce("tabulated_function_12(r)")
         potential_12.addTabulatedFunction("tabulated_function_12", tabulated_function_12)
         potential_12.setNonbondedMethod(potential_12.CutoffPeriodic)
         potential_12.setCutoffDistance(r_values_12[-1])
-        potential_12.setUseSwitchingFunction(False)
+        potential_12.setUseSwitchingFunction(True)
+        potential_12.setSwitchingDistance((self._switch_off_distance
+                                          + self._radius_one + self._radius_two).value_in_unit(unit.nanometer))
         potential_12.setUseLongRangeCorrection(False)
 
         return potential_11, potential_22, potential_12
@@ -242,7 +262,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
                     "as the radius of the second colloid)")
             self._indices_two.append(self._current_particle_index)
         else:
-            raise RuntimeError(
+            raise ValueError(
                 "the given radius must be the same as the radius of the first or the second colloid that was specified "
                 "during the initialization of this class")
         self._potential_11.addParticle([])

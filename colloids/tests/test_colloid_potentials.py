@@ -1,4 +1,4 @@
-from openmm import Context, LangevinIntegrator, Platform, System, unit
+from openmm import Context, LangevinIntegrator, Platform, System, unit, Vec3
 import pytest
 from colloids.colloid_potentials_algebraic import ColloidPotentialsAlgebraic
 from colloids.colloid_potentials_tabulated import ColloidPotentialsTabulated
@@ -63,10 +63,9 @@ class TestParameters(object):
         system = System()
         # Make system very large so that we do not care about periodic boundaries.
         side_length_value = side_length.value_in_unit(unit.nanometer)
-        # noinspection PyTypeChecker
-        system.setDefaultPeriodicBoxVectors([side_length_value, 0.0, 0.0],
-                                            [0.0, side_length_value, 0.0],
-                                            [0.0, 0.0, side_length_value])
+        system.setDefaultPeriodicBoxVectors(Vec3(side_length_value, 0.0, 0.0),
+                                            Vec3(0.0, side_length_value, 0.0),
+                                            Vec3(0.0, 0.0, side_length_value))
         return system
 
     @pytest.fixture

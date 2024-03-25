@@ -111,6 +111,6 @@ if __name__ == '__main__':
             for potentials in ("algebraic", "tabulated"):
                 try:
                     main(platform_name=platform, potentials=potentials, use_log=use_log, number_steps=number_steps)
-                except openmm.OpenMMException:
-                    print(f"Platform {platform} not available.")
+                except openmm.OpenMMException as err:
+                    print(err)
         print()

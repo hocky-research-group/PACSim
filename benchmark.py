@@ -106,16 +106,11 @@ def main(platform_name: str = "Reference", potentials: str = "algebraic", use_lo
 
 
 if __name__ == '__main__':
-    main(platform_name="Reference", potentials="algebraic", use_log=False, number_steps=10)
-    main(platform_name="Reference", potentials="tabulated", use_log=False, number_steps=10)
-    main(platform_name="CPU", potentials="algebraic", use_log=False, number_steps=1000)
-    main(platform_name="CPU", potentials="tabulated", use_log=False, number_steps=1000)
-    main(platform_name="OpenCL", potentials="algebraic", use_log=False, number_steps=1000)
-    main(platform_name="OpenCL", potentials="tabulated", use_log=False, number_steps=1000)
-    print()
-    main(platform_name="Reference", potentials="algebraic", use_log=True, number_steps=10)
-    main(platform_name="Reference", potentials="tabulated", use_log=True, number_steps=10)
-    main(platform_name="CPU", potentials="algebraic", use_log=True, number_steps=1000)
-    main(platform_name="CPU", potentials="tabulated", use_log=True, number_steps=1000)
-    main(platform_name="OpenCL", potentials="algebraic", use_log=True, number_steps=1000)
-    main(platform_name="OpenCL", potentials="tabulated", use_log=True, number_steps=1000)
+    for use_log in (False, True):
+        for platform, number_steps in zip(("Reference", "CPU", "OpenCL", "CUDA"), (10, 1000, 1000, 1000)):
+            for potentials in ("algebraic", "tabulated"):
+                try:
+                    main(platform_name=platform, potentials=potentials, use_log=use_log, number_steps=number_steps)
+                except openmm.OpenMMException:
+                    print(f"Platform {platform} not available.")
+        print()

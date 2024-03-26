@@ -416,17 +416,38 @@ class TestColloidPotentialsForFourParticles(TestParameters):
             assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(2, 3), (2, 3)]
             assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0, 1), (2, 3)]
 
-    def test_potential(self, openmm_context, radius_one, radius_two):
-        openmm_context.setPositions([[0.0, 0.0, 0.0],
+    @pytest.mark.parametrize("positions,expected",
+                             [
+                                 ([[0.0, 0.0, 0.0],
                                      # Place at h=30 with reference to first particle.
-                                     [2.0 * radius_one + 30.0 * unit.nanometer, 0.0, 0.0],
+                                     [680.0 * unit.nanometer, 0.0, 0.0],
                                      # Place at h=20 with reference to first particle.
-                                     [0.0, radius_one + radius_two + 20.0 * unit.nanometer, 0.0],
+                                     [0.0, 410.0 * unit.nanometer, 0.0],
                                      # Place at h=10 with reference to first particle.
-                                     [0.0, 0.0, radius_one + radius_two + 10.0 * unit.nanometer]])
+                                     [0.0, 0.0, 400.0 * unit.nanometer]],
+                                  1500.591138580165 * unit.kilojoule_per_mole),
+                                 ([[0.0, 0.0, 0.0],
+                                   # Place at h=10 with reference to first particle.
+                                   [660.0 * unit.nanometer, 0.0, 0.0],
+                                   # Place at h=30 with reference to first particle.
+                                   [0.0, 420.0 * unit.nanometer, 0.0],
+                                   # Place at h=100 with reference to first particle.
+                                   [0.0, 0.0, 490.0 * unit.nanometer]],
+                                  2933.97721160759 * unit.kilojoule_per_mole),
+                                 ([# Place at h=25 with reference to last particle.
+                                   [0.0, 0.0, 515.0],
+                                   # Place at h=15 with reference to last particle.
+                                   [0.0, 405.0, 0.0],
+                                   # Place at h=10 with reference to last particle.
+                                   [140, 0.0, 0.0],
+                                   [0.0, 0.0, 0.0]],
+                                  14398.17405177216 * unit.kilojoule_per_mole)
+                             ])
+    def test_potential(self, openmm_context, radius_one, radius_two, positions, expected):
+        openmm_context.setPositions(positions)
         openmm_state = openmm_context.getState(getEnergy=True)
         assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-                == pytest.approx(1500.591138580165, rel=1.0e-7, abs=1.0e-13))
+                == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
 
 
 # noinspection DuplicatedCode
@@ -499,17 +520,38 @@ class TestColloidPotentialsWithLogForFourParticles(TestParameters):
             assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(2, 3), (2, 3)]
             assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0, 1), (2, 3)]
 
-    def test_potential(self, openmm_context, radius_one, radius_two):
-        openmm_context.setPositions([[0.0, 0.0, 0.0],
+    @pytest.mark.parametrize("positions,expected",
+                             [
+                                 ([[0.0, 0.0, 0.0],
                                      # Place at h=30 with reference to first particle.
-                                     [2.0 * radius_one + 30.0 * unit.nanometer, 0.0, 0.0],
+                                     [680.0 * unit.nanometer, 0.0, 0.0],
                                      # Place at h=20 with reference to first particle.
-                                     [0.0, radius_one + radius_two + 20.0 * unit.nanometer, 0.0],
+                                     [0.0, 410.0 * unit.nanometer, 0.0],
                                      # Place at h=10 with reference to first particle.
-                                     [0.0, 0.0, radius_one + radius_two + 10.0 * unit.nanometer]])
+                                     [0.0, 0.0, 400.0 * unit.nanometer]],
+                                  1505.562902813702 * unit.kilojoule_per_mole),
+                                 ([[0.0, 0.0, 0.0],
+                                   # Place at h=10 with reference to first particle.
+                                   [660.0 * unit.nanometer, 0.0, 0.0],
+                                   # Place at h=30 with reference to first particle.
+                                   [0.0, 420.0 * unit.nanometer, 0.0],
+                                   # Place at h=100 with reference to first particle.
+                                   [0.0, 0.0, 490.0 * unit.nanometer]],
+                                  2915.670694976501 * unit.kilojoule_per_mole),
+                                 ([# Place at h=25 with reference to last particle.
+                                   [0.0, 0.0, 515.0],
+                                   # Place at h=15 with reference to last particle.
+                                   [0.0, 405.0, 0.0],
+                                   # Place at h=10 with reference to last particle.
+                                   [140, 0.0, 0.0],
+                                   [0.0, 0.0, 0.0]],
+                                  14284.77185919515 * unit.kilojoule_per_mole)
+                             ])
+    def test_potential(self, openmm_context, radius_one, radius_two, positions, expected):
+        openmm_context.setPositions(positions)
         openmm_state = openmm_context.getState(getEnergy=True)
         assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-                == pytest.approx(1505.562902813702, rel=1.0e-7, abs=1.0e-13))
+                == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
 
 
 if __name__ == '__main__':

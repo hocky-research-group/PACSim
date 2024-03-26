@@ -150,7 +150,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
                 (self._parameters.brush_length ** 2) * (self._parameters.brush_density ** (3 / 2)) / 35.0
                 * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
         steric_prefactor_22 = (
-                unit.BOLTZMANN_CONSTANT_kB * self._parameters.temperature * 16.0 * math.pi * self._radius_one *
+                unit.BOLTZMANN_CONSTANT_kB * self._parameters.temperature * 16.0 * math.pi * self._radius_two *
                 (self._parameters.brush_length ** 2) * (self._parameters.brush_density ** (3 / 2)) / 35.0
                 * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
         steric_prefactor_12 = (

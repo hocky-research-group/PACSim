@@ -37,7 +37,7 @@ def benchmark_openmm(platform_name: str = "Reference", potentials: str = "algebr
                      number_steps: int = 100) -> None:
     parameters = benchmark_parameters()
 
-    types, positions = read_xyz_file("first_frame.xyz")
+    types, positions = read_xyz_file("colloids/tests/first_frame.xyz")
 
     topology = app.topology.Topology()
     chain = topology.addChain()
@@ -125,7 +125,7 @@ class BenchmarkAction(argparse.Action):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Benchmark OpenMM for colloids system.")
+    parser = argparse.ArgumentParser(description="Benchmark OpenMM for a colloids system.")
     parser.add_argument("--all", action=BenchmarkAction,
                         help="run benchmark with various parameters")
     parser.add_argument("platform", help="OpenMM platform to use", type=str,

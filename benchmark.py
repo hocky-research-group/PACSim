@@ -112,7 +112,7 @@ class BenchmarkAction(argparse.Action):
         super().__init__(option_strings, dest, nargs=0, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        for use_log in (False, True):
+        for use_log in ("false", "true"):
             for platform, number_steps in zip(("Reference", "CPU", "OpenCL", "CUDA"), (10, 1000, 1000, 1000)):
                 for potentials in ("algebraic", "tabulated"):
                     try:
@@ -132,13 +132,12 @@ def main():
                         choices=("Reference", "CPU", "OpenCL", "CUDA"))
     parser.add_argument("potentials", help="colloid potentials to use", type=str,
                         choices=("algebraic", "tabulated"))
-    parser.add_argument("use_log", help="use logarithmic potentials", type=bool,
-                        choices=(False, True))
+    parser.add_argument("use_log", help="use logarithmic potentials", type=str, choices=("false", "true"))
     parser.add_argument("number_steps", help="number of time steps to run", type=int)
     args = parser.parse_args()
     assert args.number_steps > 0
-    benchmark_openmm(platform_name=args.platform, potentials=args.potentials, use_log=args.use_log,
-                     number_steps=args.number_steps)
+    benchmark_openmm(platform_name=args.platform, potentials=args.potentials,
+                     use_log=(args.use_log == "true"), number_steps=args.number_steps)
 
 
 if __name__ == '__main__':

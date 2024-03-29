@@ -28,7 +28,7 @@ def benchmark_hoomd(device: str = "CPU", number_steps: int = 100, shift: bool = 
 
     # Prevent printing the traceback when the platform is not existing.
     try:
-        hoomd.context.initialize("--mode=cpu" if device == "CPU" else "--mode=gpu")
+        hoomd.context.initialize("--mode=cpu --notice-level=0" if device == "CPU" else "--mode=gpu --notice-level=0")
     except RuntimeError as err:
         print(err, file=sys.stderr)
         exit(1)
@@ -64,11 +64,8 @@ class BenchmarkAction(argparse.Action):
         for device, number_steps in zip(("CPU", "GPU"), (1000, 1000)):
             for shift in ("false", "true"):
                 try:
-                    ret = subprocess.run(f"python {__file__} {device} {number_steps} {shift}", shell=True,
-                                         check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                    for line in ret.stdout.splitlines():
-                        if line.startswith("Time per time step:"):
-                            print(line)
+                    subprocess.run(f"python {__file__} {device} {number_steps} {shift}", shell=True,
+                                   check=True, stderr=subprocess.PIPE, text=True)
                 except subprocess.CalledProcessError as err:
                     print(err.stderr.strip())
         parser.exit()

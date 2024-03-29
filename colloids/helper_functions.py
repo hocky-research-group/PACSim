@@ -122,7 +122,7 @@ def main() -> None:
     simulation = app.Simulation(topology, system, integrator, platform)
     simulation.context.setPositions(positions)
 
-    write_gsd_file("test.gsd", simulation,
+    write_gsd_file("tests/first_frame.gsd", simulation,
                    {"positive": radius_positive.value_in_unit(unit.nanometer),
                     "negative": radius_negative.value_in_unit(unit.nanometer)})
 

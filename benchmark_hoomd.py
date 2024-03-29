@@ -9,7 +9,7 @@ from benchmark import benchmark_parameters
 from colloids.colloid_potentials_tabulated_hoomd import ColloidPotentialsTabulatedHoomd
 
 
-def benchmark_hoomd(device: str = "CPU", number_steps: int = 100):
+def benchmark_hoomd(device: str = "CPU", number_steps: int = 100, shift: bool = True):
     parameters = benchmark_parameters()
 
     radius_positive = parameters["radius_positive"].value_in_unit(unit.nanometer)
@@ -39,7 +39,7 @@ def benchmark_hoomd(device: str = "CPU", number_steps: int = 100):
         radius_one=radius_positive, radius_two=radius_negative,
         surface_potential_one=surface_potential_positive, surface_potential_two=surface_potential_negative,
         type_one="positive", type_two="negative",
-        colloid_potentials_parameters=parameters["colloid_potentials_parameters"], neighbor_list=nl)
+        colloid_potentials_parameters=parameters["colloid_potentials_parameters"], neighbor_list=nl, shift=shift)
 
     hoomd.md.integrate.mode_standard(dt=timestep)
     langevin = hoomd.md.integrate.langevin(group=hoomd.group.all(), kT=k_temperature, seed=1)
@@ -51,7 +51,7 @@ def benchmark_hoomd(device: str = "CPU", number_steps: int = 100):
     end_time = time.perf_counter_ns()
 
     print(f"Time per time step: {(end_time - start_time) * 1e-9 / number_steps} s / step (device: {device}, "
-          f"number_steps: {number_steps})")
+          f"number_steps: {number_steps}, shift: {shift})")
 
 
 # See https://stackoverflow.com/questions/60979532/argparse-ignore-positional-arguments-if-a-flag-is-set
@@ -62,14 +62,15 @@ class BenchmarkAction(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         for device, number_steps in zip(("CPU", "GPU"), (1000, 1000)):
-            try:
-                ret = subprocess.run(f"python {__file__} {device}  {number_steps}", shell=True, check=True,
-                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                for line in ret.stdout.splitlines():
-                    if line.startswith("Time per time step:"):
-                        print(line)
-            except subprocess.CalledProcessError as err:
-                print(err.stderr.strip())
+            for shift in ("false", "true"):
+                try:
+                    ret = subprocess.run(f"python {__file__} {device} {number_steps} {shift}", shell=True,
+                                         check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    for line in ret.stdout.splitlines():
+                        if line.startswith("Time per time step:"):
+                            print(line)
+                except subprocess.CalledProcessError as err:
+                    print(err.stderr.strip())
         parser.exit()
 
 
@@ -80,9 +81,10 @@ def main():
     parser.add_argument("device", help="Hoomd device to use", type=str,
                         choices=("CPU", "GPU"))
     parser.add_argument("number_steps", help="number of time steps to run", type=int)
+    parser.add_argument("shift", help="use shifted potentials", type=str, choices=("false", "true"))
     args = parser.parse_args()
     assert args.number_steps > 0
-    benchmark_hoomd(device=args.device, number_steps=args.number_steps)
+    benchmark_hoomd(device=args.device, number_steps=args.number_steps, shift=(args.shift == "true"))
 
 
 if __name__ == '__main__':

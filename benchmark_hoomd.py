@@ -61,7 +61,7 @@ class BenchmarkAction(argparse.Action):
         super().__init__(option_strings, dest, nargs=0, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        for device, number_steps in zip(("CPU", "GPU"), (1000, 1000)):
+        for device, number_steps in zip(("CPU", "GPU"), (10000, 10000)):
             for shift in ("false", "true"):
                 try:
                     subprocess.run(f"python {__file__} {device} {number_steps} {shift}", shell=True,

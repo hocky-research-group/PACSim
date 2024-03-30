@@ -93,7 +93,11 @@ def benchmark_openmm(platform_name: str = "Reference", potentials: str = "algebr
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
 
-    simulation = app.Simulation(topology, system, integrator, platform)
+    if platform_name == "CUDA" or platform_name == "OpenCL":
+        simulation = app.Simulation(topology, system, integrator, platform, 
+                                    platformProperties={"Precision": "mixed"})
+    else:
+        simulation = app.Simulation(topology, system, integrator, platform)
     simulation.context.setPositions(positions)
     simulation.context.setVelocitiesToTemperature(parameters["colloid_potentials_parameters"].temperature, 1)
 
@@ -113,7 +117,7 @@ class BenchmarkAction(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         for use_log in ("false", "true"):
-            for platform, number_steps in zip(("Reference", "CPU", "OpenCL", "CUDA"), (10, 1000, 1000, 1000)):
+            for platform, number_steps in zip(("Reference", "CPU", "OpenCL", "CUDA"), (10, 100, 1000, 10000)):
                 for potentials in ("algebraic", "tabulated"):
                     try:
                         subprocess.run(f"python {__file__} {platform} {potentials} {use_log} {number_steps}",

@@ -1,10 +1,76 @@
 from abc import ABC, abstractmethod
-from typing import Iterator
+from typing import Any, Iterator
 from openmm import CustomNonbondedForce, unit
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
 
-class ColloidPotentialsAbstract(ABC):
+class OpenMMPotentialAbstract(ABC):
+    """
+    Abstract class for a potential implemented with the CustomNonbondedForces class of openmm.
+
+    The inheriting classes must implement the add_particle and yield_potentials methods so that they can be conveniently
+    added to an openmm system.
+
+    The add_particle method should be called for every particle in the system before the method yield_potentials is
+    used in order to add the potential to the openmm system.
+    """
+
+    def __init__(self) -> None:
+        """Constructor of the OpenMMPotentialAbstract class."""
+        self._add_particle_called = False
+        self._yield_potentials_called = False
+
+    @abstractmethod
+    def add_particle(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Add a particle with the given parameters to the system.
+
+        This method has to be called for every particle in the system before the method yield_potentials is used.
+
+        Note that the overriding method in the inheriting class should call this method first because it checks that the
+        method yield_potentials was not called before.
+
+        :param args:
+            Parameters of the particle as positional arguments.
+        :type args: Any
+        :param kwargs:
+            Parameters of the particle as keyword arguments.
+        :type kwargs: Any
+
+        :raises RuntimeError:
+            If the method yield_potentials was called before this method.
+        """
+        if self._yield_potentials_called:
+            raise RuntimeError("method add_particle must be called for every particle in the system before the method "
+                               "yield_potentials is used")
+        self._add_particle_called = True
+
+    # noinspection PyTypeChecker
+    @abstractmethod
+    def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
+        """
+        Generate all potentials in the systems that are necessary to properly include the potential in an openmm system.
+
+        This method has to be called after the method add_particle was called for every particle in the system. Note
+        that the overriding method in the inheriting class should call this method first because it checks that the
+        method add_particle was called before.
+
+        The generated potentials can be added to the openmm system using the system.addForce method.
+
+        :return:
+            A generator that yields all potentials handled by this class.
+        :rtype: Iterator[CustomNonbondedForce]
+
+        :raises RuntimeError:
+            If the method add_particle was not called before this method.
+        """
+        if not self._add_particle_called:
+            raise RuntimeError("method add_particle must be called for every particle in the system before the method "
+                               "yield_potentials is used")
+        self._yield_potentials_called = True
+
+
+class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
     """
     Abstract class for the steric and electrostatic pair potentials between colloids in a solution with periodic
     boundary conditions using the CustomNonbondedForces class of openmm.
@@ -28,9 +94,8 @@ class ColloidPotentialsAbstract(ABC):
 
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters):
         """Constructor of the ColloidPotentialsAbstract class."""
+        super().__init__()
         self._parameters = colloid_potentials_parameters
-        self._add_particle_called = False
-        self._yield_potentials_called = False
 
     @abstractmethod
     def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:
@@ -40,7 +105,8 @@ class ColloidPotentialsAbstract(ABC):
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
         Note that the overriding method in the inheriting class should call this method first because it checks the
-        input arguments and that the method yield_potentials was not called before.
+        input arguments, and that the method yield_potentials was not called before (via the OpenMMPotentialAbstract
+        base class).
 
         :param radius:
             The radius of the colloid.
@@ -56,40 +122,12 @@ class ColloidPotentialsAbstract(ABC):
         :raises ValueError:
             If the radius is not greater than zero.
         :raises RuntimeError:
-            If the method yield_potentials was called before this method.
+            If the method yield_potentials was called before this method (via the OpenMMPotentialAbstract base class).
         """
+        super().add_particle()
         if not radius.unit.is_compatible(unit.nanometer):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
         if not radius.value_in_unit(unit.nanometer) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
         if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts")
-        if self._yield_potentials_called:
-            raise RuntimeError("method add_particle must be called for every particle in the system before the method "
-                               "yield_potentials is used")
-        self._add_particle_called = True
-
-    # noinspection PyTypeChecker
-    @abstractmethod
-    def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
-        """
-        Generate all potentials in the systems that are necessary to properly include the steric and electrostatic pair
-        potentials between colloids in a solution in an openmm system.
-
-        This method has to be called after the method add_particle was called for every particle in the system. Note
-        that the overriding method in the inheriting class should call this method first because it checks that the
-        method add_particle was called before.
-
-        The generated potentials can be added to the openmm system using the system.addForce method.
-
-        :return:
-            A generator that yields all potentials handled by this class.
-        :rtype: Iterator[CustomNonbondedForce]
-
-        :raises RuntimeError:
-            If the method add_particle was not called before this method.
-        """
-        if not self._add_particle_called:
-            raise RuntimeError("method add_particle must be called for every particle in the system before the method "
-                               "yield_potentials is used")
-        self._yield_potentials_called = True

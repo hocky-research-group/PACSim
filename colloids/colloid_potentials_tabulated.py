@@ -3,7 +3,7 @@ from typing import Iterator
 import numpy as np
 import numpy.typing as npt
 from openmm import Continuous1DFunction, CustomNonbondedForce, unit
-from colloids.colloid_potentials_abstract import ColloidPotentialsAbstract
+from colloids.abstracts import ColloidPotentialsAbstract
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
 

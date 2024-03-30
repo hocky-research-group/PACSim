@@ -1,7 +1,7 @@
 import math
 from typing import Iterator
 from openmm import CustomNonbondedForce, unit
-from colloids.colloid_potentials_abstract import ColloidPotentialsAbstract
+from colloids.abstracts import ColloidPotentialsAbstract
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
 

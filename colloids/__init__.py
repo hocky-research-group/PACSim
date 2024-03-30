@@ -1,4 +1,4 @@
 from .colloid_potentials_parameters import ColloidPotentialsParameters
-from .colloid_potentials_abstract import ColloidPotentialsAbstract
+from .abstracts import ColloidPotentialsAbstract, OpenMMPotentialAbstract
 from .colloid_potentials_algebraic import ColloidPotentialsAlgebraic
 from .colloid_potentials_tabulated import ColloidPotentialsTabulated

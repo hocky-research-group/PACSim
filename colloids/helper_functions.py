@@ -29,7 +29,7 @@ def read_xyz_file(filename: str, units: bool = True) -> (npt.NDArray[str],
     return types, positions
 
 
-def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict: dict[str, float]) -> None:
+def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict: dict[str, unit.Quantity]) -> None:
     positions = (
         openmm_simulation.context.getState(getPositions=True, enforcePeriodicBox=True).getPositions(asNumpy=True))
     topology = openmm_simulation.topology
@@ -59,11 +59,12 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict
     assert all(t in radius_dict for t in types)
     frame.particles.types = types
     frame.particles.typeid = [types.index(atom.name) for atom in topology.atoms()]
-    frame.particles.type_shapes = [{"type": "Sphere", "diameter": 2.0 * radius_dict[t]} for t in types]
+    frame.particles.type_shapes = [
+        {"type": "Sphere", "diameter": 2.0 * radius_dict[t].value_in_unit(unit.nano * unit.meter)} for t in types]
     frame.particles.mass = [openmm_simulation.system.getParticleMass(atom_index).value_in_unit(unit.amu)
                             for atom_index in range(topology.getNumAtoms())]
     frame.configuration.box = [side_length, side_length, side_length, 0, 0, 0]
-    with gsd.hoomd.open(name=filename, mode="x") as f:
+    with gsd.hoomd.open(name=filename, mode="w") as f:
         f.append(frame)
 
 
@@ -98,14 +99,8 @@ def main() -> None:
     topology = app.topology.Topology()
     chain = topology.addChain()
     residue = topology.addResidue("res1", chain)
-    app.element.Element(0, "positive", "positive", mass_positive)
-    app.element.Element(1, "negative", "negative", mass_negative)
     for t, position in zip(types, positions):
-        if t == "P":
-            topology.addAtom("positive", app.element.Element.getBySymbol("positive"), residue)
-        else:
-            assert t == "N"
-            topology.addAtom("negative", app.element.Element.getBySymbol("negative"), residue)
+        topology.addAtom(t, None, residue)
     topology.setPeriodicBoxVectors(np.array([[side_length.value_in_unit(unit.nano * unit.meter), 0.0, 0.0],
                                              [0.0, side_length.value_in_unit(unit.nano * unit.meter), 0.0],
                                              [0.0, 0.0, side_length.value_in_unit(unit.nano * unit.meter)]]))
@@ -126,8 +121,7 @@ def main() -> None:
     simulation.context.setPositions(positions)
 
     write_gsd_file("tests/first_frame.gsd", simulation,
-                   {"positive": radius_positive.value_in_unit(unit.nano * unit.meter),
-                    "negative": radius_negative.value_in_unit(unit.nano * unit.meter)})
+                   {"P": radius_positive, "N": radius_negative})
 
 
 if __name__ == '__main__':

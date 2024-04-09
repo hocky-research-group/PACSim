@@ -38,13 +38,13 @@ def benchmark_hoomd(device: str = "CPU", number_steps: int = 100, shift: bool = 
     ColloidPotentialsTabulatedHoomd(
         radius_one=radius_positive, radius_two=radius_negative,
         surface_potential_one=surface_potential_positive, surface_potential_two=surface_potential_negative,
-        type_one="positive", type_two="negative",
+        type_one="P", type_two="N",
         colloid_potentials_parameters=parameters["colloid_potentials_parameters"], neighbor_list=nl, shift=shift)
 
     hoomd.md.integrate.mode_standard(dt=timestep)
     langevin = hoomd.md.integrate.langevin(group=hoomd.group.all(), kT=k_temperature, seed=1)
-    langevin.set_gamma("positive", mass_positive * collision_rate)
-    langevin.set_gamma("negative", mass_negative * collision_rate)
+    langevin.set_gamma("P", mass_positive * collision_rate)
+    langevin.set_gamma("N", mass_negative * collision_rate)
 
     start_time = time.perf_counter_ns()
     hoomd.run(number_steps)

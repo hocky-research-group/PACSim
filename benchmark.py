@@ -42,14 +42,8 @@ def benchmark_openmm(platform_name: str = "Reference", potentials: str = "algebr
     topology = app.topology.Topology()
     chain = topology.addChain()
     residue = topology.addResidue("res1", chain)
-    app.element.Element(0, "positive", "positive", parameters["mass_positive"])
-    app.element.Element(1, "negative", "negative", parameters["mass_negative"])
     for t, position in zip(types, positions):
-        if t == "P":
-            topology.addAtom("positive", app.element.Element.getBySymbol("positive"), residue)
-        else:
-            assert t == "N"
-            topology.addAtom("negative", app.element.Element.getBySymbol("negative"), residue)
+        topology.addAtom(t, None, residue)
     topology.setPeriodicBoxVectors(np.array(
         [[parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0, 0.0],
          [0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0],
@@ -94,7 +88,7 @@ def benchmark_openmm(platform_name: str = "Reference", potentials: str = "algebr
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
 
-    if platform_name == "CUDA" or platform_name == "OpenCL":
+    if platform_name == "CUDA":
         simulation = app.Simulation(topology, system, integrator, platform, 
                                     platformProperties={"Precision": "mixed"})
     else:

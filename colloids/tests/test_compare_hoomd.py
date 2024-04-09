@@ -15,19 +15,20 @@ class TestCompareHoomd(object):
     @pytest.fixture
     def parameters(self):
         params = {
-            "radius_positive": 105.0 * unit.nanometer,
-            "radius_negative": 95.0 * unit.nanometer,
+            "radius_positive": 105.0 * (unit.nano * unit.meter),
+            "radius_negative": 95.0 * (unit.nano * unit.meter),
             "surface_potential_positive": 44.0 * (unit.milli * unit.volt),
             "surface_potential_negative": -54.0 * (unit.milli * unit.volt),
-            "colloid_potentials_parameters": ColloidPotentialsParameters(brush_density=0.09 / (unit.nanometer ** 2),
-                                                                         brush_length=10.6 * unit.nanometer,
-                                                                         debye_length=5.726968 * unit.nanometer,
-                                                                         temperature=298.0 * unit.kelvin,
-                                                                         dielectric_constant=80.0),
+            "colloid_potentials_parameters": ColloidPotentialsParameters(
+                brush_density=0.09 / ((unit.nano * unit.meter) ** 2),
+                brush_length=10.6 * (unit.nano * unit.meter),
+                debye_length=5.726968 * (unit.nano * unit.meter),
+                temperature=298.0 * unit.kelvin,
+                dielectric_constant=80.0),
             "collision_rate": 0.01 / (unit.pico * unit.second),
             "timestep": 0.05 * (unit.pico * unit.second),
             "mass_positive": 1.0 * unit.amu,
-            "side_length": 12328.05 * unit.nanometer,
+            "side_length": 12328.05 * (unit.nano * unit.meter),
         }
         params["mass_negative"] = (
                 (params["radius_negative"] / params["radius_positive"]) ** 3 * params["mass_positive"])
@@ -47,15 +48,16 @@ class TestCompareHoomd(object):
             else:
                 assert t == "N"
                 topology.addAtom("negative", app.element.Element.getBySymbol("negative"), residue)
-        topology.setPeriodicBoxVectors(np.array([[parameters["side_length"].value_in_unit(unit.nanometer), 0.0, 0.0],
-                                                 [0.0, parameters["side_length"].value_in_unit(unit.nanometer), 0.0],
-                                                 [0.0, 0.0, parameters["side_length"].value_in_unit(unit.nanometer)]]))
+        topology.setPeriodicBoxVectors(np.array(
+            [[parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0, 0.0],
+             [0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0],
+             [0.0, 0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter)]]))
 
         system = openmm.System()
         system.setDefaultPeriodicBoxVectors(
-            openmm.Vec3(parameters["side_length"].value_in_unit(unit.nanometer), 0.0, 0.0),
-            openmm.Vec3(0.0, parameters["side_length"].value_in_unit(unit.nanometer), 0.0),
-            openmm.Vec3(0.0, 0.0, parameters["side_length"].value_in_unit(unit.nanometer)))
+            openmm.Vec3(parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0, 0.0),
+            openmm.Vec3(0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0),
+            openmm.Vec3(0.0, 0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter)))
         platform = openmm.Platform.getPlatformByName("Reference")
         integrator = openmm.LangevinIntegrator(parameters["colloid_potentials_parameters"].temperature,
                                                parameters["collision_rate"], parameters["timestep"])
@@ -97,8 +99,8 @@ class TestCompareHoomd(object):
         hoomd.init.read_snapshot(snapshot)
         nl = hoomd.md.nlist.cell()
         ColloidPotentialsTabulatedHoomd(
-            radius_one=parameters["radius_positive"].value_in_unit(unit.nanometer),
-            radius_two=parameters["radius_negative"].value_in_unit(unit.nanometer),
+            radius_one=parameters["radius_positive"].value_in_unit(unit.nano * unit.meter),
+            radius_two=parameters["radius_negative"].value_in_unit(unit.nano * unit.meter),
             surface_potential_one=parameters["surface_potential_positive"].value_in_unit(unit.milli * unit.volt),
             surface_potential_two=parameters["surface_potential_negative"].value_in_unit(unit.milli * unit.volt),
             type_one="positive", type_two="negative",

@@ -6,11 +6,11 @@ from colloids import ColloidPotentialsParameters, ColloidPotentialsAlgebraic, Co
 class TestParameters(object):
     @pytest.fixture
     def radius_one(self):
-        return 325.0 * unit.nanometer
+        return 325.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
     def radius_two(self):
-        return 65.0 * unit.nanometer
+        return 65.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
     def surface_potential_one(self):
@@ -22,15 +22,15 @@ class TestParameters(object):
 
     @pytest.fixture
     def brush_density(self):
-        return 0.09 / (unit.nanometer ** 2)
+        return 0.09 / ((unit.nano * unit.meter) ** 2)
 
     @pytest.fixture
     def brush_length(self):
-        return 10.0 * unit.nanometer
+        return 10.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
     def debye_length(self):
-        return 5.0 * unit.nanometer
+        return 5.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
     def dielectric_constant(self):
@@ -49,7 +49,7 @@ class TestParameters(object):
 
     @pytest.fixture
     def maximum_surface_separation(self, radius_one, radius_two, debye_length):
-        return 100.0 * unit.nanometer
+        return 100.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
     def side_length(self, radius_one, radius_two, maximum_surface_separation):
@@ -60,7 +60,7 @@ class TestParameters(object):
     def openmm_system(self, side_length):
         system = System()
         # Make system very large so that we do not care about periodic boundaries.
-        side_length_value = side_length.value_in_unit(unit.nanometer)
+        side_length_value = side_length.value_in_unit(unit.nano * unit.meter)
         system.setDefaultPeriodicBoxVectors(Vec3(side_length_value, 0.0, 0.0),
                                             Vec3(0.0, side_length_value, 0.0),
                                             Vec3(0.0, 0.0, side_length_value))
@@ -121,7 +121,7 @@ class TestColloidPotentialsAlgebraicExceptions(TestParameters):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
             colloid_potentials.add_particle(
-                radius=radius_one / unit.nanometer ** 2, surface_potential=surface_potential_one)
+                radius=radius_one / ((unit.nano * unit.meter) ** 2), surface_potential=surface_potential_one)
         # Test exception on negative radius.
         with pytest.raises(ValueError):
             # noinspection PyTypeChecker
@@ -149,10 +149,10 @@ class TestColloidPotentialsAlgebraicExceptions(TestParameters):
     def test_exception_colloid_potentials_tabulated_add_wrong_particles(
             self, colloid_potentials_tabulated, radius_one, radius_two, surface_potential_one, surface_potential_two):
         with pytest.raises(ValueError):
-            colloid_potentials_tabulated.add_particle(radius=1000.0 * unit.nanometer,
+            colloid_potentials_tabulated.add_particle(radius=1000.0 * (unit.nano * unit.meter),
                                                       surface_potential=surface_potential_one)
         with pytest.raises(ValueError):
-            colloid_potentials_tabulated.add_particle(radius=1000.0 * unit.nanometer,
+            colloid_potentials_tabulated.add_particle(radius=1000.0 * (unit.nano * unit.meter),
                                                       surface_potential=surface_potential_two)
         with pytest.raises(ValueError):
             colloid_potentials_tabulated.add_particle(radius=radius_one,
@@ -236,17 +236,19 @@ class TestColloidPotentialsForTwoParticles(TestParameters):
 
     @pytest.mark.parametrize("surface_separation,expected",
                              [   # Test at h=0.
-                                 (10.0 * unit.nanometer, 1505.829355134808 * unit.kilojoule_per_mole),
+                                 (10.0 * (unit.nano * unit.meter), 1505.829355134808 * unit.kilojoule_per_mole),
                                  # Test at h=2L.
-                                 (20.0 * unit.nanometer, -10.63613061419315 * unit.kilojoule_per_mole),
+                                 (20.0 * (unit.nano * unit.meter), -10.63613061419315 * unit.kilojoule_per_mole),
                                  # Test slightly below h=2L where steric potential is not zero.
-                                 ((20.0 - 0.1) * unit.nanometer, -10.84996692702675 * unit.kilojoule_per_mole),
+                                 ((20.0 - 0.1) * (unit.nano * unit.meter),
+                                  -10.84996692702675 * unit.kilojoule_per_mole),
                                  # Test slightly above h=2L where steric potential is strictly zero.
-                                 ((20.0 + 0.1) * unit.nanometer, -10.42552111714948 * unit.kilojoule_per_mole),
+                                 ((20.0 + 0.1) * (unit.nano * unit.meter),
+                                  -10.42552111714948 * unit.kilojoule_per_mole),
                                  # Test at h=3L.
-                                 (30.0 * unit.nanometer, -1.439443749213437 * unit.kilojoule_per_mole),
+                                 (30.0 * (unit.nano * unit.meter), -1.439443749213437 * unit.kilojoule_per_mole),
                                  # Test at h=20*debye_length, where electrostatic potential should not yet be cutoff.
-                                 (100.0 * unit.nanometer, -1.196938817005087e-6 * unit.kilojoule_per_mole)
+                                 (100.0 * (unit.nano * unit.meter), -1.196938817005087e-6 * unit.kilojoule_per_mole)
                              ])
     def test_potential(self, openmm_context, radius_one, radius_two, surface_separation, expected):
         openmm_context.setPositions([[radius_one + radius_two + surface_separation, 0.0, 0.0],
@@ -326,17 +328,19 @@ class TestColloidPotentialsWithLogForTwoParticles(TestParameters):
 
     @pytest.mark.parametrize("surface_separation,expected",
                              [   # Test at h=0.
-                                 (10.0 * unit.nanometer, 1510.711567854979 * unit.kilojoule_per_mole),
+                                 (10.0 * (unit.nano * unit.meter), 1510.711567854979 * unit.kilojoule_per_mole),
                                  # Test at h=2L.
-                                 (20.0 * unit.nanometer, -10.53990009001303 * unit.kilojoule_per_mole),
+                                 (20.0 * (unit.nano * unit.meter), -10.53990009001303 * unit.kilojoule_per_mole),
                                  # Test slightly below h=2L where steric potential is not zero.
-                                 ((20.0 - 0.1) * unit.nanometer, -10.74983348860948 * unit.kilojoule_per_mole),
+                                 ((20.0 - 0.1) * (unit.nano * unit.meter),
+                                  -10.74983348860948 * unit.kilojoule_per_mole),
                                  # Test slightly above h=2L where steric potential is strictly zero.
-                                 ((20.0 + 0.1) * unit.nanometer, -10.33304182104529 * unit.kilojoule_per_mole),
+                                 ((20.0 + 0.1) * (unit.nano * unit.meter),
+                                  -10.33304182104529 * unit.kilojoule_per_mole),
                                  # Test at h=3L.
-                                 (30.0 * unit.nanometer, -1.437662679662967 * unit.kilojoule_per_mole),
+                                 (30.0 * (unit.nano * unit.meter), -1.437662679662967 * unit.kilojoule_per_mole),
                                  # Test at h=20*debye_length, where electrostatic potential should not yet be cutoff.
-                                 (100.0 * unit.nanometer, -1.196938856264202e-6 * unit.kilojoule_per_mole)
+                                 (100.0 * (unit.nano * unit.meter), -1.196938856264202e-6 * unit.kilojoule_per_mole)
                              ])
     def test_potential(self, openmm_context, radius_one, radius_two, surface_separation, expected):
         openmm_context.setPositions([[radius_one + radius_two + surface_separation, 0.0, 0.0],
@@ -420,19 +424,19 @@ class TestColloidPotentialsForFourParticles(TestParameters):
                              [
                                  ([[0.0, 0.0, 0.0],
                                      # Place at h=30 with reference to first particle.
-                                     [680.0 * unit.nanometer, 0.0, 0.0],
+                                     [680.0 * (unit.nano * unit.meter), 0.0, 0.0],
                                      # Place at h=20 with reference to first particle.
-                                     [0.0, 410.0 * unit.nanometer, 0.0],
+                                     [0.0, 410.0 * (unit.nano * unit.meter), 0.0],
                                      # Place at h=10 with reference to first particle.
-                                     [0.0, 0.0, 400.0 * unit.nanometer]],
+                                     [0.0, 0.0, 400.0 * (unit.nano * unit.meter)]],
                                   1500.591138580165 * unit.kilojoule_per_mole),
                                  ([[0.0, 0.0, 0.0],
                                    # Place at h=10 with reference to first particle.
-                                   [660.0 * unit.nanometer, 0.0, 0.0],
+                                   [660.0 * (unit.nano * unit.meter), 0.0, 0.0],
                                    # Place at h=30 with reference to first particle.
-                                   [0.0, 420.0 * unit.nanometer, 0.0],
+                                   [0.0, 420.0 * (unit.nano * unit.meter), 0.0],
                                    # Place at h=100 with reference to first particle.
-                                   [0.0, 0.0, 490.0 * unit.nanometer]],
+                                   [0.0, 0.0, 490.0 * (unit.nano * unit.meter)]],
                                   2933.97721160759 * unit.kilojoule_per_mole),
                                  ([# Place at h=25 with reference to last particle.
                                    [0.0, 0.0, 515.0],
@@ -524,19 +528,19 @@ class TestColloidPotentialsWithLogForFourParticles(TestParameters):
                              [
                                  ([[0.0, 0.0, 0.0],
                                      # Place at h=30 with reference to first particle.
-                                     [680.0 * unit.nanometer, 0.0, 0.0],
+                                     [680.0 * (unit.nano * unit.meter), 0.0, 0.0],
                                      # Place at h=20 with reference to first particle.
-                                     [0.0, 410.0 * unit.nanometer, 0.0],
+                                     [0.0, 410.0 * (unit.nano * unit.meter), 0.0],
                                      # Place at h=10 with reference to first particle.
-                                     [0.0, 0.0, 400.0 * unit.nanometer]],
+                                     [0.0, 0.0, 400.0 * (unit.nano * unit.meter)]],
                                   1505.562902813702 * unit.kilojoule_per_mole),
                                  ([[0.0, 0.0, 0.0],
                                    # Place at h=10 with reference to first particle.
-                                   [660.0 * unit.nanometer, 0.0, 0.0],
+                                   [660.0 * (unit.nano * unit.meter), 0.0, 0.0],
                                    # Place at h=30 with reference to first particle.
-                                   [0.0, 420.0 * unit.nanometer, 0.0],
+                                   [0.0, 420.0 * (unit.nano * unit.meter), 0.0],
                                    # Place at h=100 with reference to first particle.
-                                   [0.0, 0.0, 490.0 * unit.nanometer]],
+                                   [0.0, 0.0, 490.0 * (unit.nano * unit.meter)]],
                                   2915.670694976501 * unit.kilojoule_per_mole),
                                  ([# Place at h=25 with reference to last particle.
                                    [0.0, 0.0, 515.0],

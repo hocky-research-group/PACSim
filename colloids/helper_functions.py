@@ -17,13 +17,15 @@ def read_xyz_file(filename: str, units: bool = True) -> (npt.NDArray[str],
         _ = next(f)
         types = np.zeros(number_atoms, dtype=str)
         positions = np.zeros((number_atoms, 3), dtype=unit.Quantity if units else float)
+        # Do not create a unit within the loop because this is slow.
+        u = (unit.nano * unit.meter) if units else 1.0
         for index_atom in range(number_atoms):
             line = next(f)
             ls = line.split()
             types[index_atom] = ls[0]
-            positions[index_atom, 0] = float(ls[1]) * (unit.nanometer if units else 1.0)
-            positions[index_atom, 1] = float(ls[2]) * (unit.nanometer if units else 1.0)
-            positions[index_atom, 2] = float(ls[3]) * (unit.nanometer if units else 1.0)
+            positions[index_atom, 0] = float(ls[1]) * u
+            positions[index_atom, 1] = float(ls[2]) * u
+            positions[index_atom, 2] = float(ls[3]) * u
     return types, positions
 
 
@@ -36,20 +38,21 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict
     assert topology.getNumAtoms() == openmm_simulation.system.getNumParticles() == len(positions)
     periodic_box_vectors = openmm_simulation.system.getDefaultPeriodicBoxVectors()
     assert len(periodic_box_vectors) == 3
-    side_length = periodic_box_vectors[0][0].value_in_unit(unit.nanometer)
-    assert periodic_box_vectors[0][1].value_in_unit(unit.nanometer) == 0.0
-    assert periodic_box_vectors[0][2].value_in_unit(unit.nanometer) == 0.0
-    assert periodic_box_vectors[1][0].value_in_unit(unit.nanometer) == 0.0
-    assert periodic_box_vectors[1][1].value_in_unit(unit.nanometer) == side_length
-    assert periodic_box_vectors[1][2].value_in_unit(unit.nanometer) == 0.0
-    assert periodic_box_vectors[2][0].value_in_unit(unit.nanometer) == 0.0
-    assert periodic_box_vectors[2][1].value_in_unit(unit.nanometer) == 0.0
-    assert periodic_box_vectors[2][2].value_in_unit(unit.nanometer) == side_length
+    side_length = periodic_box_vectors[0][0].value_in_unit(unit.nano * unit.meter)
+    assert periodic_box_vectors[0][1].value_in_unit(unit.nano * unit.meter) == 0.0
+    assert periodic_box_vectors[0][2].value_in_unit(unit.nano * unit.meter) == 0.0
+    assert periodic_box_vectors[1][0].value_in_unit(unit.nano * unit.meter) == 0.0
+    assert periodic_box_vectors[1][1].value_in_unit(unit.nano * unit.meter) == side_length
+    assert periodic_box_vectors[1][2].value_in_unit(unit.nano * unit.meter) == 0.0
+    assert periodic_box_vectors[2][0].value_in_unit(unit.nano * unit.meter) == 0.0
+    assert periodic_box_vectors[2][1].value_in_unit(unit.nano * unit.meter) == 0.0
+    assert periodic_box_vectors[2][2].value_in_unit(unit.nano * unit.meter) == side_length
 
     frame = gsd.hoomd.Frame()
     frame.particles.N = topology.getNumAtoms()
     # Shift positions so that they are in the range [-side_length / 2, side_length / 2] (openmm uses [0, side_length]).
-    frame.particles.position = positions.value_in_unit(unit.nanometer) - np.array([side_length / 2.0 for _ in range(3)])
+    frame.particles.position = (positions.value_in_unit(unit.nano * unit.meter)
+                                - np.array([side_length / 2.0 for _ in range(3)]))
     types_set = set(atom.name for atom in topology.atoms())
     assert len(types_set) == 2
     types = list(types_set)
@@ -80,16 +83,16 @@ def write_xyz_file(filename: str, gsd_snapshot: hoomd.data.SnapshotParticleData)
 
 
 def main() -> None:
-    radius_positive = 105.0 * unit.nanometer
-    radius_negative = 95.0 * unit.nanometer
+    radius_positive = 105.0 * (unit.nano * unit.meter)
+    radius_negative = 95.0 * (unit.nano * unit.meter)
     mass_positive = 1.0 * unit.amu
     mass_negative = (radius_negative / radius_positive) ** 3 * mass_positive
-    side_length = 12328.05 * unit.nanometer
+    side_length = 12328.05 * (unit.nano * unit.meter)
     temperature = 298.0 * unit.kelvin
     # noinspection PyUnresolvedReferences
-    collision_rate = 0.01 / unit.picosecond
+    collision_rate = 0.01 / (unit.pico * unit.second)
     # noinspection PyUnresolvedReferences
-    timestep = 0.05 * unit.picosecond
+    timestep = 0.05 * (unit.pico * unit.second)
 
     types, positions = read_xyz_file("tests/first_frame.xyz")
     topology = app.topology.Topology()
@@ -103,14 +106,14 @@ def main() -> None:
         else:
             assert t == "N"
             topology.addAtom("negative", app.element.Element.getBySymbol("negative"), residue)
-    topology.setPeriodicBoxVectors(np.array([[side_length.value_in_unit(unit.nanometer), 0.0, 0.0],
-                                             [0.0, side_length.value_in_unit(unit.nanometer), 0.0],
-                                             [0.0, 0.0, side_length.value_in_unit(unit.nanometer)]]))
+    topology.setPeriodicBoxVectors(np.array([[side_length.value_in_unit(unit.nano * unit.meter), 0.0, 0.0],
+                                             [0.0, side_length.value_in_unit(unit.nano * unit.meter), 0.0],
+                                             [0.0, 0.0, side_length.value_in_unit(unit.nano * unit.meter)]]))
 
     system = openmm.System()
-    system.setDefaultPeriodicBoxVectors(openmm.Vec3(side_length.value_in_unit(unit.nanometer), 0.0, 0.0),
-                                        openmm.Vec3(0.0, side_length.value_in_unit(unit.nanometer), 0.0),
-                                        openmm.Vec3(0.0, 0.0, side_length.value_in_unit(unit.nanometer)))
+    system.setDefaultPeriodicBoxVectors(openmm.Vec3(side_length.value_in_unit(unit.nano * unit.meter), 0.0, 0.0),
+                                        openmm.Vec3(0.0, side_length.value_in_unit(unit.nano * unit.meter), 0.0),
+                                        openmm.Vec3(0.0, 0.0, side_length.value_in_unit(unit.nano * unit.meter)))
     platform = openmm.Platform.getPlatformByName("Reference")
     integrator = openmm.LangevinIntegrator(temperature, collision_rate, timestep)
     for t, position in zip(types, positions):
@@ -123,8 +126,8 @@ def main() -> None:
     simulation.context.setPositions(positions)
 
     write_gsd_file("tests/first_frame.gsd", simulation,
-                   {"positive": radius_positive.value_in_unit(unit.nanometer),
-                    "negative": radius_negative.value_in_unit(unit.nanometer)})
+                   {"positive": radius_positive.value_in_unit(unit.nano * unit.meter),
+                    "negative": radius_negative.value_in_unit(unit.nano * unit.meter)})
 
 
 if __name__ == '__main__':

@@ -50,15 +50,16 @@ def benchmark_openmm(platform_name: str = "Reference", potentials: str = "algebr
         else:
             assert t == "N"
             topology.addAtom("negative", app.element.Element.getBySymbol("negative"), residue)
-    topology.setPeriodicBoxVectors(np.array([[parameters["side_length"].value_in_unit(unit.nanometer), 0.0, 0.0],
-                                             [0.0, parameters["side_length"].value_in_unit(unit.nanometer), 0.0],
-                                             [0.0, 0.0, parameters["side_length"].value_in_unit(unit.nanometer)]]))
+    topology.setPeriodicBoxVectors(np.array(
+        [[parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0, 0.0],
+         [0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0],
+         [0.0, 0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter)]]))
 
     system = openmm.System()
     system.setDefaultPeriodicBoxVectors(
-        openmm.Vec3(parameters["side_length"].value_in_unit(unit.nanometer), 0.0, 0.0),
-        openmm.Vec3(0.0, parameters["side_length"].value_in_unit(unit.nanometer), 0.0),
-        openmm.Vec3(0.0, 0.0, parameters["side_length"].value_in_unit(unit.nanometer)))
+        openmm.Vec3(parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0, 0.0),
+        openmm.Vec3(0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0),
+        openmm.Vec3(0.0, 0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter)))
     # Prevent printing the traceback when the platform is not existing.
     try:
         platform = openmm.Platform.getPlatformByName(platform_name)

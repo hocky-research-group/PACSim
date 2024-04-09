@@ -12,8 +12,8 @@ from colloids.colloid_potentials_tabulated_hoomd import ColloidPotentialsTabulat
 def benchmark_hoomd(device: str = "CPU", number_steps: int = 100, shift: bool = True):
     parameters = benchmark_parameters()
 
-    radius_positive = parameters["radius_positive"].value_in_unit(unit.nanometer)
-    radius_negative = parameters["radius_negative"].value_in_unit(unit.nanometer)
+    radius_positive = parameters["radius_positive"].value_in_unit(unit.nano * unit.meter)
+    radius_negative = parameters["radius_negative"].value_in_unit(unit.nano * unit.meter)
     surface_potential_positive = parameters["surface_potential_positive"].value_in_unit(unit.milli * unit.volt)
     surface_potential_negative = parameters["surface_potential_negative"].value_in_unit(unit.milli * unit.volt)
     k_temperature = (parameters["colloid_potentials_parameters"].temperature * unit.BOLTZMANN_CONSTANT_kB

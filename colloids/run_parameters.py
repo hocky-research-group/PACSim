@@ -254,6 +254,18 @@ class RunParameters(object):
         If True, the energy of the system is minimized before the simulation starts.
         Defaults to False.
     :type minimize_energy_initially: bool
+    :param final_configuration_gsd_filename:
+        The name of the gsd file to which the final configuration is written.
+        If None, the final configuration is not written to a gsd file.
+        The filename must end with ".gsd".
+        Defaults to "final_frame.gsd".
+    :type final_configuration_gsd_filename: Optional[str]
+    :param final_configuration_xyz_filename:
+        The name of the xyz file to which the final configuration is written.
+        If None, the final configuration is not written to an xyz file.
+        The filename must end with ".xyz".
+        Defaults to "final_frame.xyz".
+    :type final_configuration_xyz_filename: Optional[str]
 
     :raises TupeError:
         If any of the quantities has an incompatible unit.
@@ -288,6 +300,8 @@ class RunParameters(object):
     checkpoint_interval: int = 100
     checkpoint_filename: str = "checkpoint.chk"
     minimize_energy_initially: bool = False
+    final_configuration_gsd_filename: Optional[str] = "final_frame.gsd"
+    final_configuration_xyz_filename: Optional[str] = "final_frame.xyz"
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -367,6 +381,12 @@ class RunParameters(object):
             raise ValueError("The checkpoint interval must be greater than zero.")
         if not self.checkpoint_filename.endswith(".chk"):
             raise ValueError("The filename of the checkpoint must end with '.chk'.")
+        if (self.final_configuration_gsd_filename is not None
+                and not self.final_configuration_gsd_filename.endswith(".gsd")):
+            raise ValueError("The filename of the final configuration must end with '.gsd'.")
+        if (self.final_configuration_xyz_filename is not None
+                and not self.final_configuration_xyz_filename.endswith(".xyz")):
+            raise ValueError("The filename of the final configuration must end with '.xyz'.")
 
     @classmethod
     def from_yaml(cls, filename: str) -> "RunParameters":
@@ -439,6 +459,6 @@ class RunParameters(object):
 
 
 if __name__ == '__main__':
-    RunParameters().to_yaml("example.yaml")
+    RunParameters(initial_configuration="tests/first_frame.xyz").to_yaml("example.yaml")
     parameters = RunParameters.from_yaml("example.yaml")
     print(parameters)

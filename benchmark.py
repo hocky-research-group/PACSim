@@ -23,8 +23,8 @@ def benchmark_parameters():
                                                                      debye_length=5.726968 * unit.nanometer,
                                                                      temperature=298.0 * unit.kelvin,
                                                                      dielectric_constant=80.0),
-        "collision_rate": 0.01 / unit.picosecond,
-        "timestep": 0.05 * unit.picosecond,
+        "collision_rate": 0.01 / (unit.pico * unit.second),
+        "timestep": 0.05 * (unit.pico * unit.second),
         "mass_positive": 1.0 * unit.amu,
         "side_length": 12328.05 * unit.nanometer,
     }

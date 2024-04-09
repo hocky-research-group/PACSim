@@ -20,9 +20,9 @@ def benchmark_hoomd(device: str = "CPU", number_steps: int = 100, shift: bool = 
                      * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
 
     # noinspection PyUnresolvedReferences
-    collision_rate = parameters["collision_rate"].value_in_unit(unit.picosecond ** -1)
+    collision_rate = parameters["collision_rate"].value_in_unit((unit.pico * unit.second) ** -1)
     # noinspection PyUnresolvedReferences
-    timestep = parameters["timestep"].value_in_unit(unit.picosecond)
+    timestep = parameters["timestep"].value_in_unit(unit.pico * unit.second)
     mass_positive = parameters["mass_positive"].value_in_unit(unit.amu)
     mass_negative = parameters["mass_negative"].value_in_unit(unit.amu)
 

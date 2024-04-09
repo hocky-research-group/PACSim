@@ -31,7 +31,8 @@ class ColloidPotentialsParameters(object):
         Defaults to 298.0 kelvin.
     :type temperature: unit.Quantity
     :param dielectric_constant:
-        The dielectric constant of the solvent [i.e., epsilon] and the value must be greater than zero.
+        The dielectric constant of the solvent [i.e., epsilon].
+        The value of the dielectric constant must be greater than zero.
         Defaults to 80.0 (i.e., water).
     :type dielectric_constant: float
 
@@ -43,23 +44,23 @@ class ColloidPotentialsParameters(object):
 
     VACUUM_PERMITTIVITY = 8.8541878128e-12 * unit.joule / (unit.volt ** 2 * unit.meter)
 
-    def __init__(self, brush_density: unit.Quantity = 0.09 / (unit.nanometer ** 2),
-                 brush_length: unit.Quantity = 10.0 * unit.nanometer,
-                 debye_length: unit.Quantity = 5.0 * unit.nanometer,
+    def __init__(self, brush_density: unit.Quantity = 0.09 / ((unit.nano * unit.meter) ** 2),
+                 brush_length: unit.Quantity = 10.0 * (unit.nano * unit.meter),
+                 debye_length: unit.Quantity = 5.0 * (unit.nano * unit.meter),
                  temperature: unit.Quantity = 298.0 * unit.kelvin,
                  dielectric_constant: float = 80.0):
         """Constructor of the ColloidPotentialsParameters class."""
-        if not brush_density.unit.is_compatible(unit.nanometer ** -2):
+        if not brush_density.unit.is_compatible((unit.nano * unit.meter) ** -2):
             raise TypeError("argument brush_density must have a unit that is compatible with 1/nanometer^2")
-        if not brush_density.value_in_unit(unit.nanometer ** -2) > 0.0:
+        if not brush_density.value_in_unit((unit.nano * unit.meter) ** -2) > 0.0:
             raise ValueError("argument brush_density must have a value greater than zero")
-        if not brush_length.unit.is_compatible(unit.nanometer):
+        if not brush_length.unit.is_compatible(unit.nano * unit.meter):
             raise TypeError("argument brush_length must have a unit that is compatible with nanometers")
-        if not brush_length.value_in_unit(unit.nanometer) > 0.0:
+        if not brush_length.value_in_unit(unit.nano * unit.meter) > 0.0:
             raise ValueError("argument brush_length must have a value greater than zero")
-        if not debye_length.unit.is_compatible(unit.nanometer):
+        if not debye_length.unit.is_compatible(unit.nano * unit.meter):
             raise TypeError("argument debye_length must have a unit that is compatible with nanometers")
-        if not debye_length.value_in_unit(unit.nanometer) > 0.0:
+        if not debye_length.value_in_unit(unit.nano * unit.meter) > 0.0:
             raise ValueError("argument debye_length must have a value greater than zero")
         if not temperature.unit.is_compatible(unit.kelvin):
             raise TypeError("argument temperature must have a unit that is compatible with kelvin")
@@ -67,9 +68,9 @@ class ColloidPotentialsParameters(object):
             raise ValueError("argument temperature must have a value greater than zero")
         if not dielectric_constant > 0.0:
             raise ValueError("argument dielectric_constant must have a value greater than zero")
-        self._brush_density = brush_density.in_units_of(unit.nanometer ** -2)
-        self._brush_length = brush_length.in_units_of(unit.nanometer)
-        self._debye_length = debye_length.in_units_of(unit.nanometer)
+        self._brush_density = brush_density.in_units_of((unit.nano * unit.meter) ** -2)
+        self._brush_length = brush_length.in_units_of(unit.nano * unit.meter)
+        self._debye_length = debye_length.in_units_of(unit.nano * unit.meter)
         self._temperature = temperature.in_units_of(unit.kelvin)
         self._dielectric_constant = dielectric_constant
 
@@ -96,6 +97,6 @@ class ColloidPotentialsParameters(object):
 
 if __name__ == '__main__':
     parameters_one = ColloidPotentialsParameters()
-    parameters_two = ColloidPotentialsParameters(brush_density=0.1 / (unit.nanometer ** 2))
+    parameters_two = ColloidPotentialsParameters(brush_density=0.1 / ((unit.nano * unit.meter) ** 2))
     print(parameters_one.brush_density)
     print(parameters_two.brush_density)

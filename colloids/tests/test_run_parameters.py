@@ -1,3 +1,4 @@
+from dataclasses import fields
 import os
 from openmm import unit
 import pytest
@@ -18,10 +19,11 @@ class TestQuantity(object):
                               (3.0 * (unit.mega * unit.angstrom) / ((unit.milli * unit.second) * unit.volt)),
                               (12.0 * (unit.mega * unit.angstrom) / (unit.milli * unit.second) * unit.volt)])
     def test_quantity(self, openmm_quantity):
-        print(openmm_quantity.unit.get_symbol())
         new_openmm_quantity = Quantity(openmm_quantity).to_openmm_quantity()
-        print(new_openmm_quantity)
-        assert new_openmm_quantity == openmm_quantity
+        # Using new_openmm_quantity == openmm_quantity directly can fail because openmm uses floating conversion factors
+        # in this equality comparison that can lead to small differences in the values.
+        assert (new_openmm_quantity.value_in_unit(openmm_quantity.unit)
+                == pytest.approx(openmm_quantity.value_in_unit(openmm_quantity.unit), rel=1e-12, abs=1e-12))
 
 
 class TestRunParameters(object):
@@ -40,7 +42,66 @@ class TestRunParameters(object):
         return RunParameters.from_yaml(yaml_file)
 
     def test_run_parameters(self, parameters, yaml_parameters):
-        assert yaml_parameters == parameters
+        # Because we cannot compare openmm quantities directly (see above), we have to compare all fields explicitly.
+        # When new fields are added to the RunParameters dataclass, this test must be updated accordingly.
+        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 26
+        assert parameters.initial_configuration == yaml_parameters.initial_configuration
+        assert len(parameters.masses) == len(yaml_parameters.masses)
+        assert len(parameters.radii) == len(yaml_parameters.radii)
+        assert len(parameters.surface_potentials) == len(yaml_parameters.surface_potentials)
+        for t in parameters.masses:
+            assert t in yaml_parameters.masses
+            assert (parameters.masses[t].value_in_unit(parameters.masses[t].unit)
+                    == pytest.approx(yaml_parameters.masses[t].value_in_unit(parameters.masses[t].unit), rel=1e-12,
+                                     abs=1e-12))
+        for t in parameters.radii:
+            assert t in yaml_parameters.radii
+            assert (parameters.radii[t].value_in_unit(parameters.radii[t].unit)
+                    == pytest.approx(yaml_parameters.radii[t].value_in_unit(parameters.radii[t].unit), rel=1e-12,
+                                     abs=1e-12))
+        for t in parameters.surface_potentials:
+            assert t in yaml_parameters.surface_potentials
+            assert (parameters.surface_potentials[t].value_in_unit(parameters.surface_potentials[t].unit)
+                    == pytest.approx(
+                        yaml_parameters.surface_potentials[t].value_in_unit(parameters.surface_potentials[t].unit),
+                        rel=1e-12, abs=1e-12))
+
+        assert (parameters.side_length.value_in_unit(parameters.side_length.unit)
+                == pytest.approx(yaml_parameters.side_length.value_in_unit(parameters.side_length.unit), rel=1e-12,
+                                 abs=1e-12))
+        assert parameters.platform_name == yaml_parameters.platform_name
+        assert (parameters.temperature.value_in_unit(parameters.temperature.unit)
+                == pytest.approx(yaml_parameters.temperature.value_in_unit(parameters.temperature.unit), rel=1e-12,
+                                 abs=1e-12))
+        assert (parameters.collision_rate.value_in_unit(parameters.collision_rate.unit)
+                == pytest.approx(yaml_parameters.collision_rate.value_in_unit(parameters.collision_rate.unit),
+                                 rel=1e-12, abs=1e-12))
+        assert (parameters.timestep.value_in_unit(parameters.timestep.unit)
+                == pytest.approx(yaml_parameters.timestep.value_in_unit(parameters.timestep.unit), rel=1e-12,
+                                 abs=1e-12))
+        assert (parameters.brush_density.value_in_unit(parameters.brush_density.unit)
+                == pytest.approx(yaml_parameters.brush_density.value_in_unit(parameters.brush_density.unit), rel=1e-12,
+                                 abs=1e-12))
+        assert (parameters.brush_length.value_in_unit(parameters.brush_length.unit)
+                == pytest.approx(yaml_parameters.brush_length.value_in_unit(parameters.brush_length.unit), rel=1e-12,
+                                 abs=1e-12))
+        assert (parameters.debye_length.value_in_unit(parameters.debye_length.unit)
+                == pytest.approx(yaml_parameters.debye_length.value_in_unit(parameters.debye_length.unit), rel=1e-12,
+                                 abs=1e-12))
+        assert parameters.dielectric_constant == yaml_parameters.dielectric_constant
+        assert parameters.use_log == yaml_parameters.use_log
+        assert parameters.integrator_seed == yaml_parameters.integrator_seed
+        assert parameters.velocity_seed == yaml_parameters.velocity_seed
+        assert parameters.run_steps == yaml_parameters.run_steps
+        assert parameters.state_data_interval == yaml_parameters.state_data_interval
+        assert parameters.state_data_filename == yaml_parameters.state_data_filename
+        assert parameters.trajectory_interval == yaml_parameters.trajectory_interval
+        assert parameters.trajectory_filename == yaml_parameters.trajectory_filename
+        assert parameters.checkpoint_interval == yaml_parameters.checkpoint_interval
+        assert parameters.checkpoint_filename == yaml_parameters.checkpoint_filename
+        assert parameters.minimize_energy_initially == yaml_parameters.minimize_energy_initially
+        assert parameters.final_configuration_gsd_filename == yaml_parameters.final_configuration_gsd_filename
+        assert parameters.final_configuration_xyz_filename == yaml_parameters.final_configuration_xyz_filename
 
 
 if __name__ == '__main__':

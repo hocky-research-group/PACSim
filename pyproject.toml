@@ -13,7 +13,8 @@ dependencies = [
     "numpy >= 1.26",
     "openmm >= 8.0",
     "pytest >= 7.4",
-    "gsd >= 3.2"
+    "gsd >= 3.2",
+    "pyyaml >= 6.0"
 ]
 
 [tool.setuptools.packages.find]

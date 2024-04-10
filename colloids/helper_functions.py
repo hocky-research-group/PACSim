@@ -70,19 +70,32 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict
         f.append(frame)
 
 
+def write_xyz_file(filename: str, openmm_simulation: app.Simulation) -> None:
+    positions = (
+        openmm_simulation.context.getState(getPositions=True, enforcePeriodicBox=True).getPositions(asNumpy=True))
+    positions = positions.value_in_unit(unit.nano * unit.meter)
+    topology = openmm_simulation.topology
+    assert topology.getNumChains() == 1
+    assert topology.getNumResidues() == 1
+    assert topology.getNumAtoms() == openmm_simulation.system.getNumParticles() == len(positions)
+    assert len(list(topology.atoms())) == len(positions)
+    with open(filename, "w") as file:
+        print(openmm_simulation.system.getNumParticles(), file=file)
+        print("Atom positions:", file=file)
+        for atom, position in zip(topology.atoms(), positions):
+            assert len(position) == 3
+            print(f"{atom.name} {position[0]} {position[1]} {position[2]}", file=file)
+
+
 # noinspection PyUnresolvedReferences
-def write_xyz_file(filename: str, gsd_snapshot: hoomd.data.SnapshotParticleData) -> None:
+def write_xyz_file_from_hoomd(filename: str, gsd_snapshot: hoomd.data.SnapshotParticleData) -> None:
     with open(filename, "x") as file:
         print(gsd_snapshot.particles.N, file=file)
         print("Atom positions:", file=file)
         for index in range(gsd_snapshot.particles.N):
             position = gsd_snapshot.particles.position[index, :]
             t = gsd_snapshot.particles.types[index]
-            if t == "positive":
-                print(f"P {position[0]} {position[1]} {position[2]}", file=file)
-            else:
-                assert t == "negative"
-                print(f"N {position[0]} {position[1]} {position[2]}", file=file)
+            print(f"{t} {position[0]} {position[1]} {position[2]}", file=file)
 
 
 def main() -> None:

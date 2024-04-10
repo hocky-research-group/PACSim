@@ -46,6 +46,9 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
     :type use_log: bool
     """
 
+    _nanometer = unit.nano * unit.meter
+    _millivolt = unit.milli * unit.volt
+
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
                  use_log: bool = True) -> None:
         """Constructor of the ColloidPotentialsAlgebraic class."""
@@ -53,7 +56,7 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         self._use_log = use_log
         self._steric_potential = self._set_up_steric_potential()
         self._electrostatic_potential = self._set_up_electrostatic_potential()
-        self._max_radius = -math.inf * unit.nanometer
+        self._max_radius = -math.inf * self._nanometer
 
     def _set_up_steric_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""
@@ -72,11 +75,11 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             "steric_prefactor",
             (unit.BOLTZMANN_CONSTANT_kB * self._parameters.temperature
              * 16.0 * math.pi * (self._parameters.brush_density ** (3 / 2)) / 35.0
-             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole / (unit.nanometer ** 3))
+             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole / (self._nanometer ** 3))
         )
         # Brush length L (see Hocky paper)
         steric_potential.addGlobalParameter("brush_length",
-                                            self._parameters.brush_length.value_in_unit(unit.nanometer))
+                                            self._parameters.brush_length.value_in_unit(self._nanometer))
         steric_potential.addPerParticleParameter("radius")
         return steric_potential
 
@@ -101,9 +104,9 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             "electrostatic_prefactor",
             (2.0 * math.pi * self._parameters.VACUUM_PERMITTIVITY * self._parameters.dielectric_constant
              * unit.AVOGADRO_CONSTANT_NA).value_in_unit(
-                unit.kilojoule_per_mole / (unit.nanometer * (unit.milli * unit.volt) ** 2)))
+                unit.kilojoule_per_mole / (self._nanometer * self._millivolt ** 2)))
         electrostatic_potential.addGlobalParameter("debye_length",
-                                                   self._parameters.debye_length.value_in_unit(unit.nanometer))
+                                                   self._parameters.debye_length.value_in_unit(self._nanometer))
         electrostatic_potential.addPerParticleParameter("radius")
         # Psi should be given in millivolts.
         electrostatic_potential.addPerParticleParameter("psi")
@@ -133,12 +136,12 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         """
         super().add_particle(radius, surface_potential)
 
-        if radius.in_units_of(unit.nanometer) > self._max_radius:
-            self._max_radius = radius.in_units_of(unit.nanometer)
+        if radius.in_units_of(self._nanometer) > self._max_radius:
+            self._max_radius = radius.in_units_of(self._nanometer)
 
-        self._steric_potential.addParticle([radius.value_in_unit(unit.nanometer)])
-        self._electrostatic_potential.addParticle([radius.value_in_unit(unit.nanometer),
-                                                   surface_potential.value_in_unit(unit.milli * unit.volt)])
+        self._steric_potential.addParticle([radius.value_in_unit(self._nanometer)])
+        self._electrostatic_potential.addParticle([radius.value_in_unit(self._nanometer),
+                                                   surface_potential.value_in_unit(self._millivolt)])
 
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """
@@ -155,11 +158,11 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             If the method add_particle was not called before this method (via the abstract base class).
         """
         super().yield_potentials()
-        assert not math.isinf(self._max_radius.value_in_unit(unit.nanometer))
+        assert not math.isinf(self._max_radius.value_in_unit(self._nanometer))
 
         self._steric_potential.setNonbondedMethod(self._steric_potential.CutoffPeriodic)
         self._steric_potential.setCutoffDistance(
-            (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(unit.nanometer))
+            (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(self._nanometer))
         self._steric_potential.setUseLongRangeCorrection(False)
         self._steric_potential.setUseSwitchingFunction(False)
         # Set different force groups for steric and electrostatic potentials to allow for different cutoffs on the
@@ -168,11 +171,11 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
 
         self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffPeriodic)
         self._electrostatic_potential.setCutoffDistance(
-            (2.0 * self._max_radius + 21.0 * self._parameters.debye_length).value_in_unit(unit.nanometer))
+            (2.0 * self._max_radius + 21.0 * self._parameters.debye_length).value_in_unit(self._nanometer))
         self._electrostatic_potential.setUseLongRangeCorrection(False)
         self._electrostatic_potential.setUseSwitchingFunction(True)
         self._electrostatic_potential.setSwitchingDistance(
-            (2.0 * self._max_radius + 20.0 * self._parameters.debye_length).value_in_unit(unit.nanometer))
+            (2.0 * self._max_radius + 20.0 * self._parameters.debye_length).value_in_unit(self._nanometer))
         self._electrostatic_potential.setForceGroup(1)
 
         yield self._steric_potential

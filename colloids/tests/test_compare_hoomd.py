@@ -1,4 +1,3 @@
-from importlib import reload
 import hoomd
 import hoomd.md
 import numpy as np
@@ -34,20 +33,18 @@ class TestCompareHoomd(object):
                 (params["radius_negative"] / params["radius_positive"]) ** 3 * params["mass_positive"])
         return params
 
+    @pytest.fixture(params=["first_frame", "final_frame"])
+    def filename(self, request):
+        return request.param
+
     @pytest.fixture(params=["algebraic", "tabulated"])
-    def openmm_result(self, parameters, request):
-        types, positions = read_xyz_file("first_frame.xyz")
+    def openmm_result(self, parameters, filename, request):
+        types, positions = read_xyz_file(f"{filename}.xyz")
         topology = app.topology.Topology()
         chain = topology.addChain()
         residue = topology.addResidue("res1", chain)
-        app.element.Element(0, "positive", "positive", parameters["mass_positive"])
-        app.element.Element(1, "negative", "negative", parameters["mass_negative"])
         for t, position in zip(types, positions):
-            if t == "P":
-                topology.addAtom("positive", app.element.Element.getBySymbol("positive"), residue)
-            else:
-                assert t == "N"
-                topology.addAtom("negative", app.element.Element.getBySymbol("negative"), residue)
+            topology.addAtom(t, None, residue)
         topology.setPeriodicBoxVectors(np.array(
             [[parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0, 0.0],
              [0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0],
@@ -87,15 +84,12 @@ class TestCompareHoomd(object):
         simulation.context.setPositions(positions)
         simulation.context.setVelocitiesToTemperature(parameters["colloid_potentials_parameters"].temperature, 1)
         openmm_state = simulation.context.getState(getEnergy=True)
-        yield openmm_state.getPotentialEnergy()
-        # Reload the element module to reset the existing set of elements.
-        # Without this, adding the same element again above would raise an exception.
-        reload(openmm.app.element)
+        return openmm_state.getPotentialEnergy()
 
     @pytest.fixture
-    def hoomd_result(self, parameters):
+    def hoomd_result(self, parameters, filename):
         hoomd.context.initialize("--mode=cpu --notice-level=0")
-        snapshot = hoomd.data.gsd_snapshot("first_frame.gsd")
+        snapshot = hoomd.data.gsd_snapshot(f"{filename}.gsd")
         hoomd.init.read_snapshot(snapshot)
         nl = hoomd.md.nlist.cell()
         ColloidPotentialsTabulatedHoomd(
@@ -103,16 +97,16 @@ class TestCompareHoomd(object):
             radius_two=parameters["radius_negative"].value_in_unit(unit.nano * unit.meter),
             surface_potential_one=parameters["surface_potential_positive"].value_in_unit(unit.milli * unit.volt),
             surface_potential_two=parameters["surface_potential_negative"].value_in_unit(unit.milli * unit.volt),
-            type_one="positive", type_two="negative",
+            type_one="P", type_two="N",
             colloid_potentials_parameters=parameters["colloid_potentials_parameters"],
             neighbor_list=nl, shift=False)
         k_temperature = (parameters["colloid_potentials_parameters"].temperature * unit.BOLTZMANN_CONSTANT_kB
                          * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
         hoomd.md.integrate.mode_standard(dt=parameters["timestep"].value_in_unit(unit.pico * unit.second))
         langevin = hoomd.md.integrate.langevin(group=hoomd.group.all(), kT=k_temperature, seed=1)
-        langevin.set_gamma("positive", parameters["mass_positive"].value_in_unit(unit.amu)
+        langevin.set_gamma("P", parameters["mass_positive"].value_in_unit(unit.amu)
                            * parameters["collision_rate"].value_in_unit((unit.pico * unit.second) ** -1))
-        langevin.set_gamma("negative", parameters["mass_negative"].value_in_unit(unit.amu)
+        langevin.set_gamma("N", parameters["mass_negative"].value_in_unit(unit.amu)
                            * parameters["collision_rate"].value_in_unit((unit.pico * unit.second) ** -1))
         # noinspection PyTypeChecker
         log = hoomd.analyze.log(filename=None, quantities=["potential_energy"], period=1, overwrite=True, phase=-1)

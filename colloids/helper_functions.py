@@ -10,6 +10,8 @@ from openmm import unit
 
 def read_xyz_file(filename: str, units: bool = True) -> (npt.NDArray[str],
                                                          Union[npt.NDArray[float], npt.NDArray[unit.Quantity]]):
+    if not filename.endswith(".xyz"):
+        raise ValueError("The file must have the .xyz extension.")
     with open(filename, "r") as f:
         line = next(f)
         ls = line.split()

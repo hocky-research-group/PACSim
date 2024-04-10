@@ -201,13 +201,22 @@ class TestColloidPotentialsForTwoParticles(TestParameters):
 
             assert not steric_force.getUseSwitchingFunction()
             assert electrostatic_force.getUseSwitchingFunction()
-            assert electrostatic_force.getSwitchingDistance() == 2.0 * max(radius_one, radius_two) + 20.0 * debye_length
+            assert (electrostatic_force.getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
 
             assert steric_force.getNonbondedMethod() == steric_force.CutoffPeriodic
             assert electrostatic_force.getNonbondedMethod() == electrostatic_force.CutoffPeriodic
 
-            assert steric_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 2.0 * brush_length
-            assert electrostatic_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 21.0 * debye_length
+            assert (steric_force.getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 2.0 * brush_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (electrostatic_force.getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
         else:
             assert isinstance(colloid_potentials, ColloidPotentialsTabulated)
             assert len(openmm_context.getSystem().getForces()) == 3
@@ -217,19 +226,26 @@ class TestColloidPotentialsForTwoParticles(TestParameters):
                 assert force.getUseSwitchingFunction()
                 assert force.getNonbondedMethod() == force.CutoffPeriodic
                 assert force.getNumInteractionGroups() == 1
-            assert (openmm_context.getSystem().getForce(0).getCutoffDistance()
-                    == 2.0 * radius_one + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(1).getCutoffDistance()
-                    == 2.0 * radius_two + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(2).getCutoffDistance()
-                    == radius_one + radius_two + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(0).getSwitchingDistance()
-                    == 2.0 * radius_one + 20.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(1).getSwitchingDistance()
-                    == 2.0 * radius_two + 20.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(2).getSwitchingDistance()
-                    == radius_one + radius_two + 20.0 * debye_length)
-            print(openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0))
+            assert (openmm_context.getSystem().getForce(0).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_one + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(1).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_two + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(2).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx(
+                        (radius_one + radius_two + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                        rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(0).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_one + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(1).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(2).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx(
+                        (radius_one + radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                        rel=1e-12, abs=1e-12))
             assert openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0) == [(0,), (0,)]
             assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(1,), (1,)]
             assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0,), (1,)]
@@ -293,13 +309,22 @@ class TestColloidPotentialsWithLogForTwoParticles(TestParameters):
 
             assert not steric_force.getUseSwitchingFunction()
             assert electrostatic_force.getUseSwitchingFunction()
-            assert electrostatic_force.getSwitchingDistance() == 2.0 * max(radius_one, radius_two) + 20.0 * debye_length
+            assert (electrostatic_force.getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
 
             assert steric_force.getNonbondedMethod() == steric_force.CutoffPeriodic
             assert electrostatic_force.getNonbondedMethod() == electrostatic_force.CutoffPeriodic
 
-            assert steric_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 2.0 * brush_length
-            assert electrostatic_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 21.0 * debye_length
+            assert (steric_force.getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 2.0 * brush_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (electrostatic_force.getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
         else:
             assert isinstance(colloid_potentials_log, ColloidPotentialsTabulated)
             assert len(openmm_context.getSystem().getForces()) == 3
@@ -309,19 +334,26 @@ class TestColloidPotentialsWithLogForTwoParticles(TestParameters):
                 assert force.getUseSwitchingFunction()
                 assert force.getNonbondedMethod() == force.CutoffPeriodic
                 assert force.getNumInteractionGroups() == 1
-            assert (openmm_context.getSystem().getForce(0).getCutoffDistance()
-                    == 2.0 * radius_one + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(1).getCutoffDistance()
-                    == 2.0 * radius_two + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(2).getCutoffDistance()
-                    == radius_one + radius_two + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(0).getSwitchingDistance()
-                    == 2.0 * radius_one + 20.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(1).getSwitchingDistance()
-                    == 2.0 * radius_two + 20.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(2).getSwitchingDistance()
-                    == radius_one + radius_two + 20.0 * debye_length)
-            print(openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0))
+            assert (openmm_context.getSystem().getForce(0).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_one + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(1).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_two + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(2).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx(
+                        (radius_one + radius_two + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                        rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(0).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_one + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(1).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(2).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx(
+                        (radius_one + radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                        rel=1e-12, abs=1e-12))
             assert openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0) == [(0,), (0,)]
             assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(1,), (1,)]
             assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0,), (1,)]
@@ -387,13 +419,22 @@ class TestColloidPotentialsForFourParticles(TestParameters):
 
             assert not steric_force.getUseSwitchingFunction()
             assert electrostatic_force.getUseSwitchingFunction()
-            assert electrostatic_force.getSwitchingDistance() == 2.0 * max(radius_one, radius_two) + 20.0 * debye_length
+            assert (electrostatic_force.getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
 
             assert steric_force.getNonbondedMethod() == steric_force.CutoffPeriodic
             assert electrostatic_force.getNonbondedMethod() == electrostatic_force.CutoffPeriodic
 
-            assert steric_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 2.0 * brush_length
-            assert electrostatic_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 21.0 * debye_length
+            assert (steric_force.getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 2.0 * brush_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (electrostatic_force.getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
         else:
             assert isinstance(colloid_potentials, ColloidPotentialsTabulated)
             assert len(openmm_context.getSystem().getForces()) == 3
@@ -403,19 +444,26 @@ class TestColloidPotentialsForFourParticles(TestParameters):
                 assert force.getUseSwitchingFunction()
                 assert force.getNonbondedMethod() == force.CutoffPeriodic
                 assert force.getNumInteractionGroups() == 1
-            assert (openmm_context.getSystem().getForce(0).getCutoffDistance()
-                    == 2.0 * radius_one + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(1).getCutoffDistance()
-                    == 2.0 * radius_two + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(2).getCutoffDistance()
-                    == radius_one + radius_two + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(0).getSwitchingDistance()
-                    == 2.0 * radius_one + 20.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(1).getSwitchingDistance()
-                    == 2.0 * radius_two + 20.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(2).getSwitchingDistance()
-                    == radius_one + radius_two + 20.0 * debye_length)
-            print(openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0))
+            assert (openmm_context.getSystem().getForce(0).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_one + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(1).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_two + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(2).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx(
+                        (radius_one + radius_two + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                        rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(0).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_one + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(1).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(2).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx(
+                        (radius_one + radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                        rel=1e-12, abs=1e-12))
             assert openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0) == [(0, 1), (0, 1)]
             assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(2, 3), (2, 3)]
             assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0, 1), (2, 3)]
@@ -491,13 +539,22 @@ class TestColloidPotentialsWithLogForFourParticles(TestParameters):
 
             assert not steric_force.getUseSwitchingFunction()
             assert electrostatic_force.getUseSwitchingFunction()
-            assert electrostatic_force.getSwitchingDistance() == 2.0 * max(radius_one, radius_two) + 20.0 * debye_length
+            assert (electrostatic_force.getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
 
             assert steric_force.getNonbondedMethod() == steric_force.CutoffPeriodic
             assert electrostatic_force.getNonbondedMethod() == electrostatic_force.CutoffPeriodic
 
-            assert steric_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 2.0 * brush_length
-            assert electrostatic_force.getCutoffDistance() == 2.0 * max(radius_one, radius_two) + 21.0 * debye_length
+            assert (steric_force.getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 2.0 * brush_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (electrostatic_force.getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * max(radius_one, radius_two)
+                                      + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
         else:
             assert isinstance(colloid_potentials_log, ColloidPotentialsTabulated)
             assert len(openmm_context.getSystem().getForces()) == 3
@@ -507,19 +564,26 @@ class TestColloidPotentialsWithLogForFourParticles(TestParameters):
                 assert force.getUseSwitchingFunction()
                 assert force.getNonbondedMethod() == force.CutoffPeriodic
                 assert force.getNumInteractionGroups() == 1
-            assert (openmm_context.getSystem().getForce(0).getCutoffDistance()
-                    == 2.0 * radius_one + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(1).getCutoffDistance()
-                    == 2.0 * radius_two + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(2).getCutoffDistance()
-                    == radius_one + radius_two + 21.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(0).getSwitchingDistance()
-                    == 2.0 * radius_one + 20.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(1).getSwitchingDistance()
-                    == 2.0 * radius_two + 20.0 * debye_length)
-            assert (openmm_context.getSystem().getForce(2).getSwitchingDistance()
-                    == radius_one + radius_two + 20.0 * debye_length)
-            print(openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0))
+            assert (openmm_context.getSystem().getForce(0).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_one + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(1).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_two + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(2).getCutoffDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx(
+                        (radius_one + radius_two + 21.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                        rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(0).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_one + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(1).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx((2.0 * radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                                     rel=1e-12, abs=1e-12))
+            assert (openmm_context.getSystem().getForce(2).getSwitchingDistance().value_in_unit(unit.nano * unit.meter)
+                    == pytest.approx(
+                        (radius_one + radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
+                        rel=1e-12, abs=1e-12))
             assert openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0) == [(0, 1), (0, 1)]
             assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(2, 3), (2, 3)]
             assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0, 1), (2, 3)]

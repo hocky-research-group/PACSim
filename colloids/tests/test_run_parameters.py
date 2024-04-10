@@ -31,6 +31,12 @@ class TestRunParameters(object):
     def parameters(self):
         return RunParameters(initial_configuration="first_frame.xyz")
 
+    @pytest.fixture(autouse=True)
+    def change_test_dir(self, request, monkeypatch):
+        # Change the working directory to the directory of the test file.
+        # See https://stackoverflow.com/questions/62044541/change-pytest-working-directory-to-test-case-directory
+        monkeypatch.chdir(request.fspath.dirname)
+
     @pytest.fixture
     def yaml_file(self, parameters):
         parameters.to_yaml("test.yaml")

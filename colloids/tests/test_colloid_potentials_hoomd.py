@@ -29,6 +29,12 @@ class TestColloidPotentialsTabulatedHoomd(object):
                 (params["radius_negative"] / params["radius_positive"]) ** 3 * params["mass_positive"])
         return params
 
+    @pytest.fixture(autouse=True)
+    def change_test_dir(self, request, monkeypatch):
+        # Change the working directory to the directory of the test file.
+        # See https://stackoverflow.com/questions/62044541/change-pytest-working-directory-to-test-case-directory
+        monkeypatch.chdir(request.fspath.dirname)
+
     @pytest.mark.parametrize("filename,shift,expected",
                              [["first_frame.gsd", True, -0.4659521251272684],
                               ["first_frame.gsd", False, -0.4911881156335491],

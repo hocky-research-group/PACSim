@@ -55,4 +55,5 @@ timestep: !Quantity
 trajectory_filename: trajectory.dcd
 trajectory_interval: 1000000000
 use_log: false
+use_tabulated: false
 velocity_seed: null

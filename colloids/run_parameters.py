@@ -205,6 +205,11 @@ class RunParameters(object):
         (Oxford University Press, 2001), 2nd edition].
         Defaults to False.
     :type use_log: bool
+    :param use_tabulated:
+        If True, the steric and electrostatic forces are computed based on tabulated functions.
+        If False, the steric and electrostatic forces are computed based on algebraic expressions.
+        Defaults to False.
+    :type use_tabulated: bool
     :param integrator_seed:
         The seed for the random number generator of the integrator.
         If None, a random seed is used.
@@ -290,6 +295,7 @@ class RunParameters(object):
     debye_length: unit.Quantity = 5.726968 * (unit.nano * unit.meter)
     dielectric_constant: float = 80.0
     use_log: bool = False
+    use_tabulated: bool = False
     integrator_seed: Optional[int] = None
     velocity_seed: Optional[int] = None
     run_steps: int = 100

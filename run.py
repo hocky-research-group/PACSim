@@ -3,7 +3,7 @@ import numpy as np
 import openmm
 from openmm import app
 from openmm import unit
-from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters
+from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
 from colloids.run_parameters import RunParameters
 
@@ -62,8 +62,21 @@ def main():
         debye_length=parameters.debye_length, temperature=parameters.temperature,
         dielectric_constant=parameters.dielectric_constant
     )
-    colloid_potentials = ColloidPotentialsAlgebraic(
-        colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log)
+    if parameters.use_tabulated:
+        # TODO: Maybe generalize tabulated potentials to more than two types.
+        set_of_types = set(types)
+        if not len(set_of_types) == 2:
+            raise ValueError("Tabulated potentials only supports two types.")
+        first_type = set_of_types.pop()
+        second_type = set_of_types.pop()
+        colloid_potentials = ColloidPotentialsTabulated(
+            radius_one=parameters.radii[first_type], radius_two=parameters.radii[second_type],
+            surface_potential_one=parameters.surface_potentials[first_type],
+            surface_potential_two=parameters.surface_potentials[second_type],
+            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log)
+    else:
+        colloid_potentials = ColloidPotentialsAlgebraic(
+            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log)
 
     for t, position in zip(types, positions):
         system.addParticle(parameters.masses[t])

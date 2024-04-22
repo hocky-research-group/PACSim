@@ -88,13 +88,13 @@ def write_xyz_file(filename: str, openmm_simulation: app.Simulation) -> None:
 
 
 # noinspection PyUnresolvedReferences
-def write_xyz_file_from_hoomd(filename: str, gsd_snapshot: hoomd.data.SnapshotParticleData) -> None:
-    with open(filename, "x") as file:
+def write_xyz_file_from_gsd_snapshot(filename: str, gsd_snapshot: hoomd.data.SnapshotParticleData) -> None:
+    with open(filename, "w") as file:
         print(gsd_snapshot.particles.N, file=file)
         print("Atom positions:", file=file)
         for index in range(gsd_snapshot.particles.N):
             position = gsd_snapshot.particles.position[index, :]
-            t = gsd_snapshot.particles.types[index]
+            t = gsd_snapshot.particles.types[gsd_snapshot.particles.typeid[index]]
             print(f"{t} {position[0]} {position[1]} {position[2]}", file=file)
 
 

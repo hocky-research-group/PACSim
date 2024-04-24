@@ -88,11 +88,12 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str]) -> app
     return simulation
 
 
-def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append: bool) -> None:
+def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append: bool,
+                     total_number_steps: int) -> None:
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
                                             parameters.radii, parameters.surface_potentials, simulation,
                                             append_file=append))
-    simulation.reporters.append(StatusReporter(parameters.run_steps // 100, parameters.run_steps))
+    simulation.reporters.append(StatusReporter(total_number_steps // 100, total_number_steps))
     simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
                                                       parameters.state_data_interval, time=True,
                                                       kineticEnergy=True, potentialEnergy=True, temperature=True,
@@ -128,7 +129,7 @@ def main():
         # See https://openmm.github.io/openmm-cookbook/dev/notebooks/cookbook/report_minimization.html
         simulation.minimizeEnergy()
 
-    set_up_reporters(parameters, simulation, False)
+    set_up_reporters(parameters, simulation, False, parameters.run_steps)
 
     simulation.step(parameters.run_steps)
     # TODO: Automatically plot energies etc.

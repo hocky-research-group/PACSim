@@ -15,7 +15,7 @@ debye_length: !Quantity
 dielectric_constant: 80.0
 final_configuration_gsd_filename: final_frame.gsd
 final_configuration_xyz_filename: final_frame.xyz
-initial_configuration: colloids/tests/first_frame.xyz
+initial_configuration: tests/first_frame.xyz
 integrator_seed: null
 masses:
   N: !Quantity

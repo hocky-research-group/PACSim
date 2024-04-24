@@ -8,6 +8,7 @@ from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters, Co
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
 from colloids.run_parameters import RunParameters
+from colloids.status_reporter import StatusReporter
 
 
 class ExampleAction(argparse.Action):
@@ -71,7 +72,7 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str]) -> app
         colloid_potentials = ColloidPotentialsAlgebraic(
             colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log)
 
-    for t, position in zip(types, positions):
+    for t in types:
         system.addParticle(parameters.masses[t])
         colloid_potentials.add_particle(radius=parameters.radii[t],
                                         surface_potential=parameters.surface_potentials[t])
@@ -91,12 +92,14 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
                                             parameters.radii, parameters.surface_potentials, simulation,
                                             append_file=append))
+    simulation.reporters.append(StatusReporter(parameters.run_steps // 100, parameters.run_steps))
     simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
                                                       parameters.state_data_interval, time=True,
                                                       kineticEnergy=True, potentialEnergy=True, temperature=True,
                                                       speed=True, append=append))
     simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
                                                        parameters.checkpoint_interval))
+
 
 def main():
     parser = argparse.ArgumentParser(description="Run OpenMM for a colloids system.")

@@ -108,7 +108,7 @@ class GSDReporter(object):
         self._radii = radii
         self._surface_potentials = surface_potentials
         self._append_file = append_file
-        self._file = gsd.hoomd.open(name=filename, mode="r+" if self._append_file else "x")
+        self._file = gsd.hoomd.open(name=filename, mode="r+" if self._append_file else "w")
         self._frame = None
         self.report(simulation, simulation.context.getState(getPositions=True, getVelocities=True, getEnergy=True,
                                                             enforcePeriodicBox=False))

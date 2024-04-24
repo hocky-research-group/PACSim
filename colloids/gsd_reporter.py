@@ -133,7 +133,6 @@ class GSDReporter(object):
         :rtype: tuple[int, bool, bool, bool, bool, bool]
         """
         steps = self._report_interval - simulation.currentStep % self._report_interval
-        # TODO: Play around with enforcePeriodicBox (last argument, look at trajectory).
         return steps, True, True, False, True, False
 
     def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:

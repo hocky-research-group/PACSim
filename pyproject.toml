@@ -19,6 +19,7 @@ dependencies = [
 
 [project.scripts]
 colloids-run = "colloids.colloids_run:main"
+colloids-resume = "colloids.colloids_resume:main"
 
 [tool.setuptools.packages.find]
 exclude = ["Literature", "jupyter-scripts"]

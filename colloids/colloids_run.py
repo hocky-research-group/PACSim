@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+import numpy.typing as npt
 import openmm
 from openmm import app
 from openmm import unit
@@ -21,21 +22,12 @@ class ExampleAction(argparse.Action):
         parser.exit()
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Run OpenMM for a colloids system.")
-    parser.add_argument("yaml_file", help="YAML file with simulation parameters", type=str)
-    parser.add_argument("--example", help="write an example YAML file and exit", action=ExampleAction)
-    args = parser.parse_args()
-
-    parameters = RunParameters.from_yaml(args.yaml_file)
-
-    types, positions = read_xyz_file(parameters.initial_configuration)
-
+def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str]) -> app.Simulation:
     topology = app.topology.Topology()
     chain = topology.addChain()
     residue = topology.addResidue("res1", chain)
 
-    for t, position in zip(types, positions):
+    for t in types:
         topology.addAtom(t, None, residue)
 
     topology.setPeriodicBoxVectors(np.array(
@@ -91,8 +83,36 @@ def main():
                                     platformProperties={"Precision": "mixed"})
     else:
         simulation = app.Simulation(topology, system, integrator, platform)
-    simulation.context.setPositions(positions)
 
+    return simulation
+
+
+def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append: bool) -> None:
+    simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
+                                            parameters.radii, parameters.surface_potentials, simulation,
+                                            append_file=append))
+    simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
+                                                      parameters.state_data_interval, time=True,
+                                                      kineticEnergy=True, potentialEnergy=True, temperature=True,
+                                                      speed=True, append=append))
+    simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
+                                                       parameters.checkpoint_interval))
+
+def main():
+    parser = argparse.ArgumentParser(description="Run OpenMM for a colloids system.")
+    parser.add_argument("yaml_file", help="YAML file with simulation parameters", type=str)
+    parser.add_argument("--example", help="write an example YAML file and exit", action=ExampleAction)
+    args = parser.parse_args()
+
+    if not args.yaml_file.endswith(".yaml"):
+        raise ValueError("The YAML file must have the .yaml extension.")
+
+    parameters = RunParameters.from_yaml(args.yaml_file)
+    types, positions = read_xyz_file(parameters.initial_configuration)
+
+    simulation = set_up_simulation(parameters, types)
+
+    simulation.context.setPositions(positions)
     if parameters.velocity_seed is not None:
         simulation.context.setVelocitiesToTemperature(parameters.temperature,
                                                       parameters.velocity_seed)
@@ -105,15 +125,7 @@ def main():
         # See https://openmm.github.io/openmm-cookbook/dev/notebooks/cookbook/report_minimization.html
         simulation.minimizeEnergy()
 
-    simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
-                                            parameters.radii, parameters.surface_potentials, simulation,
-                                            append_file=False))
-    simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
-                                                      parameters.state_data_interval, time=True,
-                                                      kineticEnergy=True, potentialEnergy=True, temperature=True,
-                                                      speed=True))
-    simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
-                                                       parameters.checkpoint_interval))
+    set_up_reporters(parameters, simulation, False)
 
     simulation.step(parameters.run_steps)
     # TODO: Automatically plot energies etc.

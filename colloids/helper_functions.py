@@ -31,41 +31,53 @@ def read_xyz_file(filename: str, units: bool = True) -> (npt.NDArray[str],
     return types, positions
 
 
-def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict: dict[str, unit.Quantity]) -> None:
+def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict: dict[str, unit.Quantity],
+                   surface_potentials_dict: dict[str, unit.Quantity]) -> None:
+    nanometer = unit.nano * unit.meter
+    millivolt = unit.milli * unit.volt
+
     positions = (
-        openmm_simulation.context.getState(getPositions=True, enforcePeriodicBox=True).getPositions(asNumpy=True))
+        openmm_simulation.context.getState(getPositions=True, enforcePeriodicBox=False).getPositions(asNumpy=True))
     topology = openmm_simulation.topology
     assert topology.getNumChains() == 1
     assert topology.getNumResidues() == 1
     assert topology.getNumAtoms() == openmm_simulation.system.getNumParticles() == len(positions)
     periodic_box_vectors = openmm_simulation.system.getDefaultPeriodicBoxVectors()
     assert len(periodic_box_vectors) == 3
-    side_length = periodic_box_vectors[0][0].value_in_unit(unit.nano * unit.meter)
-    assert periodic_box_vectors[0][1].value_in_unit(unit.nano * unit.meter) == 0.0
-    assert periodic_box_vectors[0][2].value_in_unit(unit.nano * unit.meter) == 0.0
-    assert periodic_box_vectors[1][0].value_in_unit(unit.nano * unit.meter) == 0.0
-    assert periodic_box_vectors[1][1].value_in_unit(unit.nano * unit.meter) == side_length
-    assert periodic_box_vectors[1][2].value_in_unit(unit.nano * unit.meter) == 0.0
-    assert periodic_box_vectors[2][0].value_in_unit(unit.nano * unit.meter) == 0.0
-    assert periodic_box_vectors[2][1].value_in_unit(unit.nano * unit.meter) == 0.0
-    assert periodic_box_vectors[2][2].value_in_unit(unit.nano * unit.meter) == side_length
+    assert periodic_box_vectors[0][1].value_in_unit(nanometer) == 0.0
+    assert periodic_box_vectors[0][2].value_in_unit(nanometer) == 0.0
+    assert periodic_box_vectors[1][2].value_in_unit(nanometer) == 0.0
 
     frame = gsd.hoomd.Frame()
     frame.particles.N = topology.getNumAtoms()
-    # Shift positions so that they are in the range [-side_length / 2, side_length / 2] (openmm uses [0, side_length]).
-    frame.particles.position = (positions.value_in_unit(unit.nano * unit.meter)
-                                - np.array([side_length / 2.0 for _ in range(3)]))
+    frame.particles.position = positions.value_in_unit(nanometer)
     types_set = set(atom.name for atom in topology.atoms())
     assert len(types_set) == 2
     types = list(types_set)
     assert all(t in radius_dict for t in types)
     frame.particles.types = types
-    frame.particles.typeid = [types.index(atom.name) for atom in topology.atoms()]
+    typeid = [types.index(atom.name) for atom in topology.atoms()]
+    frame.particles.typeid = typeid
     frame.particles.type_shapes = [
-        {"type": "Sphere", "diameter": 2.0 * radius_dict[t].value_in_unit(unit.nano * unit.meter)} for t in types]
+        {"type": "Sphere", "diameter": 2.0 * radius_dict[t].value_in_unit(nanometer)} for t in types]
+    frame.particles.diameter = [
+        2.0 * radius_dict[types[typeid[atom_index]]].value_in_unit(nanometer)
+        for atom_index in range(topology.getNumAtoms())]
+    frame.particles.charge = [
+        surface_potentials_dict[types[typeid[atom_index]]].value_in_unit(millivolt)
+        for atom_index in range(topology.getNumAtoms())]
     frame.particles.mass = [openmm_simulation.system.getParticleMass(atom_index).value_in_unit(unit.amu)
                             for atom_index in range(topology.getNumAtoms())]
-    frame.configuration.box = [side_length, side_length, side_length, 0, 0, 0]
+    # See http://docs.openmm.org/7.6.0/userguide/theory/05_other_features.html
+    # See https://hoomd-blue.readthedocs.io/en/v2.9.3/box.html
+    frame.configuration.box = [
+        periodic_box_vectors[0][0].value_in_unit(nanometer),
+        periodic_box_vectors[1][1].value_in_unit(nanometer),
+        periodic_box_vectors[2][2].value_in_unit(nanometer),
+        periodic_box_vectors[1][0] / periodic_box_vectors[1][1],
+        periodic_box_vectors[2][0] / periodic_box_vectors[2][2],
+        periodic_box_vectors[2][1] / periodic_box_vectors[2][2]
+    ]
     with gsd.hoomd.open(name=filename, mode="w") as f:
         f.append(frame)
 

@@ -236,14 +236,14 @@ class RunParameters(object):
         Defaults to "state_data.csv".
     :type state_data_filename: str
     :param trajectory_interval:
-        The interval at which the trajectory is written to a dcd file.
+        The interval at which the trajectory is written to a gsd file.
         The interval must be greater than zero.
         Defaults to 100.
     :type trajectory_interval: int
     :param trajectory_filename:
-        The name of the dcd file to which the trajectory is written.
-        The filename must end with ".dcd".
-        Defaults to "trajectory.dcd".
+        The name of the gsd file to which the trajectory is written.
+        The filename must end with ".gsd".
+        Defaults to "trajectory.gsd".
     :type trajectory_filename: str
     :param checkpoint_interval:
         The interval at which the checkpoint is written to a chk file.
@@ -302,7 +302,7 @@ class RunParameters(object):
     state_data_interval: int = 100
     state_data_filename: str = "state_data.csv"
     trajectory_interval: int = 100
-    trajectory_filename: str = "trajectory.dcd"
+    trajectory_filename: str = "trajectory.gsd"
     checkpoint_interval: int = 100
     checkpoint_filename: str = "checkpoint.chk"
     minimize_energy_initially: bool = False
@@ -381,8 +381,8 @@ class RunParameters(object):
             raise ValueError("The filename of the state data must end with '.csv'.")
         if self.trajectory_interval <= 0:
             raise ValueError("The trajectory interval must be greater than zero.")
-        if not self.trajectory_filename.endswith(".dcd"):
-            raise ValueError("The filename of the trajectory must end with '.dcd'.")
+        if not self.trajectory_filename.endswith(".gsd"):
+            raise ValueError("The filename of the trajectory must end with '.gsd'.")
         if self.checkpoint_interval <= 0:
             raise ValueError("The checkpoint interval must be greater than zero.")
         if not self.checkpoint_filename.endswith(".chk"):

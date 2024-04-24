@@ -4,6 +4,7 @@ import openmm
 from openmm import app
 from openmm import unit
 from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated
+from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
 from colloids.run_parameters import RunParameters
 
@@ -104,7 +105,9 @@ def main():
         # See https://openmm.github.io/openmm-cookbook/dev/notebooks/cookbook/report_minimization.html
         simulation.minimizeEnergy()
 
-    simulation.reporters.append(app.DCDReporter(parameters.trajectory_filename, parameters.trajectory_interval))
+    simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
+                                            parameters.radii, parameters.surface_potentials, simulation,
+                                            append_file=False))
     simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
                                                       parameters.state_data_interval, time=True,
                                                       kineticEnergy=True, potentialEnergy=True, temperature=True,
@@ -117,7 +120,8 @@ def main():
     # TODO: CHECK ALL SURFACE SEPARATIONS
 
     if parameters.final_configuration_gsd_filename is not None:
-        write_gsd_file(parameters.final_configuration_gsd_filename, simulation, parameters.radii)
+        write_gsd_file(parameters.final_configuration_gsd_filename, simulation, parameters.radii,
+                       parameters.surface_potentials)
 
     if parameters.final_configuration_xyz_filename is not None:
         write_xyz_file(parameters.final_configuration_xyz_filename, simulation)

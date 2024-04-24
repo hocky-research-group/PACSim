@@ -52,8 +52,8 @@ temperature: !Quantity
 timestep: !Quantity
   unit: picosecond
   value: 0.05
-trajectory_filename: trajectory.dcd
-trajectory_interval: 1000000000
+trajectory_filename: trajectory.gsd
+trajectory_interval: 1000
 use_log: false
 use_tabulated: false
 velocity_seed: null

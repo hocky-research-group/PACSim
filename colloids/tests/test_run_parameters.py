@@ -50,7 +50,7 @@ class TestRunParameters(object):
     def test_run_parameters(self, parameters, yaml_parameters):
         # Because we cannot compare openmm quantities directly (see above), we have to compare all fields explicitly.
         # When new fields are added to the RunParameters dataclass, this test must be updated accordingly.
-        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 26
+        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 27
         assert parameters.initial_configuration == yaml_parameters.initial_configuration
         assert len(parameters.masses) == len(yaml_parameters.masses)
         assert len(parameters.radii) == len(yaml_parameters.radii)
@@ -96,6 +96,7 @@ class TestRunParameters(object):
                                  abs=1e-12))
         assert parameters.dielectric_constant == yaml_parameters.dielectric_constant
         assert parameters.use_log == yaml_parameters.use_log
+        assert parameters.use_tabulated == yaml_parameters.use_tabulated
         assert parameters.integrator_seed == yaml_parameters.integrator_seed
         assert parameters.velocity_seed == yaml_parameters.velocity_seed
         assert parameters.run_steps == yaml_parameters.run_steps

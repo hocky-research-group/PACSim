@@ -4,10 +4,10 @@ Install and setup [Git Large File Storage](https://git-lfs.com) (used for the la
 
 ## Dependencies
 
-If you only want to use the openmm part of this package, you can use Python 3.12 (or older).
+If you only want to use the openmm part of this package, you can use Python 3.12 (or any older version >= 3.7).
 
-If you want to use the Hoomd part of this package, use Python 3.10 (or older) because that is the latest Python version 
-that is supported by Hoomd < 3 .
+If you want to use the Hoomd part of this package, use Python 3.10 (or any older version >= 3.7) because that is the 
+latest Python version that is supported by Hoomd < 3.
 
 We recommend installing Python and the required packages using 
 [Anaconda](https://www.anaconda.com/products/distribution). 
@@ -20,6 +20,9 @@ The following packages are required:
 - openmm >= 8.0
 - pytest >= 7.4
 - gsd >= 3.2
+- pyyaml >= 6.0
+- tqdm >= 4.65
+- pandas >= 2.2
 - hoomd == 2.9.7
 
 ## Installation

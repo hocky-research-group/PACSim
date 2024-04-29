@@ -2,6 +2,7 @@ import filecmp
 import os.path
 import shutil
 import subprocess
+import pandas as pd
 import pytest
 
 
@@ -29,6 +30,9 @@ class TestRunAndResume(object):
         assert os.path.isfile(directory_name + "/final_frame.xyz")
         assert os.path.isfile(directory_name + "/state_data.csv")
         assert os.path.isfile(directory_name + "/trajectory.gsd")
+        # Remove speed column from state_data.csv which varies between runs.
+        f = pd.read_csv(directory_name + "/state_data.csv", usecols=[0, 1, 2, 3])
+        f.to_csv(directory_name + "/state_data.csv")
 
     @pytest.fixture(autouse=True)
     def resume(self, directory_name):
@@ -40,6 +44,9 @@ class TestRunAndResume(object):
         assert os.path.isfile(directory_name + "/final_frame_resume.xyz")
         assert os.path.isfile(directory_name + "/state_data_resume.csv")
         assert os.path.isfile(directory_name + "/trajectory_resume.gsd")
+        # Remove speed column from state_data_resume.csv which varies between runs.
+        f = pd.read_csv(directory_name + "/state_data_resume.csv", usecols=[0, 1, 2, 3])
+        f.to_csv(directory_name + "/state_data_resume.csv")
 
     def test_run_and_resume(self, directory_name):
         assert filecmp.cmp(directory_name + "/final_frame.gsd", directory_name + "/final_frame_resume.gsd",

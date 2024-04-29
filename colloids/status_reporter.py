@@ -32,7 +32,7 @@ class StatusReporter(object):
         if not total_number_steps > 0:
             raise ValueError("The total number of steps must be positive.")
         self._report_interval = report_interval
-        self._status = tqdm.tqdm(miniters=1, total=total_number_steps)
+        self._status = tqdm.tqdm(miniters=1, total=total_number_steps, unit="steps")
 
     # noinspection PyPep8Naming
     def describeNextReport(self, simulation: openmm.app.Simulation) -> tuple[int, bool, bool, bool, bool, bool]:

@@ -35,3 +35,31 @@ pip install -e .
 
 Note that this attempts to install the requirements with pip, if you did not install them yourself before. However, 
 because hoomd is not available on PyPI, you need to install it manually (or via conda).
+
+## Usage
+
+The installation process creates two executables `colloids-run` and `colloids-resume`. You might have to add the 
+directory where pip installs executables to your PATH environment variable in order to access these executables.
+
+### colloids-run
+
+The `colloids-run` executable is used to run simulations. It expects a configuration file in yaml format as the only 
+positional argument:
+
+```bash
+colloids-run run.yaml
+```
+
+An exemplary configuration file called `example.yaml` can be created with the command 
+`colloids-run --example`. Another exemplary configuration file is provided in `colloids/run.yaml`.
+
+### colloids-resume
+A simulation that is run with the `colloids-run` executable creates checkpoints in periodic intervals. One can resume a 
+simulation from a checkpoint using the `colloids-resume` executable. It expects the original configuration file (because
+the checkpoint file only stores the positions and velocities of the particles in an OpenMM context), the checkpoint 
+file, and the number of time steps that should be run (the corresponding value in the configuration file is ignored). 
+For example, use the following command to continue a simulation for 100000 time steps:
+
+```bash
+colloids-resume run.yaml checkpoint.chk 100000
+```

@@ -151,7 +151,8 @@ def main() -> None:
     simulation.context.setPositions(positions)
 
     write_gsd_file("tests/first_frame.gsd", simulation,
-                   {"P": radius_positive, "N": radius_negative})
+                   {"P": radius_positive, "N": radius_negative},
+                   {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
 
 
 if __name__ == '__main__':

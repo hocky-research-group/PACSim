@@ -86,7 +86,7 @@ class GSDReporter(object):
         assert simulation.topology.getNumChains() == 1
         assert simulation.topology.getNumResidues() == 1
         assert simulation.topology.getNumAtoms() == simulation.system.getNumParticles()
-        types = list(set(atom.name for atom in simulation.topology.atoms()))
+        types = list(dict.fromkeys(atom.name for atom in simulation.topology.atoms()))
         if not all(t in radii for t in types):
             raise ValueError("All types of the simulation must have a radius.")
         if not all(rt in types for rt in radii):
@@ -109,9 +109,43 @@ class GSDReporter(object):
         self._surface_potentials = surface_potentials
         self._append_file = append_file
         self._file = gsd.hoomd.open(name=filename, mode="r+" if self._append_file else "w")
-        self._frame = None
-        self.report(simulation, simulation.context.getState(getPositions=True, getVelocities=True, getEnergy=True,
-                                                            enforcePeriodicBox=False))
+        self._frame = self._set_up_frame(simulation)
+        if not self._append_file:
+            # Include initial configuration in frame.
+            self.report(simulation, simulation.context.getState(getPositions=True, getVelocities=True, getEnergy=True,
+                                                                enforcePeriodicBox=False))
+
+    def _set_up_frame(self, simulation: openmm.app.Simulation) -> gsd.hoomd.Frame:
+        if not self._append_file:
+            # Assume that the following properties are constant throughout the simulation.
+            frame = gsd.hoomd.Frame()
+            frame.particles.N = simulation.topology.getNumAtoms()
+            # Use a dictionary instead of a set to preserve the order of the types.
+            # See https://stackoverflow.com/questions/1653970/does-python-have-an-ordered-set
+            # Works since Python 3.7.
+            types = list(dict.fromkeys(atom.name for atom in simulation.topology.atoms()))
+            frame.particles.types = types
+            frame.particles.type_shapes = [
+                {"type": "Sphere", "diameter": 2.0 * self._radii[t].value_in_unit(self._nanometer)}
+                for t in types]
+            assert (list(atom.index for atom in simulation.topology.atoms())
+                    == list(range(simulation.topology.getNumAtoms())))
+            typeid = [types.index(atom.name) for atom in simulation.topology.atoms()]
+            frame.particles.typeid = typeid
+            frame.particles.diameter = [
+                2.0 * self._radii[types[typeid[atom_index]]].value_in_unit(self._nanometer)
+                for atom_index in range(simulation.topology.getNumAtoms())]
+            frame.particles.charge = [
+                self._surface_potentials[types[typeid[atom_index]]].value_in_unit(self._millivolt)
+                for atom_index in range(simulation.topology.getNumAtoms())]
+            frame.particles.mass = [simulation.system.getParticleMass(atom_index).value_in_unit(unit.amu)
+                                    for atom_index in range(simulation.topology.getNumAtoms())]
+            frame.configuration.dimensions = 3
+        else:
+            # Copy constant properties from initial frame.
+            assert len(self._file) > 0
+            frame = self._file[0]
+        return frame
 
     # noinspection PyPep8Naming
     def describeNextReport(self, simulation: openmm.app.Simulation) -> tuple[int, bool, bool, bool, bool, bool]:
@@ -146,29 +180,6 @@ class GSDReporter(object):
             The current state of the OpenMM simulation.
         :type state: openmm.State
         """
-        if self._frame is None:
-            # Assume number of particles constant.
-            self._frame = gsd.hoomd.Frame()
-            self._frame.particles.N = simulation.topology.getNumAtoms()
-            types = list(set(atom.name for atom in simulation.topology.atoms()))
-            self._frame.particles.types = types
-            self._frame.particles.type_shapes = [
-                {"type": "Sphere", "diameter": 2.0 * self._radii[t].value_in_unit(self._nanometer)}
-                for t in types]
-            assert (list(atom.index for atom in simulation.topology.atoms())
-                    == list(range(simulation.topology.getNumAtoms())))
-            typeid = [types.index(atom.name) for atom in simulation.topology.atoms()]
-            self._frame.particles.typeid = typeid
-            self._frame.particles.diameter = [
-                2.0 * self._radii[types[typeid[atom_index]]].value_in_unit(self._nanometer)
-                for atom_index in range(simulation.topology.getNumAtoms())]
-            self._frame.particles.charge = [
-                self._surface_potentials[types[typeid[atom_index]]].value_in_unit(self._millivolt)
-                for atom_index in range(simulation.topology.getNumAtoms())]
-            self._frame.particles.mass = [simulation.system.getParticleMass(atom_index).value_in_unit(unit.amu)
-                                          for atom_index in range(simulation.topology.getNumAtoms())]
-            self._frame.configuration.dimensions = 3
-
         assert state.getStepCount() == simulation.currentStep
         self._frame.configuration.step = state.getStepCount()
         positions = state.getPositions(asNumpy=True)

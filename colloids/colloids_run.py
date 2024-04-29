@@ -88,16 +88,16 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str]) -> app
     return simulation
 
 
-def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append: bool,
+def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
                      total_number_steps: int) -> None:
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
                                             parameters.radii, parameters.surface_potentials, simulation,
-                                            append_file=append))
-    simulation.reporters.append(StatusReporter(total_number_steps // 100, total_number_steps))
+                                            append_file=append_file))
+    simulation.reporters.append(StatusReporter(max(1, total_number_steps // 100), total_number_steps))
     simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
                                                       parameters.state_data_interval, time=True,
                                                       kineticEnergy=True, potentialEnergy=True, temperature=True,
-                                                      speed=True, append=append))
+                                                      speed=True, append=append_file))
     simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
                                                        parameters.checkpoint_interval))
 

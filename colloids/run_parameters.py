@@ -314,7 +314,7 @@ class RunParameters(object):
         if not self.initial_configuration.endswith(".xyz"):
             raise ValueError("The filename of the initial configuration must end with '.xyz'")
         types_from_file, _ = read_xyz_file(self.initial_configuration)
-        types = set(types_from_file)
+        types = list(dict.fromkeys(types_from_file))
         for t in types:
             if t not in self.masses:
                 raise ValueError(f"Type {t} of the initial configuration is not in masses dictionary.")

@@ -58,7 +58,10 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str]) -> app
     )
     if parameters.use_tabulated:
         # TODO: Maybe generalize tabulated potentials to more than two types.
-        set_of_types = set(types)
+        # Use a dictionary instead of a set to preserve the order of the types.
+        # See https://stackoverflow.com/questions/1653970/does-python-have-an-ordered-set
+        # Works since Python 3.7.
+        set_of_types = list(dict.fromkeys(types))
         if not len(set_of_types) == 2:
             raise ValueError("Tabulated potentials only supports two types.")
         first_type = set_of_types.pop()

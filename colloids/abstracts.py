@@ -92,6 +92,9 @@ class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
     :type colloid_potentials_parameters: ColloidPotentialsParameters
     """
 
+    _nanometer = unit.nano * unit.meter
+    _millivolt = unit.milli * unit.volt
+
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters):
         """Constructor of the ColloidPotentialsAbstract class."""
         super().__init__()
@@ -125,9 +128,9 @@ class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
             If the method yield_potentials was called before this method (via the OpenMMPotentialAbstract base class).
         """
         super().add_particle()
-        if not radius.unit.is_compatible(unit.nanometer):
+        if not radius.unit.is_compatible(self._nanometer):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
-        if not radius.value_in_unit(unit.nanometer) > 0.0:
+        if not radius.value_in_unit(self._nanometer) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
         if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts")

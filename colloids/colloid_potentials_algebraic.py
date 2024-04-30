@@ -54,9 +54,6 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         If the cutoff factor is not greater than zero.
     """
 
-    _nanometer = unit.nano * unit.meter
-    _millivolt = unit.milli * unit.volt
-
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
                  use_log: bool = True, cutoff_factor: float = 21.0) -> None:
         """Constructor of the ColloidPotentialsAlgebraic class."""

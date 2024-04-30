@@ -77,9 +77,6 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         If the cutoff factor is not greater than zero.
     """
 
-    _nanometer = unit.nano * unit.meter
-    _millivolt = unit.milli * unit.volt
-
     def __init__(self, radius_one: unit.Quantity, radius_two: unit.Quantity,
                  surface_potential_one: unit.Quantity, surface_potential_two: unit.Quantity,
                  colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),

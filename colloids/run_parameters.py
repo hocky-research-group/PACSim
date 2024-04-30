@@ -294,6 +294,7 @@ class RunParameters(object):
     brush_length: unit.Quantity = 10.6 * (unit.nano * unit.meter)
     debye_length: unit.Quantity = 5.726968 * (unit.nano * unit.meter)
     dielectric_constant: float = 80.0
+    cutoff_factor: float = 21.0
     use_log: bool = False
     use_tabulated: bool = False
     integrator_seed: Optional[int] = None

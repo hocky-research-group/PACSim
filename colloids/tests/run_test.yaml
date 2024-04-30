@@ -9,6 +9,7 @@ checkpoint_interval: 500
 collision_rate: !Quantity
   unit: /picosecond
   value: 0.01
+cutoff_factor: 21.0
 debye_length: !Quantity
   unit: nanometer
   value: 5.726968

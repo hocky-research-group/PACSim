@@ -70,10 +70,12 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str]) -> app
             radius_one=parameters.radii[first_type], radius_two=parameters.radii[second_type],
             surface_potential_one=parameters.surface_potentials[first_type],
             surface_potential_two=parameters.surface_potentials[second_type],
-            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log)
+            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
+            cutoff_factor=parameters.cutoff_factor)
     else:
         colloid_potentials = ColloidPotentialsAlgebraic(
-            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log)
+            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
+            cutoff_factor=parameters.cutoff_factor)
 
     for t in types:
         system.addParticle(parameters.masses[t])

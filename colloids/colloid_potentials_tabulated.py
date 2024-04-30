@@ -28,14 +28,14 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
     of the second type. It requires the radii and surface potentials of the two types of colloids on initialization.
 
     The potential of every CustomNonbondedForce instance has a cutoff at a surface-to-surface separation of
-    20.0 * debye_length between the involved types of colloids. Here, debye_length is the Debye screening length that is
-    stored in the ColloidPotentialsParameters instance.
+    cutoff_factor * debye_length between the involved types of colloids. Here, debye_length is the Debye screening
+    length that is stored in the ColloidPotentialsParameters instance, and cutoff_factor is set on initialization. A
+    switching function reduces the interaction at surface-to-surface separations larger than
+    (cutoff_factor - 1) * debye_length to make the potential and forces go smoothly to 0 at the cutoff distance.
 
     Note that the steric potential from the Alexander-de Gennes polymer brush model uses the mixing rule
     r = r_1 + r_2 / 2.0 for the prefactor [see eq. (1)], whereas the electrostatic potential from DLVO theory uses
     r = 2.0 / (1.0 / r_1 + 1.0 / r_2) for the prefactor.
-
-    # TODO: Compare smoothing to Michael's way, benchmark.
 
     :param radius_one:
         The radius of the first type of colloid.
@@ -63,12 +63,18 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         (Oxford University Press, 2001), 2nd edition].
         Defaults to True.
     :type use_log: bool
+    :param cutoff_factor:
+        The factor by which the Debye length is multiplied to get the cutoff distance of the forces.
+        Defaults to 21.0.
+    :type cutoff_factor: float
 
     :raises TypeError:
         If the radius_one, radius_two, surface_potential_one, or surface_potential_two is not a Quantity with a proper
         unit.
     :raises ValueError:
         If the radius_one or radius_two is not greater than zero.
+    :raises ValueError:
+        If the cutoff factor is not greater than zero.
     """
 
     _nanometer = unit.nano * unit.meter
@@ -77,10 +83,11 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
     def __init__(self, radius_one: unit.Quantity, radius_two: unit.Quantity,
                  surface_potential_one: unit.Quantity, surface_potential_two: unit.Quantity,
                  colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
-                 use_log: bool = True) -> None:
+                 use_log: bool = True, cutoff_factor: float = 21.0) -> None:
         """Constructor of the ColloidPotentialsTabulated class."""
         super().__init__(colloid_potentials_parameters)
-
+        if not cutoff_factor > 0.0:
+            raise ValueError("The cutoff factor must be greater than zero.")
         if not radius_one.unit.is_compatible(self._nanometer):
             raise TypeError("argument radius_one must have a unit that is compatible with nanometer")
         if not radius_one.value_in_unit(self._nanometer) > 0.0:
@@ -99,8 +106,9 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         self._surface_potential_one = surface_potential_one.in_units_of(self._millivolt)
         self._surface_potential_two = surface_potential_two.in_units_of(self._millivolt)
         self._use_log = use_log
-        self._maximum_surface_separation = 21.0 * self._parameters.debye_length
-        self._switch_off_distance = 20.0 * self._parameters.debye_length
+        self._cutoff_factor = cutoff_factor
+        self._maximum_surface_separation = self._cutoff_factor * self._parameters.debye_length
+        self._switch_off_distance = (self._cutoff_factor - 1.0) * self._parameters.debye_length
         self._number_samples = 5000
         self._potential_11, self._potential_22, self._potential_12 = self._set_up_potentials()
         self._current_particle_index = 0

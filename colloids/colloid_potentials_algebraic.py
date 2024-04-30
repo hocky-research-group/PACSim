@@ -20,11 +20,12 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
     yield_potentials method in order to add them to the openmm system (using the system.addForce method), the
     add_particle method has to be called for each colloid in the system to define its radius and surface potential.
 
-    The cutoff of the electrostatic potential is set to 2.0 * r_max + 21.0 * debye_length, where r_max is the largest
-    radius of the colloids in the system and debye_length is the Debye screening length that is stored in the
-    ColloidPotentialsParameters instance. The largest r_max is automatically determined when the add_particle method is
-    called. A switching function reduces the interaction at distances larger than 2.0 * r_max + 20.0 * debye_length to
-    make the potential and forces go smoothly to 0 at the cutoff distance.
+    The cutoff of the electrostatic potential is set to 2.0 * r_max + cutoff_factor * debye_length, where r_max is the
+    largest radius of the colloids in the system, debye_length is the Debye screening length that is stored in the
+    ColloidPotentialsParameters instance, and cutoff_factor is set on initialization. The largest r_max is automatically
+    determined when the add_particle method is called. A switching function reduces the interaction at distances larger
+    than 2.0 * r_max + (cutoff_factor - 1) * debye_length to make the potential and forces go smoothly to 0 at the
+    cutoff distance.
 
     The cutoff of the steric potential is set to 2.0 * r_max + 2.0 * brush_length, where brush_length is the thickness
     of the polymer brush.
@@ -44,19 +45,30 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         (Oxford University Press, 2001), 2nd edition].
         Defaults to True.
     :type use_log: bool
+    :param cutoff_factor:
+        The factor by which the Debye length is multiplied to get the cutoff distance of the electrostatic force.
+        Defaults to 21.0.
+    :type cutoff_factor: float
+
+    :raises ValueError:
+        If the cutoff factor is not greater than zero.
     """
 
     _nanometer = unit.nano * unit.meter
     _millivolt = unit.milli * unit.volt
 
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
-                 use_log: bool = True) -> None:
+                 use_log: bool = True, cutoff_factor: float = 21.0) -> None:
         """Constructor of the ColloidPotentialsAlgebraic class."""
         super().__init__(colloid_potentials_parameters)
+        if not cutoff_factor > 0.0:
+            raise ValueError("The cutoff factor must be greater than zero.")
+
         self._use_log = use_log
         self._steric_potential = self._set_up_steric_potential()
         self._electrostatic_potential = self._set_up_electrostatic_potential()
         self._max_radius = -math.inf * self._nanometer
+        self._cutoff_factor = cutoff_factor
 
     def _set_up_steric_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""
@@ -171,11 +183,13 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
 
         self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffPeriodic)
         self._electrostatic_potential.setCutoffDistance(
-            (2.0 * self._max_radius + 21.0 * self._parameters.debye_length).value_in_unit(self._nanometer))
+            (2.0 * self._max_radius
+             + self._cutoff_factor * self._parameters.debye_length).value_in_unit(self._nanometer))
         self._electrostatic_potential.setUseLongRangeCorrection(False)
         self._electrostatic_potential.setUseSwitchingFunction(True)
         self._electrostatic_potential.setSwitchingDistance(
-            (2.0 * self._max_radius + 20.0 * self._parameters.debye_length).value_in_unit(self._nanometer))
+            (2.0 * self._max_radius
+             + (self._cutoff_factor - 1.0) * self._parameters.debye_length).value_in_unit(self._nanometer))
         self._electrostatic_potential.setForceGroup(1)
 
         yield self._steric_potential

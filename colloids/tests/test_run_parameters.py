@@ -2,7 +2,8 @@ from dataclasses import fields
 import os
 from openmm import unit
 import pytest
-from colloids.run_parameters import Quantity, RunParameters
+from colloids.abstracts import Parameters
+from colloids.run_parameters import RunParameters
 
 
 class TestQuantity(object):
@@ -19,7 +20,7 @@ class TestQuantity(object):
                               (3.0 * (unit.mega * unit.angstrom) / ((unit.milli * unit.second) * unit.volt)),
                               (12.0 * (unit.mega * unit.angstrom) / (unit.milli * unit.second) * unit.volt)])
     def test_quantity(self, openmm_quantity):
-        new_openmm_quantity = Quantity(openmm_quantity).to_openmm_quantity()
+        new_openmm_quantity = Parameters._Quantity(openmm_quantity).to_openmm_quantity()
         # Using new_openmm_quantity == openmm_quantity directly can fail because openmm uses floating conversion factors
         # in this equality comparison that can lead to small differences in the values.
         assert (new_openmm_quantity.value_in_unit(openmm_quantity.unit)

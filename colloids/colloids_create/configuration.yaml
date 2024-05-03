@@ -1,0 +1,6 @@
+filename: initial_configuration.xyz
+lattice_repeats: 15
+lattice_spacing_factor: 4.03
+lattice_type: sc
+orbit_factor: 1.3
+satellites_per_center: 1

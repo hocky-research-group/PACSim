@@ -117,6 +117,8 @@ def main():
         raise ValueError("The YAML file must have the .yaml extension.")
 
     parameters = RunParameters.from_yaml(args.yaml_file)
+    parameters.check_types_of_initial_configuration()
+
     types, positions = read_xyz_file(parameters.initial_configuration)
 
     simulation = set_up_simulation(parameters, types)

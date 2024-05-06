@@ -202,34 +202,31 @@ class RunParameters(Parameters):
         """Check if the parameters are valid after initialization."""
         if not self.initial_configuration.endswith(".xyz"):
             raise ValueError("The filename of the initial configuration must end with '.xyz'")
-        types_from_file, _ = read_xyz_file(self.initial_configuration)
-        types = list(dict.fromkeys(types_from_file))
-        for t in types:
-            if t not in self.masses:
-                raise ValueError(f"Type {t} of the initial configuration is not in masses dictionary.")
+        for t in self.masses:
             if not self.masses[t].unit.is_compatible(unit.amu):
                 raise TypeError(f"Mass of type {t} must have a unit compatible with atomic mass units.")
             if self.masses[t] <= 0.0 * unit.amu:
                 raise ValueError(f"Mass of type {t} must be greater than zero.")
             if t not in self.radii:
-                raise ValueError(f"Type {t} of the initial configuration is not in radii dictionary.")
+                raise ValueError(f"Type {t} of the masses dictionary is not in radii dictionary.")
+            if t not in self.surface_potentials:
+                raise ValueError(f"Type {t} of the masses dictionary is not in surface potentials dictionary.")
+        for t in self.radii:
             if not self.radii[t].unit.is_compatible(unit.nano * unit.meter):
                 raise TypeError(f"Radius of type {t} must have a unit compatible with nanometers.")
             if self.radii[t] <= 0.0 * (unit.nano * unit.meter):
                 raise ValueError(f"Radius of type {t} must be greater than zero.")
+            if t not in self.masses:
+                raise ValueError(f"Type {t} of the radii dictionary is not in masses dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
+        for t in self.surface_potentials:
             if not self.surface_potentials[t].unit.is_compatible(unit.milli * unit.volt):
                 raise TypeError(f"Surface potential of type {t} must have a unit compatible with millivolts.")
-        for t in self.masses:
-            if t not in types:
-                raise ValueError(f"Type {t} of the masses dictionary is not in the initial configuration.")
-        for t in self.radii:
-            if t not in types:
-                raise ValueError(f"Type {t} of the radii dictionary is not in the initial configuration.")
-        for t in self.surface_potentials:
-            if t not in types:
-                raise ValueError(f"Type {t} of the surface potentials dictionary is not in the initial configuration.")
+            if t not in self.masses:
+                raise ValueError(f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
+            if t not in self.radii:
+                raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
         if not self.side_length.unit.is_compatible(unit.nano * unit.meter):
             raise TypeError("The side length must have a unit compatible with nanometers.")
         if self.side_length <= 0.0 * (unit.nano * unit.meter):
@@ -282,6 +279,34 @@ class RunParameters(Parameters):
         if (self.final_configuration_xyz_filename is not None
                 and not self.final_configuration_xyz_filename.endswith(".xyz")):
             raise ValueError("The filename of the final configuration must end with '.xyz'.")
+
+    def check_types_of_initial_configuration(self):
+        """
+        Check if the types of the initial configuration are consistent with the masses, radii, and surface-potentials
+        dictionaries.
+
+        :raises ValueError:
+            If the types of the initial configuration are not consistent with the masses, radii, and surface-potentials
+            dictionaries.
+        """
+        types_from_file, _ = read_xyz_file(self.initial_configuration)
+        types = list(dict.fromkeys(types_from_file))
+        for t in types:
+            if t not in self.masses:
+                raise ValueError(f"Type {t} of the initial configuration is not in masses dictionary.")
+            if t not in self.radii:
+                raise ValueError(f"Type {t} of the initial configuration is not in radii dictionary.")
+            if t not in self.surface_potentials:
+                raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
+        for t in self.masses:
+            if t not in types:
+                raise ValueError(f"Type {t} of the masses dictionary is not in the initial configuration.")
+        for t in self.radii:
+            if t not in types:
+                raise ValueError(f"Type {t} of the radii dictionary is not in the initial configuration.")
+        for t in self.surface_potentials:
+            if t not in types:
+                raise ValueError(f"Type {t} of the surface potentials dictionary is not in the initial configuration.")
 
 
 if __name__ == '__main__':

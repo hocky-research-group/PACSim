@@ -1,0 +1,60 @@
+brush_density: !Quantity
+  unit: /(nanometer**2)
+  value: 0.09
+brush_length: !Quantity
+  unit: nanometer
+  value: 6.5
+checkpoint_filename: checkpoint.chk
+checkpoint_interval: 500
+collision_rate: !Quantity
+  unit: /picosecond
+  value: 0.01
+cutoff_factor: 21.0
+debye_length: !Quantity
+  unit: nanometer
+  value: 3.675205
+dielectric_constant: 80.0
+final_configuration_gsd_filename: final_frame.gsd
+final_configuration_xyz_filename: final_frame.xyz
+initial_configuration: first_frame.xyz
+integrator_seed: 3
+masses:
+  N: !Quantity
+    unit: dalton
+    value:  1.885
+  P: !Quantity
+    unit: dalton
+    value: 1.0
+minimize_energy_initially: false
+platform_name: Reference
+radii:
+  N: !Quantity
+    unit: nanometer
+    value: 105.0
+  P: !Quantity
+    unit: nanometer
+    value: 85.0
+run_steps: 100
+side_length: !Quantity
+  unit: nanometer
+  value: 12328.05
+state_data_filename: state_data.csv
+state_data_interval: 10
+surface_potentials:
+  N: !Quantity
+    unit: millivolt
+    value: -50.0
+  P: !Quantity
+    unit: millivolt
+    value: 50.0
+temperature: !Quantity
+  unit: kelvin
+  value: 298.0
+timestep: !Quantity
+  unit: picosecond
+  value: 0.05
+trajectory_filename: trajectory.gsd
+trajectory_interval: 10
+use_log: false
+use_tabulated: false
+velocity_seed: 2

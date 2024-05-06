@@ -1,6 +1,5 @@
 from typing import Union
 import gsd.hoomd
-import hoomd
 import numpy as np
 import numpy.typing as npt
 import openmm
@@ -103,13 +102,20 @@ def write_xyz_file(filename: str, openmm_simulation: app.Simulation) -> None:
 
 
 # noinspection PyUnresolvedReferences
-def write_xyz_file_from_gsd_snapshot(filename: str, gsd_snapshot: hoomd.data.SnapshotParticleData) -> None:
+def write_xyz_file_from_gsd_frame(filename: str, gsd_frame: gsd.hoomd.Frame) -> None:
     with open(filename, "w") as file:
-        print(gsd_snapshot.particles.N, file=file)
-        print("Atom positions:", file=file)
-        for index in range(gsd_snapshot.particles.N):
-            position = gsd_snapshot.particles.position[index, :]
-            t = gsd_snapshot.particles.types[gsd_snapshot.particles.typeid[index]]
+        print(gsd_frame.particles.N, file=file)
+        # Use the extended xyz file format.
+        # See https://www.ovito.org/docs/current/reference/file_formats/input/xyz.html#extended-xyz-format
+        # See https://gsd.readthedocs.io/en/stable/schema-hoomd.html#chunk-configuration-box
+        # See https://hoomd-blue.readthedocs.io/en/v2.9.4/box.html
+        box = gsd_frame.configuration.box
+        assert len(box) == 6
+        print(f"Lattice=\"{box[0]} 0.0 0.0 {box[3] * box[1]} {box[1]} 0.0 {box[4] * box[2]} {box[5] * box[2]} {box[2]}"
+              f"\" Properties=species:S:1:pos:R:3", file=file)
+        for index in range(gsd_frame.particles.N):
+            position = gsd_frame.particles.position[index, :]
+            t = gsd_frame.particles.types[gsd_frame.particles.typeid[index]]
             print(f"{t} {position[0]} {position[1]} {position[2]}", file=file)
 
 

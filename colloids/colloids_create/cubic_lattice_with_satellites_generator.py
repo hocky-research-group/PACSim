@@ -4,6 +4,7 @@ from typing import Iterator
 from ase import Atom, build
 import numpy as np
 import numpy.typing as npt
+from openmm import unit
 from colloids.colloids_create import ConfigurationGenerator
 
 
@@ -22,15 +23,23 @@ class CubicLattice(Enum):
 
 
 class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
-    def __init__(self, filename: str, lattice: CubicLattice, lattice_constant: float, lattice_repeats: int,
-                 orbit_distance: float, satellites_per_center: int, type_lattice: str, type_satellite: str) -> None:
+
+    _nanometer = unit.nano * unit.meter
+
+    def __init__(self, filename: str, lattice: CubicLattice, lattice_constant: unit.Quantity, lattice_repeats: int,
+                 orbit_distance: unit.Quantity, satellites_per_center: int, type_lattice: str,
+                 type_satellite: str) -> None:
         super().__init__(filename)
-        if not lattice_constant > 0.0:
-            raise ValueError("The lattice constant must be greater than zero.")
+        if not lattice_constant.unit.is_compatible(self._nanometer):
+            raise TypeError("The lattice constant must have a unit that is compatible with nanometers.")
+        if not lattice_constant.value_in_unit(self._nanometer) > 0.0:
+            raise ValueError("The lattice constant must have a value greater than zero.")
         if not lattice_repeats > 0:
             raise ValueError("The number of lattice repeats must be greater than zero.")
-        if not orbit_distance > 0.0:
-            raise ValueError("The orbit distance must be greater than zero.")
+        if not orbit_distance.unit.is_compatible(self._nanometer):
+            raise TypeError("The orbit distance must have a unit that is compatible with nanometers.")
+        if not orbit_distance.value_in_unit(self._nanometer) > 0.0:
+            raise ValueError("The orbit distance must have a value greater than zero.")
         if not satellites_per_center >= 0:
             raise ValueError("The number of satellites per center must be greater than or equal to zero.")
         if not orbit_distance < lattice_constant:
@@ -56,12 +65,13 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
 
     def write_positions(self) -> None:
         # Use X as the atom name to avoid a clash with an existing chemical symbol.
-        atoms = build.bulk(name="X", crystalstructure=self._lattice.to_ase_string(), a=self._lattice_constant,
+        atoms = build.bulk(name="X", crystalstructure=self._lattice.to_ase_string(),
+                           a=self._lattice_constant.value_in_unit(self._nanometer),
                            cubic=True)
         new_atoms = []
         for atom in atoms:
-            for satellite_position in self._generate_fibonacci_sphere_grid_points(self._satellites_per_center,
-                                                                                  self._orbit_distance):
+            for satellite_position in self._generate_fibonacci_sphere_grid_points(
+                    self._satellites_per_center, self._orbit_distance.value_in_unit(self._nanometer)):
                 new_atoms.append(Atom(symbol="Y", position=atom.position + satellite_position))
         for new_atom in new_atoms:
             atoms.append(new_atom)
@@ -78,14 +88,14 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
 
 if __name__ == '__main__':
     CubicLattice.from_string("sc")
-    CubicLatticeWithSatellitesGenerator("test_sc.xyz", CubicLattice.SC, 4.05, 3,
-                                        1.3, 1,
+    CubicLatticeWithSatellitesGenerator("test_sc.xyz", CubicLattice.SC, 4.05 * (unit.nano * unit.meter),
+                                        3, 1.3 * (unit.nano * unit.meter), 1,
                                         "P", "N").write_positions()
 
-    CubicLatticeWithSatellitesGenerator("test_fcc.xyz", CubicLattice.FCC, 4.05, 3,
-                                        1.3, 1,
+    CubicLatticeWithSatellitesGenerator("test_fcc.xyz", CubicLattice.FCC, 4.05 * (unit.nano * unit.meter),
+                                        3, 1.3 * (unit.nano * unit.meter), 1,
                                         "P", "N").write_positions()
 
-    CubicLatticeWithSatellitesGenerator("test_bcc.xyz", CubicLattice.BCC, 4.05, 3,
-                                        1.3, 1,
+    CubicLatticeWithSatellitesGenerator("test_bcc.xyz", CubicLattice.BCC, 4.05 * (unit.nano * unit.meter),
+                                        3, 1.3 * (unit.nano * unit.meter), 1,
                                         "P", "N").write_positions()

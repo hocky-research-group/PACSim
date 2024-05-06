@@ -10,11 +10,8 @@ class ConfigurationParameters(Parameters):
     lattice_repeats: int = 8
     orbit_factor: float = 1.3
     satellites_per_center: int = 1
-    filename: str = "initial_configuration.xyz"
 
     def __post_init__(self):
-        if not self.filename.endswith(".xyz"):
-            raise ValueError("The filename must have the .xyz extension.")
         if self.lattice_spacing_factor <= 0.0:
             raise ValueError("The lattice spacing factor must be positive.")
         if self.lattice_repeats <= 0:

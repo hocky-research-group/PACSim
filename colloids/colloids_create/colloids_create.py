@@ -30,24 +30,25 @@ def main():
     if not args.configuration_parameters.endswith(".yaml"):
         raise ValueError("The YAML file for the configuration parameters must have the .yaml extension.")
 
-    simulation_parameters = RunParameters.from_yaml(args.yaml_file)
+    run_parameters = RunParameters.from_yaml(args.simulation_parameters)
     configuration_parameters = ConfigurationParameters.from_yaml(args.configuration_parameters)
 
-    if not len(simulation_parameters.radii) == 2:
+    if not len(run_parameters.radii) == 2:
         raise ValueError("This script can only generate an initial configuration for two types of particles.")
 
     # Sort entries in dictionary by value in descending order.
-    radii = sorted(simulation_parameters.radii.items(), key=lambda r: r[1], reverse=True)
-    print(radii)
+    radii = sorted(run_parameters.radii.items(), key=lambda r: r[1], reverse=True)
 
     lattice_spacing = 2.0 * radii[0][1] * configuration_parameters.lattice_spacing_factor
-    orbit_distance = ((radii[0][1] + radii[1][1] + 2.0 * simulation_parameters.brush_length)
+    orbit_distance = ((radii[0][1] + radii[1][1] + 2.0 * run_parameters.brush_length)
                       * configuration_parameters.orbit_factor)
     generator = CubicLatticeWithSatellitesGenerator(
-        configuration_parameters.filename, CubicLattice.from_string(configuration_parameters.lattice_type),
+        run_parameters.initial_configuration, CubicLattice.from_string(configuration_parameters.lattice_type),
         lattice_spacing, configuration_parameters.lattice_repeats, orbit_distance,
         configuration_parameters.satellites_per_center, radii[0][0], radii[1][0])
     generator.write_positions()
+
+    run_parameters.check_types_of_initial_configuration()
 
 
 if __name__ == '__main__':

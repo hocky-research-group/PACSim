@@ -1,33 +1,18 @@
-from typing import Union
+import ase.io
 import gsd.hoomd
-import numpy as np
 import numpy.typing as npt
 import openmm
 from openmm import app
 from openmm import unit
 
 
-def read_xyz_file(filename: str, units: bool = True) -> (npt.NDArray[str],
-                                                         Union[npt.NDArray[float], npt.NDArray[unit.Quantity]]):
+def read_xyz_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[float]):
     if not filename.endswith(".xyz"):
         raise ValueError("The file must have the .xyz extension.")
-    with open(filename, "r") as f:
-        line = next(f)
-        ls = line.split()
-        number_atoms = int(ls[0])
-        _ = next(f)
-        types = np.zeros(number_atoms, dtype=str)
-        positions = np.zeros((number_atoms, 3), dtype=unit.Quantity if units else float)
-        # Do not create a unit within the loop because this is slow.
-        u = (unit.nano * unit.meter) if units else 1.0
-        for index_atom in range(number_atoms):
-            line = next(f)
-            ls = line.split()
-            types[index_atom] = ls[0]
-            positions[index_atom, 0] = float(ls[1]) * u
-            positions[index_atom, 1] = float(ls[2]) * u
-            positions[index_atom, 2] = float(ls[3]) * u
-    return types, positions
+    atoms = ase.io.read(filename, format="extxyz")
+    cell = atoms.get_cell()[:]
+    assert cell.shape == (3, 3)
+    return atoms.get_chemical_symbols(), atoms.get_positions(), cell
 
 
 def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict: dict[str, unit.Quantity],
@@ -131,20 +116,16 @@ def main() -> None:
     # noinspection PyUnresolvedReferences
     timestep = 0.05 * (unit.pico * unit.second)
 
-    types, positions = read_xyz_file("tests/first_frame.xyz")
+    types, positions, cell = read_xyz_file("tests/first_frame.xyz")
     topology = app.topology.Topology()
     chain = topology.addChain()
     residue = topology.addResidue("res1", chain)
     for t, position in zip(types, positions):
         topology.addAtom(t, None, residue)
-    topology.setPeriodicBoxVectors(np.array([[side_length.value_in_unit(unit.nano * unit.meter), 0.0, 0.0],
-                                             [0.0, side_length.value_in_unit(unit.nano * unit.meter), 0.0],
-                                             [0.0, 0.0, side_length.value_in_unit(unit.nano * unit.meter)]]))
+    topology.setPeriodicBoxVectors(cell)
 
     system = openmm.System()
-    system.setDefaultPeriodicBoxVectors(openmm.Vec3(side_length.value_in_unit(unit.nano * unit.meter), 0.0, 0.0),
-                                        openmm.Vec3(0.0, side_length.value_in_unit(unit.nano * unit.meter), 0.0),
-                                        openmm.Vec3(0.0, 0.0, side_length.value_in_unit(unit.nano * unit.meter)))
+    system.setDefaultPeriodicBoxVectors(openmm.Vec3(*cell[0]), openmm.Vec3(*cell[1]), openmm.Vec3(*cell[2]))
     platform = openmm.Platform.getPlatformByName("Reference")
     integrator = openmm.LangevinIntegrator(temperature, collision_rate, timestep)
     for t, position in zip(types, positions):

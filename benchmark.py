@@ -37,23 +37,17 @@ def benchmark_openmm(platform_name: str = "Reference", potentials: str = "algebr
                      number_steps: int = 100) -> None:
     parameters = benchmark_parameters()
 
-    types, positions = read_xyz_file("colloids/tests/first_frame.xyz")
+    types, positions, cell = read_xyz_file("colloids/tests/first_frame.xyz")
 
     topology = app.topology.Topology()
     chain = topology.addChain()
     residue = topology.addResidue("res1", chain)
     for t, position in zip(types, positions):
         topology.addAtom(t, None, residue)
-    topology.setPeriodicBoxVectors(np.array(
-        [[parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0, 0.0],
-         [0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0],
-         [0.0, 0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter)]]))
+    topology.setPeriodicBoxVectors(cell)
 
     system = openmm.System()
-    system.setDefaultPeriodicBoxVectors(
-        openmm.Vec3(parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0, 0.0),
-        openmm.Vec3(0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0),
-        openmm.Vec3(0.0, 0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter)))
+    system.setDefaultPeriodicBoxVectors(openmm.Vec3(*cell[0]), openmm.Vec3(*cell[1]), openmm.Vec3(*cell[2]))
     # Prevent printing the traceback when the platform is not existing.
     try:
         platform = openmm.Platform.getPlatformByName(platform_name)

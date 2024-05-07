@@ -1,9 +1,7 @@
 import argparse
-import numpy as np
 import numpy.typing as npt
 import openmm
 from openmm import app
-from openmm import unit
 from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
@@ -23,7 +21,8 @@ class ExampleAction(argparse.Action):
         parser.exit()
 
 
-def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str]) -> app.Simulation:
+def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
+                      cell: npt.NDArray[float]) -> app.Simulation:
     topology = app.topology.Topology()
     chain = topology.addChain()
     residue = topology.addResidue("res1", chain)
@@ -31,16 +30,10 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str]) -> app
     for t in types:
         topology.addAtom(t, None, residue)
 
-    topology.setPeriodicBoxVectors(np.array(
-        [[parameters.side_length.value_in_unit(unit.nano * unit.meter), 0.0, 0.0],
-         [0.0, parameters.side_length.value_in_unit(unit.nano * unit.meter), 0.0],
-         [0.0, 0.0, parameters.side_length.value_in_unit(unit.nano * unit.meter)]]))
+    topology.setPeriodicBoxVectors(cell)
 
     system = openmm.System()
-    system.setDefaultPeriodicBoxVectors(
-        openmm.Vec3(parameters.side_length.value_in_unit(unit.nano * unit.meter), 0.0, 0.0),
-        openmm.Vec3(0.0, parameters.side_length.value_in_unit(unit.nano * unit.meter), 0.0),
-        openmm.Vec3(0.0, 0.0, parameters.side_length.value_in_unit(unit.nano * unit.meter)))
+    system.setDefaultPeriodicBoxVectors(openmm.Vec3(*cell[0]), openmm.Vec3(*cell[1]), openmm.Vec3(*cell[2]))
     # Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
@@ -119,9 +112,9 @@ def main():
     parameters = RunParameters.from_yaml(args.yaml_file)
     parameters.check_types_of_initial_configuration()
 
-    types, positions = read_xyz_file(parameters.initial_configuration)
+    types, positions, cell = read_xyz_file(parameters.initial_configuration)
 
-    simulation = set_up_simulation(parameters, types)
+    simulation = set_up_simulation(parameters, types, cell)
 
     simulation.context.setPositions(positions)
     if parameters.velocity_seed is not None:

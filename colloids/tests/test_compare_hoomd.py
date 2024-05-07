@@ -45,22 +45,16 @@ class TestCompareHoomd(object):
 
     @pytest.fixture(params=["algebraic", "tabulated"])
     def openmm_result(self, parameters, filename, request):
-        types, positions = read_xyz_file(f"{filename}.xyz")
+        types, positions, cell = read_xyz_file(f"{filename}.xyz")
         topology = app.topology.Topology()
         chain = topology.addChain()
         residue = topology.addResidue("res1", chain)
         for t, position in zip(types, positions):
             topology.addAtom(t, None, residue)
-        topology.setPeriodicBoxVectors(np.array(
-            [[parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0, 0.0],
-             [0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0],
-             [0.0, 0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter)]]))
+        topology.setPeriodicBoxVectors(cell)
 
         system = openmm.System()
-        system.setDefaultPeriodicBoxVectors(
-            openmm.Vec3(parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0, 0.0),
-            openmm.Vec3(0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter), 0.0),
-            openmm.Vec3(0.0, 0.0, parameters["side_length"].value_in_unit(unit.nano * unit.meter)))
+        system.setDefaultPeriodicBoxVectors(openmm.Vec3(*cell[0]), openmm.Vec3(*cell[1]), openmm.Vec3(*cell[2]))
         platform = openmm.Platform.getPlatformByName("Reference")
         integrator = openmm.LangevinIntegrator(parameters["colloid_potentials_parameters"].temperature,
                                                parameters["collision_rate"], parameters["timestep"])

@@ -35,9 +35,6 @@ radii:
     unit: nanometer
     value: 105.0
 run_steps: 100000
-side_length: !Quantity
-  unit: nanometer
-  value: 12328.05
 state_data_filename: state_data.csv
 state_data_interval: 1000
 surface_potentials:

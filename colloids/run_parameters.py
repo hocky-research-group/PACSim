@@ -42,11 +42,6 @@ class RunParameters(Parameters):
         The unit of the surface potentials must be compatible with millivolts.
         Defaults to {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)}.
     :type surface_potentials: dict[str, unit.Quantity]
-    :param side_length:
-        The side length of the cubic simulation box.
-        The unit of the side_length must be compatible with nanometers and the value must be greater than zero.
-        Defaults to 12328.05 * (unit.nano * unit.meter).
-    :type side_length: unit.Quantity
     :param platform_name:
         The name of the platform to use for the simulation.
         Defaults to "Reference". Other possible choices are "CPU", "CUDA", or "OpenCL".
@@ -173,7 +168,6 @@ class RunParameters(Parameters):
         default_factory=lambda: {"P": 105.0 * (unit.nano * unit.meter), "N": 95.0 * (unit.nano * unit.meter)})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
-    side_length: unit.Quantity = 12328.05 * (unit.nano * unit.meter)
     platform_name: str = "Reference"
     temperature: unit.Quantity = 298.0 * unit.kelvin
     collision_rate: unit.Quantity = 0.01 / (unit.pico * unit.second)
@@ -227,10 +221,6 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
             if t not in self.radii:
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
-        if not self.side_length.unit.is_compatible(unit.nano * unit.meter):
-            raise TypeError("The side length must have a unit compatible with nanometers.")
-        if self.side_length <= 0.0 * (unit.nano * unit.meter):
-            raise ValueError("The side length must be greater than zero.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
         if not self.temperature.unit.is_compatible(unit.kelvin):
@@ -289,7 +279,7 @@ class RunParameters(Parameters):
             If the types of the initial configuration are not consistent with the masses, radii, and surface-potentials
             dictionaries.
         """
-        types_from_file, _ = read_xyz_file(self.initial_configuration)
+        types_from_file, _, _ = read_xyz_file(self.initial_configuration)
         types = list(dict.fromkeys(types_from_file))
         for t in types:
             if t not in self.masses:

@@ -15,7 +15,8 @@ plt.rcParams.update({
 
 
 class StateDataPlotter(Plotter):
-    def __init__(self, working_directory: str, run_parameters: Collection[dict[str, Union[pathlib.Path, RunParameters]]],
+    def __init__(self, working_directory: str,
+                 run_parameters: Collection[dict[str, Union[pathlib.Path, RunParameters]]],
                  labels: Optional[Collection[str]]):
         super().__init__(working_directory)
         self._temperatures = [rp["parameters"].temperature for rp in run_parameters]
@@ -55,9 +56,9 @@ class StateDataPlotter(Plotter):
             temperature_axes.axhline(temperature.value_in_unit(unit.kelvin), linestyle="dashed", color=f"C{index}")
             temperature_axes.axhline(np.mean(state_data["Temperature (K)"]), linestyle="dotted", color=f"C{index}")
         potential_energy_axes.set_xlabel(r"time $t / \unit{\nano\second}$")
-        potential_energy_axes.set_ylabel("potential energy $U / k_\mathrm{B} T$")
+        potential_energy_axes.set_ylabel(r"potential energy $U / k_\mathrm{B} T$")
         kinetic_energy_axes.set_xlabel(r"time $t / \unit{\nano\second}$")
-        kinetic_energy_axes.set_ylabel("kinetic energy $K / k_\mathrm{B} T$")
+        kinetic_energy_axes.set_ylabel(r"kinetic energy $K / k_\mathrm{B} T$")
         temperature_axes.set_xlabel(r"time $t / \unit{\nano\second}$")
         temperature_axes.set_ylabel(r"temperature $T / \unit{\kelvin}$")
         potential_energy_axes.legend()

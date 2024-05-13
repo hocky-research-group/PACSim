@@ -32,12 +32,6 @@ class StateDataPlotter(Plotter):
             raise ValueError("The number of labels must match the number of state data files.")
         self._labels = labels if labels is not None else [path for path in self._state_data_paths]
 
-    @staticmethod
-    def _combine_paths(base_path: pathlib.Path, path: str) -> pathlib.Path:
-        # If path is a complete path, this only returns that complete path.
-        # Otherwise, this combines base_path and path.
-        return pathlib.Path(base_path) / pathlib.Path(path)
-
     def plot(self) -> None:
         potential_energy_figure = plt.figure()
         potential_energy_axes = potential_energy_figure.subplots()

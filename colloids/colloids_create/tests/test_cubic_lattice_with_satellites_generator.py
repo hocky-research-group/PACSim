@@ -2,12 +2,17 @@ import os
 import subprocess
 import ase.io
 import gsd.hoomd
-import numpy.testing as npt
 import pytest
 from colloids.helper_functions import write_xyz_file_from_gsd_frame
 
 
 class TestCubicLatticeWithSatellitesGenerator(object):
+    @pytest.fixture(autouse=True)
+    def change_test_dir(self, request, monkeypatch):
+        # Change the working directory to the directory of the test file.
+        # See https://stackoverflow.com/questions/62044541/change-pytest-working-directory-to-test-case-directory
+        monkeypatch.chdir(request.fspath.dirname)
+
     @pytest.fixture
     def run_parameters_file(self):
         return "run_test.yaml"

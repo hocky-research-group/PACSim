@@ -1,13 +1,16 @@
-import hoomd
-import hoomd.md
-import numpy as np
 import openmm
 from openmm import app
 from openmm import unit
 import pytest
 from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated
-from colloids.colloid_potentials_tabulated_hoomd import ColloidPotentialsTabulatedHoomd
 from colloids.helper_functions import read_xyz_file
+try:
+    import hoomd
+    import hoomd.md
+    from colloids.colloid_potentials_tabulated_hoomd import ColloidPotentialsTabulatedHoomd
+except ModuleNotFoundError:
+    # Skip all tests from this module.
+    pytestmark = pytest.mark.skipif(True, reason="hoomd is not installed")
 
 
 class TestCompareHoomd(object):

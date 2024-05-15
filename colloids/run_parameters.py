@@ -169,12 +169,12 @@ class RunParameters(Parameters):
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
     platform_name: str = "Reference"
-    temperature: unit.Quantity = 298.0 * unit.kelvin
-    collision_rate: unit.Quantity = 0.01 / (unit.pico * unit.second)
-    timestep: unit.Quantity = 0.05 * (unit.pico * unit.second)
-    brush_density: unit.Quantity = 0.09 / ((unit.nano * unit.meter) ** 2)
-    brush_length: unit.Quantity = 10.6 * (unit.nano * unit.meter)
-    debye_length: unit.Quantity = 5.726968 * (unit.nano * unit.meter)
+    temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
+    collision_rate: unit.Quantity = field(default_factory=lambda: 0.01 / (unit.pico * unit.second))
+    timestep: unit.Quantity = field(default_factory=lambda: 0.05 * (unit.pico * unit.second))
+    brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
+    brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
+    debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
     dielectric_constant: float = 80.0
     cutoff_factor: float = 21.0
     use_log: bool = False

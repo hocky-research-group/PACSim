@@ -36,10 +36,22 @@ pip install -e .
 Note that this attempts to install the requirements with pip, if you did not install them yourself before. However, 
 because hoomd is not available on PyPI, you need to install it manually (or via conda).
 
+## Testing
+
+After installation, you can test whether your installation is working correctly by running the following command from 
+this directory:
+
+```bash
+pytest colloids
+```
+
+If hoomd is not installed, some tests are automatically skipped.
+
 ## Usage
 
-The installation process creates two executables `colloids-run` and `colloids-resume`. You might have to add the 
-directory where pip installs executables to your PATH environment variable in order to access these executables.
+The installation process creates three executables `colloids-run`, `colloids-resume`, and `colloids-create`. You might 
+have to add the directory where pip installs executables to your PATH environment variable in order to access these 
+executables.
 
 ### colloids-run
 
@@ -62,4 +74,26 @@ For example, use the following command to continue a simulation for 100000 time 
 
 ```bash
 colloids-resume run.yaml checkpoint.chk 100000
+```
+
+### colloids-create
+The configuration file for the `colloids-run` executable specifies the filename of an initial configuration for the 
+simulation in the `initial_configuration` key. This initial configuration should be stored in the extended XYZ file 
+format.
+
+The `colloids-create` executable can be used to create an initial configuration for simulations in the extended XYZ file 
+format. It expects two configuration files in yaml format as positional arguments:
+1.  A configuration file that specifies the parameters of the simulation. This yaml file is usually the one that is 
+    passed to the `colloids-run` executable afterward, and it contains the filename in which the generated initial 
+    configuration is stored. See `colloids/run.yaml` for an example.
+2. A configuration file that specifies the parameters of the initial configuration. See 
+   `colloids/colloids_create/configuration.yaml` for an example.
+
+A typical workflow for running a simulation with `colloids-run` from an initial configuration created by 
+`colloids-create` consists of creating a directory with `run.yaml` and `configuration.yaml` files, and then running the 
+following two commands:
+
+```bash
+colloids-create run.yaml configuration.yaml
+colloids-run run.yaml
 ```

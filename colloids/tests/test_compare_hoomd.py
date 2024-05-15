@@ -1,6 +1,5 @@
 import hoomd
 import hoomd.md
-import numpy as np
 import openmm
 from openmm import app
 from openmm import unit

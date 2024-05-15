@@ -38,7 +38,11 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
     # TODO: ALLOW FOR DIFFERENT INTEGRATORS?
-    integrator = openmm.LangevinMiddleIntegrator(parameters.temperature,
+    #integrator = openmm.LangevinMiddleIntegrator(parameters.temperature,
+                                                 #parameters.collision_rate,
+                                                 #parameters.timestep)
+   
+    integrator = openmm.LangevinIntegrator(parameters.temperature,
                                                  parameters.collision_rate,
                                                  parameters.timestep)
     if parameters.integrator_seed is not None:

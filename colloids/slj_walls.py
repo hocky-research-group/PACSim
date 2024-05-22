@@ -32,6 +32,8 @@ class ShiftedLennardJonesWallsParameters(object):
     parameters.check_types_of_initial_configuration()
 
     box_length = read_xyz_file(parameters.initial_configuration)[2][0]
+    #epsilon = 
+    #alpha = 
 
     if __name__ == '__main__':
         parameters = ShiftedLennardJonesWallsParameters()
@@ -48,38 +50,70 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
 
         self._use_log = use_log
         self._slj_potential = self._set_up_slj_potential()
-        #self._max_radius = -math.inf * self._nanometer
+        self._max_radius = -math.inf * self._nanometer
         #self._cutoff_factor = cutoff_factor
 
 
-    def _set_up_slj(self) -> CustomExternalForce:
-       """Set up the basic functional form of the shifted Lennard Jones potential."""
-      slj_potential = CustomExternalForce(
-         "step(-box_length/2 + r_cut + delta, box_length/2 - r_cut - delta) * "
-        "4*epsilon*(
-          (radius/(x-delta))^12+(radius/(x-delta))^6) +
-          (radius/(y-delta))^12+(radius/(y-delta))^6)
-          (radius/(z-delta))^12+(radius/(z-delta))^6)
-            )
-        " 
-       "r_cut = radius * 2 **(1/6)"
-       "delta = radius - 1"
-      )
+    def _set_up_slj_potential(self) -> CustomExternalForce:
+        """Set up the basic functional form of the shifted Lennard Jones potential."""
 
-
-      slj_potential.addGlobalParameter("epsilon", 1.0)
-
-      slj_potential.addGlobalParameter("box_length",
-                                            self._parameters.box_length.value_in_unit(self._nanometer))
-
-      slj_potential.addPerParticleParameter("x")
-      slj_potential.addPerParticleParameter("y")
-      slj_potential.addPerParticleParameter("z")
-      slj_potential.addPerParticleParameter("radius")
+        slj_potential_x = CustomExternalForce(
+                    "step(abs(x) - (box_length/2 - r_cut - delta)) * ("
+                    "4 * epsilon * "
+                    "((sigma/(box_length/2 - abs(x) - delta))^12 "
+                    "- alpha * (sigma / (box_length/2 - abs(x) - delta))^6)"
+                    "-4 * epsilon * "
+                    "((sigma/ r_cut)^12 "
+                    "- alpha * (sigma / r_cut)^6));"
+                    "delta = radius -1;"
+                    "r_cut = radius * 2^(1/6)"
+                )
+        
+        slj_potential_y = CustomExternalForce(
+                    "step(abs(y) - (box_length/2 - r_cut - delta)) * ("
+                    "4 * epsilon * "
+                    "((sigma/(box_length/2 - abs(y) - delta))^12 "
+                    "- alpha * (sigma / (box_length/2 - abs(y) - delta))^6)"
+                    "-4 * epsilon * "
+                    "((sigma/ r_cut)^12 "
+                    "- alpha * (sigma / r_cut)^6));"
+                    "delta = radius -1;"
+                    "r_cut = radius * 2^(1/6)"
+                )
+        
+        slj_potential_z = CustomExternalForce(
+                    "step(abs(z) - (box_length/2 - r_cut - delta)) * ("
+                    "4 * epsilon * "
+                    "((sigma/(box_length/2 - abs(z) - delta))^12 "
+                    "- alpha * (sigma / (box_length/2 - abs(z) - delta))^6)"
+                    "-4 * epsilon * "
+                    "((sigma/ r_cut)^12 "
+                    "- alpha * (sigma / r_cut)^6));"
+                    "sigma = radius;"
+                    "delta = radius -1;"
+                    "r_cut = radius * 2^(1/6)"
+                )
+    
+        slj_potential_x.addGlobalParameter("box_length", box_length)
+        slj_potential_x.addGlobalParameter("epsilon", epsilon*2.477709860209665*unit.kilojoule_per_mole)
+        slj_potential_x.addGlobalParameter("alpha", alpha)
       
-      return slj_potential
-      
+        slj_potential_x.addPerParticleParameter("radius")
 
+        slj_potential_y.addGlobalParameter("box_length", box_length)
+        slj_potential_y.addGlobalParameter("epsilon", epsilon*2.477709860209665*unit.kilojoule_per_mole)
+        slj_potential_y.addGlobalParameter("alpha", alpha)
+      
+        slj_potential_y.addPerParticleParameter("radius")
+
+        slj_potential_z.addGlobalParameter("box_length", box_length)
+        slj_potential_z.addGlobalParameter("epsilon", epsilon*2.477709860209665*unit.kilojoule_per_mole)
+        slj_potential_z.addGlobalParameter("alpha", alpha)
+      
+        slj_potential_z.addPerParticleParameter("radius")
+      
+      return slj_potential_x, slj_potential_y, slj_potential_z
+      
 
     def add_particle(self, radius: unit.Quantity, x: unit.Quantity, y: unit.Quantity, z: unit.Quantity ) -> None:
         """
@@ -119,48 +153,9 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         if radius.in_units_of(self._nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(self._nanometer)
 
-        self._slj_potential.addParticle([radius.value_in_unit(self._nanometer), x, y, z])
-        
-
-    def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
-        """
-        Generate all potentials in the systems that are necessary to properly include the steric and electrostatic pair
-        potentials between colloids in a solution in an openmm system.
-
-        This method has to be called after the method add_particle was called for every particle in the system.
-
-        :return:
-            A generator that yields the steric and electrostatic potentials handled by this class.
-        :rtype: Iterator[CustomNonbondedForce]
-
-        :raises RuntimeError:
-            If the method add_particle was not called before this method (via the abstract base class).
-        """
-        super().yield_potentials()
-        assert not math.isinf(self._max_radius.value_in_unit(self._nanometer))
-
-        self._steric_potential.setNonbondedMethod(self._steric_potential.CutoffPeriodic)
-        self._steric_potential.setCutoffDistance(
-            (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(self._nanometer))
-        self._steric_potential.setUseLongRangeCorrection(False)
-        self._steric_potential.setUseSwitchingFunction(False)
-        # Set different force groups for steric and electrostatic potentials to allow for different cutoffs on the
-        # OpenCL and CUDA platforms.
-        self._steric_potential.setForceGroup(0)
-
-        self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffPeriodic)
-        self._electrostatic_potential.setCutoffDistance(
-            (2.0 * self._max_radius
-             + self._cutoff_factor * self._parameters.debye_length).value_in_unit(self._nanometer))
-        self._electrostatic_potential.setUseLongRangeCorrection(False)
-        self._electrostatic_potential.setUseSwitchingFunction(True)
-        self._electrostatic_potential.setSwitchingDistance(
-            (2.0 * self._max_radius
-             + (self._cutoff_factor - 1.0) * self._parameters.debye_length).value_in_unit(self._nanometer))
-        self._electrostatic_potential.setForceGroup(1)
-
-        yield self._steric_potential
-        yield self._electrostatic_potential
+        self._slj_potential_x.addParticle([radius.value_in_unit(self._nanometer), x, y, z])
+        self._slj_potential_y.addParticle([radius.value_in_unit(self._nanometer), x, y, z])
+        self._slj_potential_z.addParticle([radius.value_in_unit(self._nanometer), x, y, z])
 
 
 if __name__ == '__main__':

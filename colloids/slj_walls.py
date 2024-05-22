@@ -2,43 +2,7 @@ import math
 #from typing import Iterator
 from openmm import CustomExternalForce, unit
 from colloids.abstracts import OpenMMPotentialAbstract 
-from colloids.helper_functions import read_xyz_file
-from colloids.run_parameters import RunParameters
-
-
-class ShiftedLennardJonesWallsParameters(object):
-    """
-    This class stores the parameters to compute the shifted Lennard Jones potential forces for closed-wall simulations .
-
-    :raises TypeError:
-        If the is not a Quantity with a proper unit.
-    :raises ValueError:
-        If the is not greater than zero.
-    
-    """
-
-    def __init__(self):
-        """Constructor of the ShiftedLennardJonesWallsParameters class."""
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("yaml_file", help="YAML file with simulation parameters", type=str)
-  
-    args = parser.parse_args()
-
-    if not args.yaml_file.endswith(".yaml"):
-        raise ValueError("The YAML file must have the .yaml extension.")
-
-    parameters = RunParameters.from_yaml(args.yaml_file)
-    parameters.check_types_of_initial_configuration()
-
-    box_length = read_xyz_file(parameters.initial_configuration)[2][0]
-    #epsilon = 
-    #alpha = 
-
-    if __name__ == '__main__':
-        parameters = ShiftedLennardJonesWallsParameters()
-        print(parameters)
-
+from colloids.slj_walls_parameters import ShiftedLennardJonesWallsParameters
 
 class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
 ####TODO: add documentation

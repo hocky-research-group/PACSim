@@ -10,6 +10,7 @@ class ConfigurationParameters(Parameters):
     lattice_repeats: int = 8
     orbit_factor: float = 1.3
     satellites_per_center: int = 1
+    padding_factor: float = 0.0
 
     def __post_init__(self):
         if self.lattice_spacing_factor <= 0.0:
@@ -22,3 +23,5 @@ class ConfigurationParameters(Parameters):
             raise ValueError("The number of satellites per center must be zero or positive.")
         if self.lattice_type not in ["sc", "bcc", "fcc"]:
             raise ValueError("The lattice type must be sc, bcc, or fcc.")
+        if self.padding_factor < 0.0:
+            raise ValueError("The padding factor must be non-negative.")

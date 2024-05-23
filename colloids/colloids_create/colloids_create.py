@@ -42,9 +42,10 @@ def main():
     lattice_spacing = 2.0 * radii[0][1] * configuration_parameters.lattice_spacing_factor
     orbit_distance = ((radii[0][1] + radii[1][1] + 2.0 * run_parameters.brush_length)
                       * configuration_parameters.orbit_factor)
+    padding_distance = radii[0][1] * configuration_parameters.padding_factor
     generator = CubicLatticeWithSatellitesGenerator(
         run_parameters.initial_configuration, CubicLattice.from_string(configuration_parameters.lattice_type),
-        lattice_spacing, configuration_parameters.lattice_repeats, orbit_distance,
+        lattice_spacing, configuration_parameters.lattice_repeats, orbit_distance, padding_distance,
         configuration_parameters.satellites_per_center, radii[0][0], radii[1][0])
     generator.write_positions()
 

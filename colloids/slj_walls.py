@@ -21,62 +21,39 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     def _set_up_slj_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the shifted Lennard Jones potential."""
 
-        slj_potential_x = CustomExternalForce(
+        slj_potential = CustomExternalForce(
                     "step(abs(x) - (box_length/2 - r_cut - delta)) * ("
                     "4 * epsilon * "
                     "((sigma/(box_length/2 - abs(x) - delta))^12 "
                     "- alpha * (sigma / (box_length/2 - abs(x) - delta))^6)"
                     "-4 * epsilon * "
                     "((sigma/ r_cut)^12 "
-                    "- alpha * (sigma / r_cut)^6));"
-                    "delta = radius -1;"
-                    "r_cut = radius * 2^(1/6)"
-                )
-        
-        slj_potential_y = CustomExternalForce(
-                    "step(abs(y) - (box_length/2 - r_cut - delta)) * ("
+                    "- alpha * (sigma / r_cut)^6))"
+                    "+step(abs(y) - (box_length/2 - r_cut - delta)) * ("
                     "4 * epsilon * "
                     "((sigma/(box_length/2 - abs(y) - delta))^12 "
                     "- alpha * (sigma / (box_length/2 - abs(y) - delta))^6)"
                     "-4 * epsilon * "
                     "((sigma/ r_cut)^12 "
-                    "- alpha * (sigma / r_cut)^6));"
-                    "delta = radius -1;"
-                    "r_cut = radius * 2^(1/6)"
-                )
-        
-        slj_potential_z = CustomExternalForce(
-                    "step(abs(z) - (box_length/2 - r_cut - delta)) * ("
+                    "- alpha * (sigma / r_cut)^6))"
+                    "+step(abs(z) - (box_length/2 - r_cut - delta)) * ("
                     "4 * epsilon * "
                     "((sigma/(box_length/2 - abs(z) - delta))^12 "
                     "- alpha * (sigma / (box_length/2 - abs(z) - delta))^6)"
                     "-4 * epsilon * "
                     "((sigma/ r_cut)^12 "
                     "- alpha * (sigma / r_cut)^6));"
-                    "sigma = radius;"
-                    "delta = radius -1;"
-                    "r_cut = radius * 2^(1/6)"
-                )
-    
-        slj_potential_x.addGlobalParameter("box_length", box_length)
-        slj_potential_x.addGlobalParameter("epsilon", epsilon) #*2.477709860209665*unit.kilojoule_per_mole)
-        slj_potential_x.addGlobalParameter("alpha", alpha)
-      
-        slj_potential_x.addPerParticleParameter("radius")
+                    "delta = radius_negative -1;"
+                    "r_cut = radius_negative * 2^(1/6)"
+                )   
 
-        slj_potential_y.addGlobalParameter("box_length", box_length)
-        slj_potential_y.addGlobalParameter("epsilon", epsilon) #*2.477709860209665*unit.kilojoule_per_mole)
-        slj_potential_y.addGlobalParameter("alpha", alpha)
+        slj_potential.addGlobalParameter("box_length", box_length)
+        slj_potential.addGlobalParameter("epsilon", epsilon) #*2.477709860209665*unit.kilojoule_per_mole)
+        slj_potential.addGlobalParameter("alpha", alpha)
       
-        slj_potential_y.addPerParticleParameter("radius")
-
-        slj_potential_z.addGlobalParameter("box_length", box_length)
-        slj_potential_z.addGlobalParameter("epsilon", epsilon) #*2.477709860209665*unit.kilojoule_per_mole)
-        slj_potential_z.addGlobalParameter("alpha", alpha)
+        slj_potential.addPerParticleParameter("radius")
       
-        slj_potential_z.addPerParticleParameter("radius")
-      
-      return slj_potential_x, slj_potential_y, slj_potential_z
+      return slj_potential
       
 
     def add_particle(self, radius: unit.Quantity, x: unit.Quantity, y: unit.Quantity, z: unit.Quantity ) -> None:
@@ -117,9 +94,7 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         if radius.in_units_of(self._nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(self._nanometer)
 
-        self._slj_potential_x.addParticle([radius.value_in_unit(self._nanometer), x, y, z])
-        self._slj_potential_y.addParticle([radius.value_in_unit(self._nanometer), x, y, z])
-        self._slj_potential_z.addParticle([radius.value_in_unit(self._nanometer), x, y, z])
+        self._slj_potential.addParticle([radius.value_in_unit(self._nanometer), x, y, z])
 
 
 if __name__ == '__main__':

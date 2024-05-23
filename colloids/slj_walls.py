@@ -59,19 +59,19 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
                 )
     
         slj_potential_x.addGlobalParameter("box_length", box_length)
-        slj_potential_x.addGlobalParameter("epsilon", epsilon*2.477709860209665*unit.kilojoule_per_mole)
+        slj_potential_x.addGlobalParameter("epsilon", epsilon) #*2.477709860209665*unit.kilojoule_per_mole)
         slj_potential_x.addGlobalParameter("alpha", alpha)
       
         slj_potential_x.addPerParticleParameter("radius")
 
         slj_potential_y.addGlobalParameter("box_length", box_length)
-        slj_potential_y.addGlobalParameter("epsilon", epsilon*2.477709860209665*unit.kilojoule_per_mole)
+        slj_potential_y.addGlobalParameter("epsilon", epsilon) #*2.477709860209665*unit.kilojoule_per_mole)
         slj_potential_y.addGlobalParameter("alpha", alpha)
       
         slj_potential_y.addPerParticleParameter("radius")
 
         slj_potential_z.addGlobalParameter("box_length", box_length)
-        slj_potential_z.addGlobalParameter("epsilon", epsilon*2.477709860209665*unit.kilojoule_per_mole)
+        slj_potential_z.addGlobalParameter("epsilon", epsilon) #*2.477709860209665*unit.kilojoule_per_mole)
         slj_potential_z.addGlobalParameter("alpha", alpha)
       
         slj_potential_z.addPerParticleParameter("radius")

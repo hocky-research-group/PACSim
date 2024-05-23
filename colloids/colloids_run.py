@@ -18,6 +18,9 @@ class ExampleAction(argparse.Action):
         # TODO PUT EQUILIBRATION STEPS?
         default_parameters = RunParameters()
         default_parameters.to_yaml("example.yaml")
+
+        default_slj_parameters = ShiftedLennardJonesWallsParameters()
+        
         parser.exit()
 
 
@@ -84,14 +87,18 @@ def set_up_simulation(parameters: RunParameters, slj_parameters: ShiftedLennardJ
             colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
             cutoff_factor=parameters.cutoff_factor)
 
+    slj_walls = ShiftedLennardJonesWalls(
+        slj_wall_parameters = slj_parameters
+    )
+
     for t in types:
         system.addParticle(parameters.masses[t])
         colloid_potentials.add_particle(radius=parameters.radii[t],
                                         surface_potential=parameters.surface_potentials[t])
-        slj_
+        slj_walls.add_particle(radius=parameters.radii[t])
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
-    for force in slj_potentials():
+    for force in slj_walls():
         system.addForce(force)
 
     if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":

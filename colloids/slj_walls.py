@@ -5,14 +5,65 @@ from colloids.abstracts import OpenMMPotentialAbstract
 from colloids.slj_walls_parameters import ShiftedLennardJonesWallsParameters
 
 class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
-####TODO: add documentation
+ """
+    This class sets up the Shifted Lennard Jones potentials for closed-wall simulations using the CustomExternalForce 
+    class of openmm.
+
+    The Shifted Lennard Jones potential acts on colloid particles within a certain distance of the wall. This distance 
+    depends on the particle radius and the length of the box box_length and is defined as box_length/2 - r_cut - delta, where
+    r_cut is radius  * 2^(1/6) and  delta is radius -1. Outside of this range, the external force acting on a particle is 0.
+    
+    The potential depends on the factors:
+      -epsilon, the Lennard Jones potential well-depth
+      -sigma, the Lennard Jones potential bond length (set equal to the particle radius)
+      -alpha, a cutoff for the shifted Lennard Jones potential that affects the continuinty and differentiability of the 
+        potential functional form
+
+    Before the potential is generated in order to add it to the openmm system (using the system.addForce method), the 
+    add_particle method has to be called for each colloid particle in the system to define its radius and the x, y, and
+    z coordinates of its position.
+
+    :param radius:
+        The radius of the the colloid.
+        The unit of the radius must be compatible with nanometers and the value must be greater than zero.
+    :type radius: unit.Quantity
+
+    :param x:
+        The x-position of the the colloid.
+        The unit must be compatible with nanometers.
+    :type x: unit.Quantity
+
+    :param y:
+        The y-position of the the colloid.
+        The unit must be compatible with nanometers.
+    :type y: unit.Quantity
+
+    :param z:
+        The z-position of the the colloid.
+        The unit must be compatible with nanometers.
+    :type z: unit.Quantity
+
+    :param slj_parameters:
+        The parameters of the Shifted Lennard Jones potentials.
+        Defaults to the default parameters of the ShiftedLennardJonesWallsParameters class.
+    :type slj_parameters: ShiftedLennardJonesWallsParameters
+    
+
+    :raises TypeError:
+        If the radius is not a Quantity with a proper unit.
+    :raises ValueError:
+        If the radius is not greater than zero.
+
+    """
+
   
     def __init__(self, slj_wall_parameters: ShiftedLennardJonesWallsParameters = ShiftedLennardJonesWallsParameters(),
-                 use_log: bool = True) -> None:
+                 #use_log: bool = True) 
+                  -> None:
         """Constructor of the ShiftedLennardJonesWalls class."""
         super().__init__(slj_wall_parameters)
 
-        self._use_log = use_log
+        #self._use_log = use_log
         self._slj_potential = self._set_up_slj_potential()
         self._max_radius = -math.inf * self._nanometer
         #self._cutoff_factor = cutoff_factor
@@ -43,8 +94,9 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
                     "-4 * epsilon * "
                     "((sigma/ r_cut)^12 "
                     "- alpha * (sigma / r_cut)^6));"
-                    "delta = radius_negative -1;"
-                    "r_cut = radius_negative * 2^(1/6)"
+                    "sigma = radius;"
+                    "delta = radius -1;"
+                    "r_cut = radius  * 2^(1/6)"
                 )   
 
         slj_potential.addGlobalParameter("box_length", box_length)
@@ -69,25 +121,24 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
 
         :param x:
             The x coordinate of the colloid particle position.
-            The unit must be compatible with nanometers and the value must be greater than zero.
+            The unit must be compatible with nanometers.
         :type x: unit.Quantity
 
         :param y:
             The y coordinate of the colloid particle position.
-            The unit must be compatible with nanometers and the value must be greater than zero.
+            The unit must be compatible with nanometers.
         :type y: unit.Quantity
 
         :param z:
             The z coordinate of the colloid particle position.
-            The unit must be compatible with nanometers and the value must be greater than zero.
+            The unit must be compatible with nanometers.
         :type z: unit.Quantity
         
         :raises TypeError:
             If the radius is not a Quantity with a proper unit (via the abstract base class).
         :raises ValueError:
             If the radius is not greater than zero (via the abstract base class).
-        :raises RuntimeError:
-            If the method yield_potentials was called before this method (via the abstract base class).
+
         """
         super().add_particle(radius, x, y, z)
 

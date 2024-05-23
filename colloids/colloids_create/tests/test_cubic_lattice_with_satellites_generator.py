@@ -42,7 +42,6 @@ class TestCubicLatticeWithSatellitesGenerator(object):
         assert os.path.isfile(initial_configuration_filename)
         atoms = ase.io.read(initial_configuration_filename, format="extxyz")
         reference_atoms = ase.io.read(reference_configuration_filename, format="extxyz")
-        reference_atoms.translate(-reference_atoms[0].position)
         assert atoms.get_chemical_symbols() == reference_atoms.get_chemical_symbols()
         assert atoms.get_cell() == pytest.approx(reference_atoms.get_cell(), rel=1e-12, abs=1e-12)
         assert atoms.get_positions() == pytest.approx(reference_atoms.get_positions(), rel=1e-5, abs=1e-5)

@@ -68,6 +68,8 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         atoms = build.bulk(name="X", crystalstructure=self._lattice.to_ase_string(),
                            a=self._lattice_constant.value_in_unit(self._nanometer),
                            cubic=True)
+        # Center the center atoms around the origin.
+        atoms.center(about=(0.0, 0.0, 0.0))
         new_atoms = []
         for atom in atoms:
             for satellite_position in self._generate_fibonacci_sphere_grid_points(
@@ -76,11 +78,17 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         for new_atom in new_atoms:
             atoms.append(new_atom)
         atoms = atoms.repeat(self._lattice_repeats)
+        # Shift all atoms so that the center atoms are centered around the origin again.
+        translation_vector = sum(-(self._lattice_repeats - 1) * cv / (2.0 * self._lattice_repeats) for cv in atoms.cell)
+        atoms.translate(translation_vector)
         # Use the extended xyz file format.
         # See https://www.ovito.org/docs/current/reference/file_formats/input/xyz.html#extended-xyz-format
+        origin_vector = -0.5 * atoms.cell.sum(axis=0)
         with open(self._filename, "w") as file:
             print(len(atoms), file=file)
-            print(f"Lattice=\"{' '.join(map(str, atoms.cell.flatten()))}\" Properties=species:S:1:pos:R:3", file=file)
+            print(f"Lattice=\"{' '.join(map(str, atoms.cell.flatten()))}\" Properties=species:S:1:pos:R:3 "
+                  f"Origin=\"{' '.join(map(str, origin_vector))}\"",
+                  file=file)
             for atom in atoms:
                 print(f"{self._type_lattice if atom.symbol=='X' else self._type_satellite} "
                       f"{atom.position[0]} {atom.position[1]} {atom.position[2]}", file=file)

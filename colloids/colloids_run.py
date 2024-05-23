@@ -2,10 +2,10 @@ import argparse
 import numpy.typing as npt
 import openmm
 from openmm import app
-from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated
+from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated, ShiftedLennardJonesWalls
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
-from colloids.run_parameters import RunParameters
+from colloids.run_parameters import RunParameters, ShiftedLennardJonesWallsParameters
 from colloids.status_reporter import StatusReporter
 
 
@@ -21,7 +21,7 @@ class ExampleAction(argparse.Action):
         parser.exit()
 
 
-def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
+def set_up_simulation(parameters: RunParameters, slj_parameters: ShiftedLennardJonesWallsParameters, types: npt.NDArray[str],
                       cell: npt.NDArray[float]) -> app.Simulation:
     topology = app.topology.Topology()
     chain = topology.addChain()
@@ -56,6 +56,13 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         debye_length=parameters.debye_length, temperature=parameters.temperature,
         dielectric_constant=parameters.dielectric_constant
     )
+
+    slj_parameters = ShiftedLennardJonesWallsParameters(
+        box_length=slj_parameters.box_length,
+        epsilon=slj_parameters.epsilon,
+        alpha=slj_parameters.alpha
+    )
+                    
     if parameters.use_tabulated:
         # TODO: Maybe generalize tabulated potentials to more than two types.
         # Use a dictionary instead of a set to preserve the order of the types.
@@ -81,7 +88,10 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         system.addParticle(parameters.masses[t])
         colloid_potentials.add_particle(radius=parameters.radii[t],
                                         surface_potential=parameters.surface_potentials[t])
+        slj_
     for force in colloid_potentials.yield_potentials():
+        system.addForce(force)
+    for force in slj_potentials():
         system.addForce(force)
 
     if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":

@@ -2,16 +2,8 @@ class ShiftedLennardJonesWallsParameters(object):
     """
     This class stores the parameters to compute the shifted Lennard Jones potential forces for closed-wall simulations .
 
-    :raises TypeError:
-        If the is not a Quantity with a proper unit.
-    :raises ValueError:
-        If the is not greater than zero.
-    
-    """
-
-
     :param box_length:
-        The dimensions of the simulation box. This is used to determine the location of the slj walls. 
+        The dimensions of the simulation box. This is used to determine the location of the SLJ walls. 
         The unit of the box_length must be compatible with nanometer. The value must be greater than 0.
         Defaults to 1000 nanometer.
     :type box_length: unit.Quantity
@@ -20,7 +12,8 @@ class ShiftedLennardJonesWallsParameters(object):
         Defaults to 1.0.
     :type epsilon: float
     :param alpha:
-        The cutoff factor in the shifted Lennard Jones potential.
+        The cutoff factor in the shifted Lennard Jones potential. 
+        This affects the continuity/ differentiability of the SLJ potential functional form.
         Defaults to 0.0 nanometers.
     :type alpha: float
   
@@ -32,7 +25,6 @@ class ShiftedLennardJonesWallsParameters(object):
 
     ENERGY_CONVERSION_FACTOR = 2.477709860209665*unit.kilojoule_per_mole
           
-
     def __init__(self, box_length, epsilon, alpha):
       box_length = unit.Quantity = 1000.0 * (unit.nano * unit.meter)
       epsilon = 1.0 * ENERGY_CONVERSION_FACTOR

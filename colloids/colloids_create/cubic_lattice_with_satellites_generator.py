@@ -27,8 +27,8 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
     _nanometer = unit.nano * unit.meter
 
     def __init__(self, filename: str, lattice: CubicLattice, lattice_constant: unit.Quantity, lattice_repeats: int,
-                 orbit_distance: unit.Quantity, satellites_per_center: int, type_lattice: str,
-                 type_satellite: str) -> None:
+                 orbit_distance: unit.Quantity, padding_distance: unit.Quantity, satellites_per_center: int,
+                 type_lattice: str, type_satellite: str) -> None:
         super().__init__(filename)
         if not lattice_constant.unit.is_compatible(self._nanometer):
             raise TypeError("The lattice constant must have a unit that is compatible with nanometers.")
@@ -40,6 +40,10 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
             raise TypeError("The orbit distance must have a unit that is compatible with nanometers.")
         if not orbit_distance.value_in_unit(self._nanometer) > 0.0:
             raise ValueError("The orbit distance must have a value greater than zero.")
+        if not padding_distance.unit.is_compatible(self._nanometer):
+            raise TypeError("The padding distance must have a unit that is compatible with nanometers.")
+        if not padding_distance.value_in_unit(self._nanometer) >= 0.0:
+            raise ValueError("The padding distance must have a value greater than or equal to zero.")
         if not satellites_per_center >= 0:
             raise ValueError("The number of satellites per center must be greater than or equal to zero.")
         if not orbit_distance < lattice_constant:
@@ -48,6 +52,7 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         self._lattice_constant = lattice_constant
         self._lattice_repeats = lattice_repeats
         self._orbit_distance = orbit_distance
+        self._padding_distance = padding_distance
         self._satellites_per_center = satellites_per_center
         self._type_lattice = type_lattice
         self._type_satellite = type_satellite
@@ -68,6 +73,8 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         atoms = build.bulk(name="X", crystalstructure=self._lattice.to_ase_string(),
                            a=self._lattice_constant.value_in_unit(self._nanometer),
                            cubic=True)
+        # Center the center atoms around the origin.
+        atoms.center(about=(0.0, 0.0, 0.0))
         new_atoms = []
         for atom in atoms:
             for satellite_position in self._generate_fibonacci_sphere_grid_points(
@@ -76,11 +83,22 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         for new_atom in new_atoms:
             atoms.append(new_atom)
         atoms = atoms.repeat(self._lattice_repeats)
+        # Shift all atoms so that the center atoms are centered around the origin again.
+        translation_vector = sum(-(self._lattice_repeats - 1) * cv / (2.0 * self._lattice_repeats) for cv in atoms.cell)
+        atoms.translate(translation_vector)
         # Use the extended xyz file format.
         # See https://www.ovito.org/docs/current/reference/file_formats/input/xyz.html#extended-xyz-format
+        scaled_cell = atoms.cell.copy()
+        for i, cell_vector in enumerate(scaled_cell):
+            norm = np.linalg.norm(cell_vector)
+            scaling_factor = (norm + 2.0 * self._padding_distance.value_in_unit(self._nanometer)) / norm
+            scaled_cell[i] *= scaling_factor
+        origin_vector = -0.5 * scaled_cell.sum(axis=0)
         with open(self._filename, "w") as file:
             print(len(atoms), file=file)
-            print(f"Lattice=\"{' '.join(map(str, atoms.cell.flatten()))}\" Properties=species:S:1:pos:R:3", file=file)
+            print(f"Lattice=\"{' '.join(map(str, scaled_cell.flatten()))}\" Properties=species:S:1:pos:R:3 "
+                  f"Origin=\"{' '.join(map(str, origin_vector))}\"",
+                  file=file)
             for atom in atoms:
                 print(f"{self._type_lattice if atom.symbol=='X' else self._type_satellite} "
                       f"{atom.position[0]} {atom.position[1]} {atom.position[2]}", file=file)
@@ -89,13 +107,13 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
 if __name__ == '__main__':
     CubicLattice.from_string("sc")
     CubicLatticeWithSatellitesGenerator("test_sc.xyz", CubicLattice.SC, 4.05 * (unit.nano * unit.meter),
-                                        3, 1.3 * (unit.nano * unit.meter), 1,
-                                        "P", "N").write_positions()
+                                        3, 1.3 * (unit.nano * unit.meter), 3.0 * (unit.nano * unit.meter),
+                                        1, "P", "N").write_positions()
 
     CubicLatticeWithSatellitesGenerator("test_fcc.xyz", CubicLattice.FCC, 4.05 * (unit.nano * unit.meter),
-                                        3, 1.3 * (unit.nano * unit.meter), 1,
-                                        "P", "N").write_positions()
+                                        3, 1.3 * (unit.nano * unit.meter), 3.0 * (unit.nano * unit.meter),
+                                        1, "P", "N").write_positions()
 
     CubicLatticeWithSatellitesGenerator("test_bcc.xyz", CubicLattice.BCC, 4.05 * (unit.nano * unit.meter),
-                                        3, 1.3 * (unit.nano * unit.meter), 1,
-                                        "P", "N").write_positions()
+                                        3, 1.3 * (unit.nano * unit.meter), 3.0 * (unit.nano * unit.meter),
+                                        1, "P", "N").write_positions()

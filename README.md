@@ -36,10 +36,22 @@ pip install -e .
 Note that this attempts to install the requirements with pip, if you did not install them yourself before. However, 
 because hoomd is not available on PyPI, you need to install it manually (or via conda).
 
+## Testing
+
+After installation, you can test whether your installation is working correctly by running the following command from 
+this directory:
+
+```bash
+pytest colloids
+```
+
+If hoomd is not installed, some tests are automatically skipped.
+
 ## Usage
 
-The installation process creates two executables `colloids-run` and `colloids-resume`. You might have to add the 
-directory where pip installs executables to your PATH environment variable in order to access these executables.
+The installation process creates three executables `colloids-run`, `colloids-resume`, and `colloids-create`. You might 
+have to add the directory where pip installs executables to your PATH environment variable in order to access these 
+executables.
 
 ### colloids-run
 
@@ -51,7 +63,7 @@ colloids-run run.yaml
 ```
 
 An exemplary configuration file called `example.yaml` can be created with the command 
-`colloids-run --example`. Another exemplary configuration file is provided in `colloids/run.yaml`.
+`colloids-run --example`. Another exemplary configuration file is provided in [`colloids/run.yaml`](colloids/run.yaml).
 
 ### colloids-resume
 A simulation that is run with the `colloids-run` executable creates checkpoints in periodic intervals. One can resume a 
@@ -62,4 +74,54 @@ For example, use the following command to continue a simulation for 100000 time 
 
 ```bash
 colloids-resume run.yaml checkpoint.chk 100000
+```
+
+### colloids-create
+The configuration file for the `colloids-run` executable specifies the filename of an initial configuration for the 
+simulation in the `initial_configuration` key. This initial configuration should be stored in the [extended XYZ file 
+format](https://www.ovito.org/manual/reference/file_formats/input/xyz.html).
+
+The `colloids-create` executable can be used to create an initial configuration for simulations in the extended XYZ file 
+format. It expects two configuration files in yaml format as positional arguments:
+1.  A configuration file that specifies the parameters of the simulation. This yaml file is usually the one that is 
+    passed to the `colloids-run` executable afterward, and it contains the filename in which the generated initial 
+    configuration is stored. See [`colloids/run.yaml`](colloids/run.yaml) for an example.
+2. A configuration file that specifies the parameters of the initial configuration. See 
+   [`colloids/colloids_create/configuration.yaml`](colloids/colloids_create/configuration.yaml) for an example. Another 
+   exemplary configuration file called `example_configuration.yaml` can be created with the command
+   `colloids-create --example`.
+
+A typical workflow for running a simulation with `colloids-run` from an initial configuration created by 
+`colloids-create` consists of creating a directory with `run.yaml` and `configuration.yaml` files, and then running the 
+following two commands:
+
+```bash
+colloids-create run.yaml configuration.yaml
+colloids-run run.yaml
+```
+
+### colloids-analyze
+
+The `colloids-run` executable generates a trajectory in the GSD file format that can be visualized with 
+[Ovito](https://www.ovito.org) and 
+analyzed with the [GSD](https://gsd.readthedocs.io/en/stable/python-api.html) Python package.
+
+In addition, the `colloids-run` executable generates a CSV file that contains the time series of the potential energy,
+the kinetic energy, and the temperature of the system. The `colloids-analyze` executable can be used to plot these time
+series. Here, it can plot the results of several simulations at once.
+
+The `colloids-analyze` expects a configuration file in yaml format that specifies the parameters of the analysis (like 
+the output directory where the plots should be generated) as the first positional argument. An exemplary configuration 
+file called `example_analysis.yaml` can be created with the command `colloids-analyze --example`. Another exemplary 
+configuration file is provided in [`colloids/colloids_analyze/analysis.yaml`](colloids/colloids_analyze/analysis.yaml).
+
+After this, the `colloids-analyze` executable receives an arbitrary number of configuration files that specified the 
+parameters of the simulations that should be analyzed. These configuration files contain the name of the CSV files
+that will be plotted.
+
+Assume, for example, that you ran three simulations with `colloids-run` in the directories `Run1`, `Run2`, and `Run3` 
+based on configuration files called `run.yaml` in either of these directories. You can analyze and compare the results 
+of these simulations with the command:
+```bash
+colloids-analyze analysis.yaml Run1/run.yaml Run2/run.yaml Run3/run.yaml
 ```

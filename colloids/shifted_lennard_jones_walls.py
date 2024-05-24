@@ -143,4 +143,16 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         self._slj_potential.addParticle([radius.value_in_unit(self._nanometer)])
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
+        """
+        Generate all potentials in the systems that are necessary to properly include the shifted Lennard-Jones walls.
+
+        This method has to be called after the method add_particle was called for every particle in the system.
+
+        :return:
+            A generator that yields shifted Lennard-Jones walls handled by this class.
+        :rtype: Iterator[CustomExternalForce]
+
+        :raises RuntimeError:
+            If the method add_particle was not called before this method (via the abstract base class).
+        """
         yield self._slj_potential

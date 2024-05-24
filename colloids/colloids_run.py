@@ -74,7 +74,7 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
             cutoff_factor=parameters.cutoff_factor)
 
     # TODO: Switch of periodic boundaries if walls are active?
-    include_walls = any(parameters.walls_directions)
+    include_walls = any(parameters.wall_directions)
 
     for t in types:
         system.addParticle(parameters.masses[t])
@@ -82,8 +82,9 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
                                         surface_potential=parameters.surface_potentials[t])
 
     if include_walls:
+        # TODO: Get box length.
         slj_walls = ShiftedLennardJonesWalls(box_length, parameters.epsilon, parameters.alpha,
-                                             parameters.walls_directions)
+                                             parameters.wall_directions)
         for t in types:
             slj_walls.add_particle(radius=parameters.radii[t])
         for force in slj_walls.yield_potentials():

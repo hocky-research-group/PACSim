@@ -1,77 +1,89 @@
-import math
-#from typing import Iterator
+from typing import Iterator
 from openmm import CustomExternalForce, unit
 from colloids.abstracts import OpenMMPotentialAbstract 
-from colloids.slj_walls_parameters import ShiftedLennardJonesWallsParameters
+import warnings
+
 
 class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
- """
-    This class sets up the Shifted Lennard Jones potentials for closed-wall simulations using the CustomExternalForce 
+    """
+    This class sets up the shifted Lennard-Jones potentials for closed-wall simulations using the CustomExternalForce
     class of openmm.
 
-    The Shifted Lennard Jones potential acts on colloid particles within a certain distance of the wall. This distance 
-    depends on the particle radius and the length of the box box_length and is defined as box_length/2 - r_cut - delta, where
-    r_cut is radius  * 2^(1/6) and  delta is radius -1. Outside of this range, the external force acting on a particle is 0.
+    The shifted Lennard-Jones potential as a wall follows the implementation of hoomd (see
+    https://hoomd-blue.readthedocs.io/en/v2.9.4/module-md-wall.html#hoomd.md.wall.slj).
+
+    This class allows to independently switch on walls in the x, y, and z directions. The walls are placed at
+    +-box_length/2 for every specified direction.
+
+    The shifted Lennard-Jones potential acts on colloid particles within a certain cutoff distance of every wall. This
+    cutoff distance depends on the particle radius and is given by r_cut - delta, where r_cut = radius * 2^(1/6) and
+    delta = radius - 1. Outside of this range, the external force acting on a particle is 0.
+
+    The Lennard-Jones potential is shifted so that it starts smoothly at zero at the cutoff distance.
+
+    The shifted Lennard-Jones potential as a function of the distance r to the wall is given by:
+    slj(r) = 4 * epsilon * ((radius / (r - delta))^12 - alpha * (radius / (r - delta))^6)
+             - 4 * epsilon * ((radius / r_cut)^12 - alpha * (radius / r_cut)^6)
     
-    The potential depends on the factors:
-      -epsilon, the Lennard Jones potential well-depth
-      -sigma, the Lennard Jones potential bond length (set equal to the particle radius)
-      -alpha, a cutoff for the shifted Lennard Jones potential that affects the continuinty and differentiability of the 
-        potential functional form
 
-    Before the potential is generated in order to add it to the openmm system (using the system.addForce method), the 
-    add_particle method has to be called for each colloid particle in the system to define its radius and the x, y, and
-    z coordinates of its position.
-
-    :param radius:
-        The radius of the the colloid.
-        The unit of the radius must be compatible with nanometers and the value must be greater than zero.
-    :type radius: unit.Quantity
-
-    :param x:
-        The x-position of the the colloid.
-        The unit must be compatible with nanometers.
-    :type x: unit.Quantity
-
-    :param y:
-        The y-position of the the colloid.
-        The unit must be compatible with nanometers.
-    :type y: unit.Quantity
-
-    :param z:
-        The z-position of the the colloid.
-        The unit must be compatible with nanometers.
-    :type z: unit.Quantity
-
-    :param slj_parameters:
-        The parameters of the Shifted Lennard Jones potentials.
-        Defaults to the default parameters of the ShiftedLennardJonesWallsParameters class.
-    :type slj_parameters: ShiftedLennardJonesWallsParameters
-    
+    :param box_length:
+        The dimensions of the simulation box. This is used to determine the location of the SLJ walls at +-box_length/2.
+        The unit of the box_length must be compatible with nanometer and the value must be greater than zero.
+    :type box_length: unit.Quantity
+    :param epsilon:
+        The unshifted Lennard-Jones potential well-depth.
+        The unit of the epsilon must be compatible with kilojoules_per_mole and the value must be greater than zero.
+    :type epsilon: unit.Quantity
+    :param alpha:
+        Factor determining the strength of the attractive part of the Lennard-Jones potential.
+        This factor has to satisfy 0 <= alpha <= 1.
+        Note that the force of this potential is only continuous if alpha = 1.
+    :type alpha: float
+    :param wall_directions:
+        A tuple of three booleans indicating whether the walls in the x, y, and z directions are active.
+        Defaults to (True, True, True).
+    :type wall_directions: tuple[int]
 
     :raises TypeError:
-        If the radius is not a Quantity with a proper unit.
+        If box_length or epsilon is not a Quantity with a proper unit.
     :raises ValueError:
-        If the radius is not greater than zero.
-
+        If box_length or epsilon is not greater than zero.
+        If alpha is not in the interval [0, 1].
+        If no wall direction is active.
     """
 
-  
-    def __init__(self, slj_wall_parameters: ShiftedLennardJonesWallsParameters = ShiftedLennardJonesWallsParameters(),
-                 #use_log: bool = True) 
-                  -> None:
+    _nanometer = unit.nano * unit.meter
+
+    def __init__(self, box_length: unit.Quantity, epsilon: unit.Quantity, alpha: float,
+                 wall_directions: tuple[int] = (True, True, True)) -> None:
         """Constructor of the ShiftedLennardJonesWalls class."""
-        super().__init__(slj_wall_parameters)
+        super().__init__()
 
-        #self._use_log = use_log
+        if not box_length.unit.is_compatible(self._nanometer):
+            raise TypeError("argument box_length must have a unit that is compatible with nanometers")
+        if not box_length.value_in_unit(self._nanometer) > 0.0:
+            raise ValueError("argument box_length must have a value greater than zero")
+        if not epsilon.unit.is_compatible(unit.kilojoule_per_mole):
+            raise TypeError("argument epsilon must have a unit that is compatible with kilojoules_per_mole")
+        if not epsilon.value_in_unit(unit.kilojoule_per_mole) > 0.0:
+            raise ValueError("argument epsilon must have a value greater than zero")
+        if not 0.0 <= alpha <= 1.0:
+            raise ValueError("argument alpha must satisfy 0 <= alpha <= 1")
+        if alpha != 1.0:
+            warnings.warn("The force of the shifted Lennard-Jones potential as a wall is only continuous if alpha = 1.")
+        if not any(wall_directions):
+            raise ValueError("At least one wall direction must be active.")
+
+        self._box_length = box_length
+        self._epsilon = epsilon
+        self._alpha = alpha
+        self._wall_directions = wall_directions
         self._slj_potential = self._set_up_slj_potential()
-        self._max_radius = -math.inf * self._nanometer
-        #self._cutoff_factor = cutoff_factor
-
 
     def _set_up_slj_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the shifted Lennard Jones potential."""
 
+        # TODO: Use self._wall_directions to switch on walls in the x, y, and z directions.
         slj_potential = CustomExternalForce(
                     "step(abs(x) - (box_length/2 - r_cut - delta)) * ("
                     "4 * epsilon * "
@@ -99,18 +111,16 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
                     "r_cut = radius  * 2^(1/6)"
                 )   
 
-        slj_potential.addGlobalParameter("box_length", box_length)
-        slj_potential.addGlobalParameter("epsilon", epsilon) #*2.477709860209665*unit.kilojoule_per_mole)
-        slj_potential.addGlobalParameter("alpha", alpha)
-      
+        slj_potential.addGlobalParameter("box_length", self._box_length.value_in_unit(self._nanometer))
+        slj_potential.addGlobalParameter("epsilon", self._epsilon.value_in_unit(unit.kilojoule_per_mole))
+        slj_potential.addGlobalParameter("alpha", self._alpha)
         slj_potential.addPerParticleParameter("radius")
       
-      return slj_potential
-      
+        return slj_potential
 
-    def add_particle(self, radius: unit.Quantity, x: unit.Quantity, y: unit.Quantity, z: unit.Quantity ) -> None:
+    def add_particle(self, radius: unit.Quantity) -> None:
         """
-        Add a colloid with a given radius and surface potential to the system.
+        Add a colloid with a given radius to the system.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -118,21 +128,6 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             The radius of the colloid.
             The unit of the radius must be compatible with nanometers and the value must be greater than zero.
         :type radius: unit.Quantity
-
-        :param x:
-            The x coordinate of the colloid particle position.
-            The unit must be compatible with nanometers.
-        :type x: unit.Quantity
-
-        :param y:
-            The y coordinate of the colloid particle position.
-            The unit must be compatible with nanometers.
-        :type y: unit.Quantity
-
-        :param z:
-            The z coordinate of the colloid particle position.
-            The unit must be compatible with nanometers.
-        :type z: unit.Quantity
         
         :raises TypeError:
             If the radius is not a Quantity with a proper unit (via the abstract base class).
@@ -140,13 +135,12 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             If the radius is not greater than zero (via the abstract base class).
 
         """
-        super().add_particle(radius, x, y, z)
+        super().add_particle()
+        if not radius.unit.is_compatible(self._nanometer):
+            raise TypeError("argument radius must have a unit that is compatible with nanometers")
+        if not radius.value_in_unit(self._nanometer) > 0.0:
+            raise ValueError("argument radius must have a value greater than zero")
+        self._slj_potential.addParticle([radius.value_in_unit(self._nanometer)])
 
-        if radius.in_units_of(self._nanometer) > self._max_radius:
-            self._max_radius = radius.in_units_of(self._nanometer)
-
-        self._slj_potential.addParticle([radius.value_in_unit(self._nanometer), x, y, z])
-
-
-if __name__ == '__main__':
-    ShiftedLennardJonesWalls()
+    def yield_potentials(self) -> Iterator[CustomExternalForce]:
+        yield self._slj_potential

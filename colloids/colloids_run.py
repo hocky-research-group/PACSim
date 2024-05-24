@@ -2,10 +2,11 @@ import argparse
 import numpy.typing as npt
 import openmm
 from openmm import app
-from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated, ShiftedLennardJonesWalls
+from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
+                      ShiftedLennardJonesWalls)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
-from colloids.run_parameters import RunParameters, ShiftedLennardJonesWallsParameters
+from colloids.run_parameters import RunParameters
 from colloids.status_reporter import StatusReporter
 
 
@@ -18,13 +19,10 @@ class ExampleAction(argparse.Action):
         # TODO PUT EQUILIBRATION STEPS?
         default_parameters = RunParameters()
         default_parameters.to_yaml("example.yaml")
-
-        default_slj_parameters = ShiftedLennardJonesWallsParameters()
-        
         parser.exit()
 
 
-def set_up_simulation(parameters: RunParameters, slj_parameters: ShiftedLennardJonesWallsParameters, types: npt.NDArray[str],
+def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
                       cell: npt.NDArray[float]) -> app.Simulation:
     topology = app.topology.Topology()
     chain = topology.addChain()
@@ -41,15 +39,10 @@ def set_up_simulation(parameters: RunParameters, slj_parameters: ShiftedLennardJ
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
     # TODO: ALLOW FOR DIFFERENT INTEGRATORS?
-    #integrator = openmm.LangevinMiddleIntegrator(parameters.temperature,
-                                                 #parameters.collision_rate,
-                                                 #parameters.timestep)
-   
     integrator = openmm.LangevinIntegrator(parameters.temperature,
-                                                 parameters.collision_rate,
-                                                 parameters.timestep)
-
-    #for testing purposes
+                                           parameters.collision_rate,
+                                           parameters.timestep)
+    # For testing purposes
     print("Using Langevin Integrator with dt =", parameters.timestep, " and gamma =" , parameters.collision_rate)
     if parameters.integrator_seed is not None:
         integrator.setRandomNumberSeed(parameters.integrator_seed)
@@ -59,13 +52,6 @@ def set_up_simulation(parameters: RunParameters, slj_parameters: ShiftedLennardJ
         debye_length=parameters.debye_length, temperature=parameters.temperature,
         dielectric_constant=parameters.dielectric_constant
     )
-
-    slj_parameters = ShiftedLennardJonesWallsParameters(
-        box_length=slj_parameters.box_length,
-        epsilon=slj_parameters.epsilon,
-        alpha=slj_parameters.alpha
-    )
-                    
     if parameters.use_tabulated:
         # TODO: Maybe generalize tabulated potentials to more than two types.
         # Use a dictionary instead of a set to preserve the order of the types.
@@ -87,18 +73,23 @@ def set_up_simulation(parameters: RunParameters, slj_parameters: ShiftedLennardJ
             colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
             cutoff_factor=parameters.cutoff_factor)
 
-    slj_walls = ShiftedLennardJonesWalls(
-        slj_wall_parameters = slj_parameters
-    )
+    # TODO: Switch of periodic boundaries if walls are active?
+    include_walls = any(parameters.walls_directions)
 
     for t in types:
         system.addParticle(parameters.masses[t])
         colloid_potentials.add_particle(radius=parameters.radii[t],
                                         surface_potential=parameters.surface_potentials[t])
-        slj_walls.add_particle(radius=parameters.radii[t])
+
+    if include_walls:
+        slj_walls = ShiftedLennardJonesWalls(box_length, parameters.epsilon, parameters.alpha,
+                                             parameters.walls_directions)
+        for t in types:
+            slj_walls.add_particle(radius=parameters.radii[t])
+        for force in slj_walls.yield_potentials():
+            system.addForce(force)
+
     for force in colloid_potentials.yield_potentials():
-        system.addForce(force)
-    for force in slj_walls():
         system.addForce(force)
 
     if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":

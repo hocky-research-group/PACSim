@@ -53,6 +53,7 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     """
 
     _nanometer = unit.nano * unit.meter
+    _kilojoule_per_mole = unit.kilojoule / unit.mole
 
     def __init__(self, box_length: unit.Quantity, epsilon: unit.Quantity, alpha: float,
                  wall_directions: tuple[int] = (True, True, True)) -> None:
@@ -83,38 +84,60 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     def _set_up_slj_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the shifted Lennard Jones potential."""
 
-        # TODO: Use self._wall_directions to switch on walls in the x, y, and z directions.
+        # Use self._wall_directions to switch on walls in the x, y, and z directions.
+
+        if self._wall_directions[0] == True:
+            x_wall=1
+        else:
+            x_wall=0
+        if self._wall_directions[1] == True:
+            y_wall=1
+        else:
+            y_wall=0
+        if self._wall_directions[2] == True:
+            z_wall=1
+        else:
+            z_wall=0
+
+        
         slj_potential = CustomExternalForce(
                     "step(abs(x) - (box_length/2 - r_cut - delta)) * ("
+                    "x_wall *("
                     "4 * epsilon * "
                     "((sigma/(box_length/2 - abs(x) - delta))^12 "
                     "- alpha * (sigma / (box_length/2 - abs(x) - delta))^6)"
                     "-4 * epsilon * "
                     "((sigma/ r_cut)^12 "
-                    "- alpha * (sigma / r_cut)^6))"
+                    "- alpha * (sigma / r_cut)^6)))"
                     "+step(abs(y) - (box_length/2 - r_cut - delta)) * ("
+                    "y_wall *("
                     "4 * epsilon * "
                     "((sigma/(box_length/2 - abs(y) - delta))^12 "
                     "- alpha * (sigma / (box_length/2 - abs(y) - delta))^6)"
                     "-4 * epsilon * "
                     "((sigma/ r_cut)^12 "
-                    "- alpha * (sigma / r_cut)^6))"
+                    "- alpha * (sigma / r_cut)^6)))"
                     "+step(abs(z) - (box_length/2 - r_cut - delta)) * ("
+                    "z_wall *("
                     "4 * epsilon * "
                     "((sigma/(box_length/2 - abs(z) - delta))^12 "
                     "- alpha * (sigma / (box_length/2 - abs(z) - delta))^6)"
                     "-4 * epsilon * "
                     "((sigma/ r_cut)^12 "
-                    "- alpha * (sigma / r_cut)^6));"
+                    "- alpha * (sigma / r_cut)^6)));"
                     "sigma = radius;"
                     "delta = radius -1;"
                     "r_cut = radius  * 2^(1/6)"
                 )   
 
         slj_potential.addGlobalParameter("box_length", self._box_length.value_in_unit(self._nanometer))
-        slj_potential.addGlobalParameter("epsilon", self._epsilon.value_in_unit(unit.kilojoule_per_mole))
+        slj_potential.addGlobalParameter("epsilon", self._epsilon.value_in_unit(self._kilojoule_per_mole))
         slj_potential.addGlobalParameter("alpha", self._alpha)
         slj_potential.addPerParticleParameter("radius")
+
+        slj_potential.addGlobalParameter("x_wall", x_wall)
+        slj_potential.addGlobalParameter("y_wall", y_wall)
+        slj_potential.addGlobalParameter("z_wall", z_wall)
       
         return slj_potential
 

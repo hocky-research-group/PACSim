@@ -168,10 +168,10 @@ class RunParameters(Parameters):
         Note that the force of this potential is only continuous if alpha = 1.
     :type alpha: float
     :param wall_directions:
-        A tuple of three booleans indicating whether the walls in the x, y, and z directions are active for 
+        A list of three booleans indicating whether the walls in the x, y, and z directions are active for 
         closed-wall simulations with shifted Lennard-Jones potential walls.
-        Defaults to (True, True, True).
-    :type wall_directions: tuple[int]
+        Defaults to [True, True, True].
+    :type wall_directions: list[bool]
 
 
     :raises TupeError:
@@ -212,7 +212,7 @@ class RunParameters(Parameters):
     final_configuration_xyz_filename: Optional[str] = "final_frame.xyz"
     epsilon: unit.Quantity = field(default_factory=lambda: 1.0 * (unit.kilojoule / unit.mole))
     alpha: float = 0.0
-    wall_directions: tuple = (True, True, True)
+    wall_directions: list = [True, True, True]
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -299,6 +299,8 @@ class RunParameters(Parameters):
             raise ValueError("alpha must be between zero and one.")
         if not any(self.wall_directions):
             raise ValueError("At least one wall direction must be active.")
+        if len(self.wall_directions)!=3:
+            raise ValueError("Wall directions must be specified for three dimensions.")
 
     def check_types_of_initial_configuration(self):
         """

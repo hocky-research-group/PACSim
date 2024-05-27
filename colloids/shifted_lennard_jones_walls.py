@@ -40,9 +40,9 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         Note that the force of this potential is only continuous if alpha = 1.
     :type alpha: float
     :param wall_directions:
-        A tuple of three booleans indicating whether the walls in the x, y, and z directions are active.
-        Defaults to (True, True, True).
-    :type wall_directions: tuple[int]
+        A list of three booleans indicating whether the walls in the x, y, and z directions are active.
+        Defaults to [True, True, True].
+    :type wall_directions: list[bool]
 
     :raises TypeError:
         If box_length or epsilon is not a Quantity with a proper unit.
@@ -50,13 +50,14 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         If box_length or epsilon is not greater than zero.
         If alpha is not in the interval [0, 1].
         If no wall direction is active.
+        If fewer or more than three wall directions are specified.
     """
 
     _nanometer = unit.nano * unit.meter
     _kilojoule_per_mole = unit.kilojoule / unit.mole
 
     def __init__(self, box_length: unit.Quantity, epsilon: unit.Quantity, alpha: float,
-                 wall_directions: tuple[int] = (True, True, True)) -> None:
+                 wall_directions: list[bool] = [True, True, True]) -> None:
         """Constructor of the ShiftedLennardJonesWalls class."""
         super().__init__()
 
@@ -74,70 +75,70 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             warnings.warn("The force of the shifted Lennard-Jones potential as a wall is only continuous if alpha = 1.")
         if not any(wall_directions):
             raise ValueError("At least one wall direction must be active.")
+        if len(wall_directions)!=3:
+            raise ValueError("Wall directions must be specified for three dimensions.")
 
         self._box_length = box_length
         self._epsilon = epsilon
         self._alpha = alpha
         self._wall_directions = wall_directions
         self._slj_potential = self._set_up_slj_potential()
-
+    
+    
     def _set_up_slj_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the shifted Lennard Jones potential."""
 
-        # Use self._wall_directions to switch on walls in the x, y, and z directions.
+        slj_x = ("step(abs(x) - (box_length/2 - r_cut - delta)) * ("
+                    "\n 4 * epsilon * "
+                    "\n ((sigma/(box_length/2 - abs(x) - delta))^12 "
+                    "\n - alpha * (sigma / (box_length/2 - abs(x) - delta))^6)"
+                    "\n -4 * epsilon * "
+                    "\n ((sigma/ r_cut)^12 "
+                    "\n - alpha * (sigma / r_cut)^6))")
+        slj_y = ( "+step(abs(y) - (box_length/2 - r_cut - delta)) * ("
+                            "\n 4 * epsilon * "
+                            "\n ((sigma/(box_length/2 - abs(y) - delta))^12 "
+                            "\n - alpha * (sigma / (box_length/2 - abs(y) - delta))^6)"
+                            "\n -4 * epsilon * "
+                            "\n ((sigma/ r_cut)^12 "
+                            "\n - alpha * (sigma / r_cut)^6))")
+        slj_z = ( "+step(abs(z) - (box_length/2 - r_cut - delta)) * ("
+                            "\n 4 * epsilon * "
+                            "\n ((sigma/(box_length/2 - abs(z) - delta))^12 "
+                            "\n - alpha * (sigma / (box_length/2 - abs(z) - delta))^6)"
+                            "\n -4 * epsilon * "
+                            "\n ((sigma/ r_cut)^12 "
+                            "\n - alpha * (sigma / r_cut)^6));")
 
-        if self._wall_directions[0] == True:
-            x_wall=1
-        else:
-            x_wall=0
-        if self._wall_directions[1] == True:
-            y_wall=1
-        else:
-            y_wall=0
-        if self._wall_directions[2] == True:
-            z_wall=1
-        else:
-            z_wall=0
+        walls = [slj_x, slj_y, slj_z]
 
+        #Use wall_directions to selectively turn on walls in x, y, and z directions
         
-        slj_potential = CustomExternalForce(
-                    "step(abs(x) - (box_length/2 - r_cut - delta)) * ("
-                    "x_wall *("
-                    "4 * epsilon * "
-                    "((sigma/(box_length/2 - abs(x) - delta))^12 "
-                    "- alpha * (sigma / (box_length/2 - abs(x) - delta))^6)"
-                    "-4 * epsilon * "
-                    "((sigma/ r_cut)^12 "
-                    "- alpha * (sigma / r_cut)^6)))"
-                    "+step(abs(y) - (box_length/2 - r_cut - delta)) * ("
-                    "y_wall *("
-                    "4 * epsilon * "
-                    "((sigma/(box_length/2 - abs(y) - delta))^12 "
-                    "- alpha * (sigma / (box_length/2 - abs(y) - delta))^6)"
-                    "-4 * epsilon * "
-                    "((sigma/ r_cut)^12 "
-                    "- alpha * (sigma / r_cut)^6)))"
-                    "+step(abs(z) - (box_length/2 - r_cut - delta)) * ("
-                    "z_wall *("
-                    "4 * epsilon * "
-                    "((sigma/(box_length/2 - abs(z) - delta))^12 "
-                    "- alpha * (sigma / (box_length/2 - abs(z) - delta))^6)"
-                    "-4 * epsilon * "
-                    "((sigma/ r_cut)^12 "
-                    "- alpha * (sigma / r_cut)^6)));"
-                    "sigma = radius;"
-                    "delta = radius -1;"
-                    "r_cut = radius  * 2^(1/6)"
-                )   
+        walls_dict = dict({walls[i]: self._wall_directions[i] for i in range(3)})
+
+        slj_force = []
+
+        for key, val in walls_dict.items():
+            if val==True:
+                slj_force.append(key)
+            
+                
+        var_defs = ["delta = radius_negative -1;",
+                            "r_cut = radius_negative * 2^(1/6)"]
+
+        for i in var_defs:
+            slj_force.append(i)
+            
+        slj_force=tuple(slj_force)
+                
+        slj_str = "\n".join(slj_force)
+
+        slj_potential = CustomExternalForce(slj_str)
 
         slj_potential.addGlobalParameter("box_length", self._box_length.value_in_unit(self._nanometer))
         slj_potential.addGlobalParameter("epsilon", self._epsilon.value_in_unit(self._kilojoule_per_mole))
         slj_potential.addGlobalParameter("alpha", self._alpha)
         slj_potential.addPerParticleParameter("radius")
-
-        slj_potential.addGlobalParameter("x_wall", x_wall)
-        slj_potential.addGlobalParameter("y_wall", y_wall)
-        slj_potential.addGlobalParameter("z_wall", z_wall)
       
         return slj_potential
 

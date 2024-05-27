@@ -120,7 +120,10 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
 
         for key, val in walls_dict.items():
             if val==True:
-                slj_force.append(key)
+                if len(slj_force)==0: 
+                    slj_force.append(key)
+                else: 
+                    slj_force.append(str("+" + key))
             
                 
         var_defs = ["delta = radius_negative -1;",

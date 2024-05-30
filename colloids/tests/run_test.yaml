@@ -1,3 +1,4 @@
+alpha: null
 brush_density: !Quantity
   unit: /(nanometer**2)
   value: 0.09
@@ -14,6 +15,7 @@ debye_length: !Quantity
   unit: nanometer
   value: 5.726968
 dielectric_constant: 80.0
+epsilon: null
 final_configuration_gsd_filename: test_run_and_resume/final_frame.gsd
 final_configuration_xyz_filename: test_run_and_resume/final_frame.xyz
 initial_configuration: first_frame.xyz
@@ -55,3 +57,7 @@ trajectory_interval: 10
 use_log: false
 use_tabulated: false
 velocity_seed: 2
+wall_directions:
+  - false
+  - false
+  - false

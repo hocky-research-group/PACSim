@@ -51,7 +51,7 @@ class TestRunParameters(object):
     def test_run_parameters(self, parameters, yaml_parameters):
         # Because we cannot compare openmm quantities directly (see above), we have to compare all fields explicitly.
         # When new fields are added to the RunParameters dataclass, this test must be updated accordingly.
-        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 27
+        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 30
         assert parameters.initial_configuration == yaml_parameters.initial_configuration
         assert len(parameters.masses) == len(yaml_parameters.masses)
         assert len(parameters.radii) == len(yaml_parameters.radii)
@@ -108,6 +108,9 @@ class TestRunParameters(object):
         assert parameters.final_configuration_gsd_filename == yaml_parameters.final_configuration_gsd_filename
         assert parameters.final_configuration_xyz_filename == yaml_parameters.final_configuration_xyz_filename
         assert parameters.cutoff_factor == yaml_parameters.cutoff_factor
+        assert all(pw == yw for pw, yw in zip(parameters.wall_directions, yaml_parameters.wall_directions))
+        assert parameters.alpha == yaml_parameters.alpha
+        assert parameters.epsilon == yaml_parameters.epsilon
 
 
 if __name__ == '__main__':

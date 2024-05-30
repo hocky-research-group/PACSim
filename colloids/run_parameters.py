@@ -154,27 +154,27 @@ class RunParameters(Parameters):
         The filename must end with ".xyz".
         Defaults to "final_frame.xyz".
     :type final_configuration_xyz_filename: Optional[str]
+    :param wall_directions:
+        A list of three booleans indicating whether the walls in the x, y, and z directions are active for
+        closed-wall simulations with shifted Lennard-Jones potential walls.
+        If any of the wall directions is active, epsilon and alpha must be specified.
+        Defaults to [False, False, False].
+    :type wall_directions: list[bool]
     :param epsilon:
         The unshifted Lennard-Jones potential well-depth for closed-wall simulations with shifted Lennard-Jones
         potential walls.
-        The unit of the epsilon must be compatible with kilojoules per mole and the value must be greater than 
-        zero.
-        Defaults to 1.0* (unit.kilojoule / unit.mole).
-    :type epsilon: unit.Quantity
+        If any wall direction is True, epsilon must be not None, its unit must be compatible with kilojoules per mole
+        and the value must be greater than zero.
+        Defaults to None.
+    :type epsilon: Optional[unit.Quantity]
     :param alpha:
         Factor determining the strength of the attractive part of the Lennard-Jones potential for closed-wall 
         simulations with shifted Lennard-Jones potential walls.
-        This factor has to satisfy 0 <= alpha <= 1.
+        If any wall direction is True, alpha must be not None and 0 <= alpha <= 1.
         Note that the force of this potential is only continuous if alpha = 1.
-    :type alpha: float
-    :param wall_directions:
-        A list of three booleans indicating whether the walls in the x, y, and z directions are active for 
-        closed-wall simulations with shifted Lennard-Jones potential walls.
-        Defaults to [True, True, True].
-    :type wall_directions: list[bool]
+    :type alpha: Optional[float]
 
-
-    :raises TupeError:
+    :raises TypeError:
         If any of the quantities has an incompatible unit.
     :raises ValueError:
         If any of the parameters has an invalid value.
@@ -210,9 +210,9 @@ class RunParameters(Parameters):
     minimize_energy_initially: bool = False
     final_configuration_gsd_filename: Optional[str] = "final_frame.gsd"
     final_configuration_xyz_filename: Optional[str] = "final_frame.xyz"
-    epsilon: unit.Quantity = field(default_factory=lambda: 1.0 * (unit.kilojoule / unit.mole))
-    alpha: float = 0.0
-    wall_directions: list = [True, True, True]
+    epsilon: Optional[unit.Quantity] = None
+    alpha: Optional[float] = None
+    wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -291,16 +291,24 @@ class RunParameters(Parameters):
         if (self.final_configuration_xyz_filename is not None
                 and not self.final_configuration_xyz_filename.endswith(".xyz")):
             raise ValueError("The filename of the final configuration must end with '.xyz'.")
-        if not self.epsilon.unit.is_compatible(unit.kilojoule/unit.mole):
-            raise TypeError("Epsilon must have a unit compatible with kilojoules per mole.")
-        if self.epsilon <= 0.0 * unit.kilojoule/unit.mole:
-            raise ValueError("epsilon must be greater than zero.")
-        if not 0.0 <= self.alpha <= 1.0:
-            raise ValueError("alpha must be between zero and one.")
-        if not any(self.wall_directions):
-            raise ValueError("At least one wall direction must be active.")
-        if len(self.wall_directions)!=3:
+        if len(self.wall_directions) != 3:
             raise ValueError("Wall directions must be specified for three dimensions.")
+        if any(self.wall_directions):
+            if self.epsilon is None:
+                raise ValueError("Epsilon must be specified if walls are active.")
+            if not self.epsilon.unit.is_compatible(unit.kilojoule_per_mole):
+                raise TypeError("Epsilon must have a unit compatible with kilojoules per mole.")
+            if self.epsilon <= 0.0 * unit.kilojoule_per_mole:
+                raise ValueError("epsilon must be greater than zero.")
+            if self.alpha is None:
+                raise ValueError("Alpha must be specified if walls are active.")
+            if not 0.0 <= self.alpha <= 1.0:
+                raise ValueError("Alpha must be between zero and one.")
+        else:
+            if self.epsilon is not None:
+                raise ValueError("Epsilon must not be specified if walls are not active.")
+            if self.alpha is not None:
+                raise ValueError("Alpha must not be specified if walls are not active.")
 
     def check_types_of_initial_configuration(self):
         """

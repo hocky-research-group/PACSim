@@ -84,6 +84,7 @@ class TestShiftedLennardJonesWallsParameters(object):
 
 
 class TestShiftedLennardJonesWallsExceptions(TestShiftedLennardJonesWallsParameters):
+    
     def test_exception_radius(self, radius, slj_potential_all, slj_potential_some):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
@@ -129,6 +130,74 @@ class TestShiftedLennardJonesWallsExceptions(TestShiftedLennardJonesWallsParamet
             pass
         with pytest.raises(RuntimeError):
             slj_potential_some.add_particle(index=1, radius=radius)
+
+    def test_exception_alpha(self):
+        # Test exception on negative alpha
+        with pytest.raises(ValueError):
+            ShiftedLennardJonesWalls(wall_distances=[1000.0, 1500.0, 2000.0] * (unit.nano * unit.meter),
+                                     epsilon=1.0 * unit.kilojoule_per_mole, alpha=-1.0,
+                                     wall_directions=[True, True, True])
+
+        # Test exception on alpha > 1
+        with pytest.raises(ValueError):
+            ShiftedLennardJonesWalls(wall_distances=[1000.0, 1500.0, 2000.0] * (unit.nano * unit.meter),
+                                     epsilon=1.0 * unit.kilojoule_per_mole, alpha=2.0,
+                                     wall_directions=[True, True, True])
+
+    def test_exception_epsilon(self):
+
+        # Test exception on wrong unit.
+        with pytest.raises(TypeError):
+            ShiftedLennardJonesWalls(wall_distances=[1000.0, 1500.0, 2000.0] * (unit.nano * unit.meter),
+                                     epsilon=1.0 * unit.joule, alpha=1.0,
+                                     wall_directions=[True, True, True])
+
+        # Test exception on negative epsilon
+        with pytest.raises(ValueError):
+            ShiftedLennardJonesWalls(wall_distances=[1000.0, 1500.0, 2000.0] * (unit.nano * unit.meter),
+                                     epsilon=-1.0 * unit.kilojoule_per_mole, alpha=1.0,
+                                     wall_directions=[True, True, True])
+
+    def test_exception_wall_directions(self):
+        # Test exception no active wall directions
+         with pytest.raises(ValueError):
+            ShiftedLennardJonesWalls(wall_distances=[1000.0, 1500.0, 2000.0] * (unit.nano * unit.meter),
+                                     epsilon=-1.0 * unit.kilojoule_per_mole, alpha=1.0,
+                                     wall_directions=[False, False, False])
+
+        # Test exception length of wall direction sequence !=3
+         with pytest.raises(ValueError):
+            ShiftedLennardJonesWalls(wall_distances=[1000.0, 1500.0, 2000.0] * (unit.nano * unit.meter),
+                                     epsilon=-1.0 * unit.kilojoule_per_mole, alpha=1.0,
+                                     wall_directions=[True, False, True, True])
+
+    
+    def test_exception_wall_distances(self):
+        # Test exception on wrong unit 
+        with pytest.raises(TypeError):
+            ShiftedLennardJonesWalls(wall_distances=[1000.0, 1500.0, 2000.0] / ((unit.nano * unit.meter) ** 2),
+                                     epsilon=-1.0 * unit.kilojoule_per_mole, alpha=1.0,
+                                     wall_directions=[True, True, True])
+        
+        
+        # Test exception length of wall distance sequence !=3
+        with pytest.raises(ValueError):
+            ShiftedLennardJonesWalls(wall_distances=[1000.0, 1500.0, 2000.0, 2500.0] * (unit.nano * unit.meter),
+                                     epsilon=-1.0 * unit.kilojoule_per_mole, alpha=1.0,
+                                     wall_directions=[True, True, True])
+
+        # Test exception wall distance not specified for active wall direction
+        with pytest.raises(ValueError):
+            ShiftedLennardJonesWalls(wall_distances=[1000.0, 0.0, 2000.0] * (unit.nano * unit.meter),
+                                     epsilon=-1.0 * unit.kilojoule_per_mole, alpha=1.0,
+                                     wall_directions=[True, True, True])
+
+
+        # Test exception wall distance specified for inactive wall direction
+        with pytest.raises(ValueError):
+            ShiftedLennardJonesWalls(wall_distances=[1000.0, 1500.0, 2000.0] * (unit.nano * unit.meter),
+                                     epsilon=-1.0 * unit.kilojoule_per_mole, alpha=1.0,
+                                     wall_directions=[True, False, True])
 
 
 class TestShiftedLennardJonesWallPotentialsAll(TestShiftedLennardJonesWallsParameters):

@@ -167,6 +167,11 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
         if not radius.value_in_unit(self._nanometer) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
+        for wall_distance in self._wall_distances:
+            if wall_distance is not None:
+                if not wall_distance / 2.0 > radius * 2**(1/6) + radius - 1.0 * self._nanometer:
+                    raise ValueError("The colloid radius leads to a cutoff radius * 2^(1/6) + radius - 1 in the "
+                                     "shifted Lennard-Jones wall that exceeds half of the wall distance.")
         self._slj_potential.addParticle(index, [radius.value_in_unit(self._nanometer)])
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:

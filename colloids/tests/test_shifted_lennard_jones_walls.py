@@ -97,7 +97,19 @@ class TestShiftedLennardJonesWallsExceptions(TestShiftedLennardJonesWallsParamet
         with pytest.raises(ValueError):
             # noinspection PyTypeChecker
             slj_potential_some.add_particle(index=0, radius=-radius)
-                                           
+
+    def test_exception_radius_too_large(self, slj_potential_all, slj_potential_some):
+        # This is fine for the smallest wall distance of 1000 nm.
+        slj_potential_all.add_particle(index=0, radius=236.0 * (unit.nano * unit.meter))
+        # This is not fine for the smallest wall distance of 1000 nm.
+        with pytest.raises(ValueError):
+            slj_potential_all.add_particle(index=1, radius=237.0 * (unit.nano * unit.meter))
+        # This is fine for the smallest relevant wall distance of 1500 nm.
+        slj_potential_some.add_particle(index=0, radius=353.0 * (unit.nano * unit.meter))
+        # This is not fine for the smallest relevant wall distance of 1500 nm.
+        with pytest.raises(ValueError):
+            slj_potential_some.add_particle(index=1, radius=354.0 * (unit.nano * unit.meter))
+
     def test_exception_no_particles_added(self, slj_potential_all, slj_potential_some):
         with pytest.raises(RuntimeError):
             for _ in slj_potential_all.yield_potentials():

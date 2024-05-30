@@ -127,7 +127,7 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         slj_string = "+".join(slj for slj, wd in zip([slj_x, slj_y, slj_z], self._wall_directions) if wd)
         assert slj_string
         # 2^(1/6) = 1.122462048309373.
-        slj_string += "; delta = radius - 1.0; r_cut = radius * 1.122462048309373"
+        slj_string += "; sigma = radius; delta = radius - 1.0; r_cut = radius * 1.122462048309373"
 
         slj_potential = CustomExternalForce(slj_string)
         slj_potential.addGlobalParameter("epsilon", self._epsilon.value_in_unit(unit.kilojoule_per_mole))
@@ -142,12 +142,15 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
 
         return slj_potential
 
-    def add_particle(self, radius: unit.Quantity) -> None:
+    def add_particle(self, index: int, radius: unit.Quantity) -> None:
         """
         Add a colloid with a given radius to the system.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
+        :param index:
+            The index of the particle in the OpenMM system.
+        :type index: int
         :param radius:
             The radius of the colloid.
             The unit of the radius must be compatible with nanometers and the value must be greater than zero.
@@ -164,7 +167,7 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
         if not radius.value_in_unit(self._nanometer) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
-        self._slj_potential.addParticle([radius.value_in_unit(self._nanometer)])
+        self._slj_potential.addParticle(index, [radius.value_in_unit(self._nanometer)])
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """
@@ -179,4 +182,5 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         :raises RuntimeError:
             If the method add_particle was not called before this method (via the abstract base class).
         """
+        super().yield_potentials()
         yield self._slj_potential

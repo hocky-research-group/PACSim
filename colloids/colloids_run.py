@@ -83,8 +83,8 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         # TODO: Get box length.
         slj_walls = ShiftedLennardJonesWalls(box_length, parameters.epsilon, parameters.alpha,
                                              parameters.wall_directions)
-        for t in types:
-            slj_walls.add_particle(radius=parameters.radii[t])
+        for i, t in enumerate(types):
+            slj_walls.add_particle(index=i, radius=parameters.radii[t])
         for force in slj_walls.yield_potentials():
             system.addForce(force)
 

@@ -3,24 +3,24 @@ import pytest
 from colloids import ShiftedLennardJonesWalls
 import numpy as np
 
-def expected_slj_walls_potential(pos, box_length, rcut, delta, epsilon, sigma, alpha):
+def expected_slj_walls_potential(pos, wall_distance, rcut, delta, epsilon, sigma, alpha):
 
-    return np.where(np.abs(pos) < box_length / 2 - rcut - delta,
+    return np.where(np.abs(pos) < wall_distance / 2 - rcut - delta,
                     0.0,
-                    4 * epsilon * (np.power(sigma / (box_length / 2 - np.abs(pos) - delta), 12)
-                                   - alpha * np.power(sigma / (box_length / 2 - np.abs(pos) - delta), 6))
+                    4 * epsilon * (np.power(sigma / (wall_distance / 2 - np.abs(pos) - delta), 12)
+                                   - alpha * np.power(sigma / (wall_distance / 2 - np.abs(pos) - delta), 6))
                     - 4 * epsilon * (np.power(sigma / rcut, 12)
                                      - alpha * np.power(sigma / rcut, 6)))
 
-def generate_parametrize_values(wall_direction, num_test_values, box_length, rcut, delta, epsilon, sigma, alpha):
+def generate_parametrize_values(wall_direction, num_test_values, wall_distance, rcut, delta, epsilon, sigma, alpha):
     
-    test_positions = np.linspace(-box_length / 2 + 200, box_length / 2 - 200, num=num_test_values)
+    test_positions = np.linspace(-wall_distance / 2 + 200, wall_distance / 2 - 200, num=num_test_values)
 
     pots_tuple=[]
 
     if wall_direction == True:
 
-        pots= expected_slj_walls_potential(test_positions, box_length, rcut,
+        pots= expected_slj_walls_potential(test_positions, wall_distance, rcut,
                          delta, epsilon, sigma, alpha)
     else:
         pots= np.zeros(num_test_values)
@@ -39,7 +39,7 @@ class TestSLJParameters(object):
         return 105.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
-    def box_length(self):
+    def wall_distance(self):
         return 1000.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
@@ -72,11 +72,11 @@ class TestSLJParameters(object):
 
 
     @pytest.fixture
-    def openmm_system(self, box_length):
+    def openmm_system(self, wall_distance):
         system = System()
-        system.setDefaultPeriodicBoxVectors(Vec3(box_length, 0.0, 0.0),
-                                            Vec3(0.0, box_length, 0.0),
-                                            Vec3(0.0, 0.0, box_length))
+        system.setDefaultPeriodicBoxVectors(Vec3(wall_distance, 0.0, 0.0),
+                                            Vec3(0.0, wall_distance, 0.0),
+                                            Vec3(0.0, 0.0, wall_distance))
         return system
 
 
@@ -89,8 +89,8 @@ class TestSLJParameters(object):
         return LangevinIntegrator(0.0, 0.0, 0.0)
 
     @pytest.fixture
-    def slj_potential(self, box_length, epsilon, alpha, wall_directions):
-        return ShiftedLennardJonesWalls(box_length, epsilon, alpha,
+    def slj_potential(self, wall_distance, epsilon, alpha, wall_directions):
+        return ShiftedLennardJonesWalls(wall_distance, epsilon, alpha,
                                              wall_directions)
 
 class TestSLJPotentialsExceptions(TestSLJParameters):
@@ -130,14 +130,14 @@ class TestSLJWallPotentials(TestSLJParameters):
             openmm_system.addForce(potential)
 
     @pytest.fixture
-    def test_positions(self, box_length, num_test_values):
-        return np.linspace(-box_length / 2 + 200, box_length / 2 - 200, num=num_test_values)
+    def test_positions(self, wall_distance, num_test_values):
+        return np.linspace(-wall_distance / 2 + 200, wall_distance / 2 - 200, num=num_test_values)
 
     @pytest.fixture
-    def expected_walls_potential(self, wall_direction, num_test_values, box_length, rcut, delta, epsilon, sigma, alpha):
+    def expected_walls_potential(self, wall_direction, num_test_values, wall_distance, rcut, delta, epsilon, sigma, alpha):
         xyz_params = []
         for i in self.wall_directions:
-            xyz_params.append(generate_parametrize_values(i, num_test_values, box_length, rcut, delta, epsilon, sigma, alpha))
+            xyz_params.append(generate_parametrize_values(i, num_test_values, wall_distance, rcut, delta, epsilon, sigma, alpha))
         return xyz_params
     
     # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before

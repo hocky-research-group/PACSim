@@ -13,7 +13,7 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     https://hoomd-blue.readthedocs.io/en/v2.9.4/module-md-wall.html#hoomd.md.wall.slj).
 
     This class allows to independently switch on walls in the x, y, and z directions. The walls are placed at
-    +-box_length / 2 for every specified direction with its specified box_length.
+    +-wall_distance / 2 for every specified direction with its specified wall_distance.
 
     The shifted Lennard-Jones potential acts on colloid particles within a certain cutoff distance of every wall. This
     cutoff distance depends on the particle radius and is given by r_cut - delta, where r_cut = radius * 2^(1/6) and
@@ -26,13 +26,13 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
              - 4 * epsilon * ((radius / r_cut)^12 - alpha * (radius / r_cut)^6)
     
 
-    :param box_lengths:
-        A list of three box lengths specifying the dimensions of the simulation box in the x, y, and z directions.
-        This is used to determine the location of the SLJ walls at +-box_length/2 for every active wall direction.
-        For any inactive wall direction (see wall_directions parameter), the corresponding box length must be None.
-        For any active wall direction, the corresponding box length must be specified.
-        The unit of any box length must be compatible with nanometer and the value must be greater than zero.
-    :type box_lengths: Sequence[Optional[unit.Quantity]]
+    :param wall_distances:
+        A list of three distances specifying the dimensions of the simulation box in the x, y, and z directions.
+        This is used to determine the location of the SLJ walls at +-wall_distance/2 for every active wall direction.
+        For any inactive wall direction (see wall_directions parameter), the corresponding wall distance must be None.
+        For any active wall direction, the corresponding wall distance must be specified.
+        The unit of any wall distance must be compatible with nanometer and the value must be greater than zero.
+    :type wall_distances: Sequence[Optional[unit.Quantity]]
     :param epsilon:
         The unshifted Lennard-Jones potential well-depth.
         The unit of the epsilon must be compatible with kilojoules_per_mole and the value must be greater than zero.
@@ -44,25 +44,25 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     :type alpha: float
     :param wall_directions:
         A list of three booleans indicating whether the walls in the x, y, and z directions are active.
-        Defaults to [True, True, True].
+        Defaults to [False, False, False].
     :type wall_directions: list[bool]
 
     :raises TypeError:
-        If epsilon or any box length for an active wall direction is not a Quantity with a proper unit.
+        If epsilon or any wall distance for an active wall direction is not a Quantity with a proper unit.
 
     :raises ValueError:
-        If epsilon or any box length for an active wall direction is not greater than zero.
+        If epsilon or any wall distance for an active wall direction is not greater than zero.
         If alpha is not in the interval [0, 1].
         If no wall direction is active.
         If not exactly three wall directions are specified.
-        If not exactly three box lengths are specified.
-        If a box length is specified for an inactive wall direction.
-        If a box length is not specified for an active wall direction.
+        If not exactly three wall distances are specified.
+        If a wall distance is specified for an inactive wall direction.
+        If a wall distance is not specified for an active wall direction.
     """
 
     _nanometer = unit.nano * unit.meter
 
-    def __init__(self, box_lengths: Sequence[Optional[unit.Quantity]], epsilon: unit.Quantity, alpha: float,
+    def __init__(self, wall_distances: Sequence[Optional[unit.Quantity]], epsilon: unit.Quantity, alpha: float,
                  wall_directions: Sequence[bool] = (True, True, True)) -> None:
         """Constructor of the ShiftedLennardJonesWalls class."""
         super().__init__()
@@ -71,21 +71,21 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             raise ValueError("at least one wall direction must be active")
         if len(wall_directions) != 3:
             raise ValueError("wall directions must be specified for three dimensions")
-        if len(box_lengths) != 3:
-            raise ValueError("box lengths must be specified for three dimensions")
-        for wd, bl in zip(wall_directions, box_lengths):
-            if wd:
-                if bl is None:
-                    raise ValueError("box length must be specified for any active wall direction")
-                if not bl.unit.is_compatible(self._nanometer):
-                    raise TypeError("any box length must have a unit that is compatible with nanometers")
-                if not bl.value_in_unit(self._nanometer) > 0.0:
-                    raise ValueError("any box length must have a value greater than zero")
+        if len(wall_distances) != 3:
+            raise ValueError("wall distances must be specified for three dimensions")
+        for wdir, wdist in zip(wall_directions, wall_distances):
+            if wdir:
+                if wdist is None:
+                    raise ValueError("wall distance must be specified for any active wall direction")
+                if not wdist.unit.is_compatible(self._nanometer):
+                    raise TypeError("any wall distance must have a unit that is compatible with nanometers")
+                if not wdist.value_in_unit(self._nanometer) > 0.0:
+                    raise ValueError("any wall distance must have a value greater than zero")
             else:
-                if bl is not None:
-                    raise ValueError("box length must not be specified for inactive wall direction")
+                if wdist is not None:
+                    raise ValueError("wall distance must not be specified for inactive wall direction")
         if not epsilon.unit.is_compatible(unit.kilojoule_per_mole):
-            raise TypeError("argument epsilon must have a unit that is compatible with kilojoules_per_mole")
+            raise TypeError("argument epsilon must have a unit that is compatible with kilojoules per mole")
         if not epsilon.value_in_unit(unit.kilojoule_per_mole) > 0.0:
             raise ValueError("argument epsilon must have a value greater than zero")
         if not 0.0 <= alpha <= 1.0:
@@ -93,7 +93,7 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         if alpha != 1.0:
             warnings.warn("The force of the shifted Lennard-Jones potential as a wall is only continuous if alpha = 1.")
 
-        self._box_lengths = box_lengths
+        self._wall_distances = wall_distances
         self._epsilon = epsilon
         self._alpha = alpha
         self._wall_directions = wall_directions
@@ -102,29 +102,29 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     def _set_up_slj_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the shifted Lennard Jones potential."""
 
-        slj_x = ("step(abs(x) - (box_length_x / 2.0 - r_cut - delta)) * ("
+        slj_x = ("step(abs(x) - (wall_distance_x / 2.0 - r_cut - delta)) * ("
                  "4.0 * epsilon * "
-                 "((sigma / (box_length_x / 2.0 - abs(x) - delta))^12 "
-                 " - alpha * (sigma / (box_length_x / 2.0 - abs(x) - delta))^6)"
+                 "((sigma / (wall_distance_x / 2.0 - abs(x) - delta))^12 "
+                 " - alpha * (sigma / (wall_distance_x / 2.0 - abs(x) - delta))^6)"
                  "- 4.0 * epsilon * "
                  "((sigma / r_cut)^12 "
                  " - alpha * (sigma / r_cut)^6))")
-        slj_y = ("step(abs(y) - (box_length_y / 2.0 - r_cut - delta)) * ("
+        slj_y = ("step(abs(y) - (wall_distance_y / 2.0 - r_cut - delta)) * ("
                  "4.0 * epsilon * "
-                 "((sigma / (box_length_y / 2.0 - abs(y) - delta))^12 "
-                 " - alpha * (sigma / (box_length_y / 2.0 - abs(y) - delta))^6)"
+                 "((sigma / (wall_distance_y / 2.0 - abs(y) - delta))^12 "
+                 " - alpha * (sigma / (wall_distance_y / 2.0 - abs(y) - delta))^6)"
                  "- 4.0 * epsilon * "
                  "((sigma / r_cut)^12 "
                  " - alpha * (sigma / r_cut)^6))")
-        slj_z = ("step(abs(z) - (box_length_z / 2.0 - r_cut - delta)) * ("
+        slj_z = ("step(abs(z) - (wall_distance_z / 2.0 - r_cut - delta)) * ("
                  "4.0 * epsilon * "
-                 "((sigma / (box_length_z / 2.0 - abs(z) - delta))^12 "
-                 " - alpha * (sigma / (box_length_z / 2.0 - abs(z) - delta))^6)"
+                 "((sigma / (wall_distance_z / 2.0 - abs(z) - delta))^12 "
+                 " - alpha * (sigma / (wall_distance_z / 2.0 - abs(z) - delta))^6)"
                  "- 4.0 * epsilon * "
                  "((sigma / r_cut)^12 "
                  " - alpha * (sigma / r_cut)^6))")
 
-        slj_string = "+".join(slj for slj, wd in zip([slj_x, slj_y, slj_z], self._wall_directions) if wd)
+        slj_string = "+".join(slj for slj, wdir in zip([slj_x, slj_y, slj_z], self._wall_directions) if wdir)
         assert slj_string
         # 2^(1/6) = 1.122462048309373.
         slj_string += "; delta = radius - 1.0; r_cut = radius * 1.122462048309373"
@@ -134,11 +134,11 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         slj_potential.addGlobalParameter("alpha", self._alpha)
         slj_potential.addPerParticleParameter("radius")
         if self._wall_directions[0]:
-            slj_potential.addGlobalParameter("box_length_x", self._box_lengths[0].value_in_unit(self._nanometer))
+            slj_potential.addGlobalParameter("wall_distance_x", self._wall_distances[0].value_in_unit(self._nanometer))
         if self._wall_directions[1]:
-            slj_potential.addGlobalParameter("box_length_y", self._box_lengths[1].value_in_unit(self._nanometer))
+            slj_potential.addGlobalParameter("wall_distance_y", self._wall_distances[1].value_in_unit(self._nanometer))
         if self._wall_directions[2]:
-            slj_potential.addGlobalParameter("box_length_z", self._box_lengths[2].value_in_unit(self._nanometer))
+            slj_potential.addGlobalParameter("wall_distance_z", self._wall_distances[2].value_in_unit(self._nanometer))
 
         return slj_potential
 

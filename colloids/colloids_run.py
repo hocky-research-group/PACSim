@@ -42,8 +42,6 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     integrator = openmm.LangevinIntegrator(parameters.temperature,
                                            parameters.collision_rate,
                                            parameters.timestep)
-    # For testing purposes
-    print("Using Langevin Integrator with dt =", parameters.timestep, " and gamma =" , parameters.collision_rate)
     if parameters.integrator_seed is not None:
         integrator.setRandomNumberSeed(parameters.integrator_seed)
 

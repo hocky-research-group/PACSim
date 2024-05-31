@@ -1,5 +1,7 @@
+from typing import Optional
 import gsd.hoomd
 import numpy as np
+import numpy.typing as npt
 import openmm.app
 from openmm import unit
 
@@ -13,6 +15,11 @@ class GSDReporter(object):
 
     The gsd file will store the current time step, positions, velocities, and box vectors of the simulation at every
     reported time step of the simulation.
+
+    The cell vectors of the OpenMM simulation were possibly artificially enlarged in the presence of walls to prevent
+    particles interacting through walls when periodic boundary conditions are used. Thus, one can optionally specify
+    a cell on initialization that will be stored in the gsd file at every reported time step of the simulation instead
+    of the cell vectors within OpenMM.
 
     The log of the gsd file will store the time, potential energy, and kinetic energy of the simulation at every
     reported time step of the simulation. The log can be accessed with the gsd.hoomd.read_log function.
@@ -50,6 +57,11 @@ class GSDReporter(object):
         file already exists.
         Defaults to False.
     :type append_file: bool
+    :param cell:
+        The cell vectors that should be stored in the gsd file at every reported time step.
+        If None, the cell vectors of the OpenMM simulation are used.
+        Defaults to None.
+    :type cell: Optional[npt.NDArray[unit.Quantity]]
 
     :raises ValueError:
         If the filename does not end with the .gsd extension.
@@ -77,7 +89,7 @@ class GSDReporter(object):
 
     def __init__(self, filename: str, report_interval: int, radii: dict[str, unit.Quantity],
                  surface_potentials: dict[str, unit.Quantity], simulation: openmm.app.Simulation,
-                 append_file: bool = False) -> None:
+                 append_file: bool = False, cell: Optional[npt.NDArray[unit.Quantity]] = None) -> None:
         """Constructor of the GSDReporter class."""
         if not filename.endswith(".gsd"):
             raise ValueError("The file must have the .gsd extension.")
@@ -110,6 +122,7 @@ class GSDReporter(object):
         self._append_file = append_file
         self._file = gsd.hoomd.open(name=filename, mode="r+" if self._append_file else "w")
         self._frame = self._set_up_frame(simulation)
+        self._cell = cell
         if not self._append_file:
             # Include initial configuration in frame.
             self.report(simulation, simulation.context.getState(getPositions=True, getVelocities=True, getEnergy=True,
@@ -169,6 +182,7 @@ class GSDReporter(object):
         steps = self._report_interval - simulation.currentStep % self._report_interval
         return steps, True, True, False, True, False
 
+    # noinspection PyUnresolvedReferences
     def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
         """
         Generate a report by storing information about the trajectory in the GSD file.
@@ -188,7 +202,7 @@ class GSDReporter(object):
         velocities = state.getVelocities(asNumpy=True)
         assert len(velocities) == self._frame.particles.N
         self._frame.particles.velocity = velocities.value_in_unit(self._nanometer_per_picosecond)
-        periodic_box_vectors = state.getPeriodicBoxVectors()
+        periodic_box_vectors = self._cell if self._cell is not None else state.getPeriodicBoxVectors()
         assert len(periodic_box_vectors) == 3
         assert periodic_box_vectors[0][1].value_in_unit(self._nanometer) == 0.0
         assert periodic_box_vectors[0][2].value_in_unit(self._nanometer) == 0.0

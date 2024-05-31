@@ -93,15 +93,20 @@ class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
     :param colloid_potentials_parameters:
         The parameters of the steric and electrostatic pair potentials between colloidal particles.
     :type colloid_potentials_parameters: ColloidPotentialsParameters
+    :param periodic_boundary_conditions:
+        Whether this force should use periodic cutoffs for the steric and electrostatic potentials.
+    :type periodic_boundary_conditions: bool
     """
 
     _nanometer = unit.nano * unit.meter
     _millivolt = unit.milli * unit.volt
 
-    def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters):
+    def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters,
+                 periodic_boundary_conditions: bool) -> None:
         """Constructor of the ColloidPotentialsAbstract class."""
         super().__init__()
         self._parameters = colloid_potentials_parameters
+        self._periodic_boundary_conditions = periodic_boundary_conditions
 
     @abstractmethod
     def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:

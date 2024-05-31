@@ -57,7 +57,7 @@ trajectory_interval: 1000
 use_log: false
 use_tabulated: false
 velocity_seed: null
-wall_directions: 
+wall_directions:
   - false
   - false
   - false

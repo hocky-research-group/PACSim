@@ -25,7 +25,7 @@ def main():
 
     simulation.loadCheckpoint(args.checkpoint_file)
 
-    set_up_reporters(parameters, simulation, True, args.number_steps)
+    set_up_reporters(parameters, simulation, True, args.number_steps, cell)
 
     simulation.step(args.number_steps)
 

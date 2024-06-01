@@ -291,6 +291,10 @@ class RunParameters(Parameters):
         if (self.final_configuration_xyz_filename is not None
                 and not self.final_configuration_xyz_filename.endswith(".xyz")):
             raise ValueError("The filename of the final configuration must end with '.xyz'.")
+        if isinstance(self.wall_directions, str):
+            raise ValueError("Wall directions was parsed as a string although it should be a list of bools. "
+                             "Make sure that the yaml file is correctly formatted and that there is space after each "
+                             "dash in the list of wall directions.")
         if len(self.wall_directions) != 3:
             raise ValueError("Wall directions must be specified for three dimensions.")
         if any(self.wall_directions):

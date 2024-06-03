@@ -154,8 +154,27 @@ class RunParameters(Parameters):
         The filename must end with ".xyz".
         Defaults to "final_frame.xyz".
     :type final_configuration_xyz_filename: Optional[str]
+    :param wall_directions:
+        A list of three booleans indicating whether the walls in the x, y, and z directions are active for
+        closed-wall simulations with shifted Lennard-Jones potential walls.
+        If any of the wall directions is active, epsilon and alpha must be specified.
+        Defaults to [False, False, False].
+    :type wall_directions: list[bool]
+    :param epsilon:
+        The unshifted Lennard-Jones potential well-depth for closed-wall simulations with shifted Lennard-Jones
+        potential walls.
+        If any wall direction is True, epsilon must be not None, its unit must be compatible with kilojoules per mole
+        and the value must be greater than zero.
+        Defaults to None.
+    :type epsilon: Optional[unit.Quantity]
+    :param alpha:
+        Factor determining the strength of the attractive part of the Lennard-Jones potential for closed-wall 
+        simulations with shifted Lennard-Jones potential walls.
+        If any wall direction is True, alpha must be not None and 0 <= alpha <= 1.
+        Note that the force of this potential is only continuous if alpha = 1.
+    :type alpha: Optional[float]
 
-    :raises TupeError:
+    :raises TypeError:
         If any of the quantities has an incompatible unit.
     :raises ValueError:
         If any of the parameters has an invalid value.
@@ -170,8 +189,8 @@ class RunParameters(Parameters):
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
     platform_name: str = "Reference"
     temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
-    collision_rate: unit.Quantity = field(default_factory=lambda: 0.01 / (unit.pico * unit.second))
-    timestep: unit.Quantity = field(default_factory=lambda: 0.05 * (unit.pico * unit.second))
+    collision_rate: unit.Quantity = field(default_factory=lambda: 0.001574074286750681 / (unit.pico * unit.second))
+    timestep: unit.Quantity = field(default_factory=lambda: 0.03176470159055431 * (unit.pico * unit.second))
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
     debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
@@ -191,6 +210,9 @@ class RunParameters(Parameters):
     minimize_energy_initially: bool = False
     final_configuration_gsd_filename: Optional[str] = "final_frame.gsd"
     final_configuration_xyz_filename: Optional[str] = "final_frame.xyz"
+    epsilon: Optional[unit.Quantity] = None
+    alpha: Optional[float] = None
+    wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -269,6 +291,28 @@ class RunParameters(Parameters):
         if (self.final_configuration_xyz_filename is not None
                 and not self.final_configuration_xyz_filename.endswith(".xyz")):
             raise ValueError("The filename of the final configuration must end with '.xyz'.")
+        if isinstance(self.wall_directions, str):
+            raise ValueError("Wall directions was parsed as a string although it should be a list of bools. "
+                             "Make sure that the yaml file is correctly formatted and that there is space after each "
+                             "dash in the list of wall directions.")
+        if len(self.wall_directions) != 3:
+            raise ValueError("Wall directions must be specified for three dimensions.")
+        if any(self.wall_directions):
+            if self.epsilon is None:
+                raise ValueError("Epsilon must be specified if walls are active.")
+            if not self.epsilon.unit.is_compatible(unit.kilojoule_per_mole):
+                raise TypeError("Epsilon must have a unit compatible with kilojoules per mole.")
+            if self.epsilon <= 0.0 * unit.kilojoule_per_mole:
+                raise ValueError("epsilon must be greater than zero.")
+            if self.alpha is None:
+                raise ValueError("Alpha must be specified if walls are active.")
+            if not 0.0 <= self.alpha <= 1.0:
+                raise ValueError("Alpha must be between zero and one.")
+        else:
+            if self.epsilon is not None:
+                raise ValueError("Epsilon must not be specified if walls are not active.")
+            if self.alpha is not None:
+                raise ValueError("Alpha must not be specified if walls are not active.")
 
     def check_types_of_initial_configuration(self):
         """

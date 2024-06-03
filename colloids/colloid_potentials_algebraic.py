@@ -7,8 +7,8 @@ from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
 class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
     """
-    This class sets up the steric and electrostatic pair potentials between colloids in a solution with periodic
-    boundary conditions using the CustomNonbondedForces class of openmm with an algebraic expression.
+    This class sets up the steric and electrostatic pair potentials between colloids in a solution using the
+    CustomNonbondedForces class of openmm with an algebraic expression.
 
     The potentials are given in Hueckel, Hocky, Palacci & Sacanna, Nature 580, 487--490 (2020)
     (see https://doi.org/10.1038/s41586-020-2205-0). Any references to equations or symbols in the code refer to this
@@ -30,6 +30,8 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
     The cutoff of the steric potential is set to 2.0 * r_max + 2.0 * brush_length, where brush_length is the thickness
     of the polymer brush.
 
+    The cutoffs can be set to be periodic or non-periodic.
+
     Note that the steric potential from the Alexander-de Gennes polymer brush model uses the mixing rule
     r = r_1 + r_2 / 2.0 for the prefactor [see eq. (1)], whereas the electrostatic potential from DLVO theory uses
     r = 2.0 / (1.0 / r_1 + 1.0 / r_2) for the prefactor.
@@ -49,15 +51,18 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         The factor by which the Debye length is multiplied to get the cutoff distance of the electrostatic force.
         Defaults to 21.0.
     :type cutoff_factor: float
+    :param periodic_boundary_conditions:
+        Whether this force should use periodic cutoffs for the steric and electrostatic potentials.
+    :type periodic_boundary_conditions: bool
 
     :raises ValueError:
         If the cutoff factor is not greater than zero.
     """
 
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
-                 use_log: bool = True, cutoff_factor: float = 21.0) -> None:
+                 use_log: bool = True, cutoff_factor: float = 21.0, periodic_boundary_conditions: bool = True) -> None:
         """Constructor of the ColloidPotentialsAlgebraic class."""
-        super().__init__(colloid_potentials_parameters)
+        super().__init__(colloid_potentials_parameters, periodic_boundary_conditions)
         if not cutoff_factor > 0.0:
             raise ValueError("The cutoff factor must be greater than zero.")
 
@@ -169,7 +174,10 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         super().yield_potentials()
         assert not math.isinf(self._max_radius.value_in_unit(self._nanometer))
 
-        self._steric_potential.setNonbondedMethod(self._steric_potential.CutoffPeriodic)
+        if self._periodic_boundary_conditions:
+            self._steric_potential.setNonbondedMethod(self._steric_potential.CutoffPeriodic)
+        else:
+            self._steric_potential.setNonbondedMethod(self._steric_potential.CutoffNonPeriodic)
         self._steric_potential.setCutoffDistance(
             (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(self._nanometer))
         self._steric_potential.setUseLongRangeCorrection(False)
@@ -178,7 +186,10 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         # OpenCL and CUDA platforms.
         self._steric_potential.setForceGroup(0)
 
-        self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffPeriodic)
+        if self._periodic_boundary_conditions:
+            self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffPeriodic)
+        else:
+            self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffNonPeriodic)
         self._electrostatic_potential.setCutoffDistance(
             (2.0 * self._max_radius
              + self._cutoff_factor * self._parameters.debye_length).value_in_unit(self._nanometer))

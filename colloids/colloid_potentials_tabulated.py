@@ -9,8 +9,8 @@ from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
 class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
     """
-    This class sets up the steric and electrostatic pair potentials between colloids in a solution with periodic
-    boundary conditions using the CustomNonbondedForces class of openmm with tabulated functions.
+    This class sets up the steric and electrostatic pair potentials between colloids in a solution using the
+    CustomNonbondedForces class of openmm with tabulated functions.
 
     The potentials are given in Hueckel, Hocky, Palacci & Sacanna, Nature 580, 487--490 (2020)
     (see https://doi.org/10.1038/s41586-020-2205-0). Any references to equations or symbols in the code refer to this
@@ -32,6 +32,8 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
     length that is stored in the ColloidPotentialsParameters instance, and cutoff_factor is set on initialization. A
     switching function reduces the interaction at surface-to-surface separations larger than
     (cutoff_factor - 1) * debye_length to make the potential and forces go smoothly to 0 at the cutoff distance.
+
+    The cutoffs can be set to be periodic or non-periodic.
 
     Note that the steric potential from the Alexander-de Gennes polymer brush model uses the mixing rule
     r = r_1 + r_2 / 2.0 for the prefactor [see eq. (1)], whereas the electrostatic potential from DLVO theory uses
@@ -67,6 +69,9 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         The factor by which the Debye length is multiplied to get the cutoff distance of the forces.
         Defaults to 21.0.
     :type cutoff_factor: float
+    :param periodic_boundary_conditions:
+        Whether this force should use periodic cutoffs for the steric and electrostatic potentials.
+    :type periodic_boundary_conditions: bool
 
     :raises TypeError:
         If the radius_one, radius_two, surface_potential_one, or surface_potential_two is not a Quantity with a proper
@@ -80,9 +85,9 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
     def __init__(self, radius_one: unit.Quantity, radius_two: unit.Quantity,
                  surface_potential_one: unit.Quantity, surface_potential_two: unit.Quantity,
                  colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
-                 use_log: bool = True, cutoff_factor: float = 21.0) -> None:
+                 use_log: bool = True, cutoff_factor: float = 21.0, periodic_boundary_conditions: bool = True) -> None:
         """Constructor of the ColloidPotentialsTabulated class."""
-        super().__init__(colloid_potentials_parameters)
+        super().__init__(colloid_potentials_parameters, periodic_boundary_conditions)
         if not cutoff_factor > 0.0:
             raise ValueError("The cutoff factor must be greater than zero.")
         if not radius_one.unit.is_compatible(self._nanometer):
@@ -198,7 +203,10 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
         potential_11 = CustomNonbondedForce("tabulated_function_11(r)")
         potential_11.addTabulatedFunction("tabulated_function_11", tabulated_function_11)
-        potential_11.setNonbondedMethod(potential_11.CutoffPeriodic)
+        if self._periodic_boundary_conditions:
+            potential_11.setNonbondedMethod(potential_11.CutoffPeriodic)
+        else:
+            potential_11.setNonbondedMethod(potential_11.CutoffNonPeriodic)
         potential_11.setCutoffDistance(r_values_11[-1])
         potential_11.setUseSwitchingFunction(True)
         potential_11.setSwitchingDistance((self._switch_off_distance
@@ -207,7 +215,10 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
         potential_22 = CustomNonbondedForce("tabulated_function_22(r)")
         potential_22.addTabulatedFunction("tabulated_function_22", tabulated_function_22)
-        potential_22.setNonbondedMethod(potential_22.CutoffPeriodic)
+        if self._periodic_boundary_conditions:
+            potential_22.setNonbondedMethod(potential_22.CutoffPeriodic)
+        else:
+            potential_22.setNonbondedMethod(potential_22.CutoffNonPeriodic)
         potential_22.setCutoffDistance(r_values_22[-1])
         potential_22.setUseSwitchingFunction(True)
         potential_22.setSwitchingDistance((self._switch_off_distance
@@ -216,7 +227,10 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
         potential_12 = CustomNonbondedForce("tabulated_function_12(r)")
         potential_12.addTabulatedFunction("tabulated_function_12", tabulated_function_12)
-        potential_12.setNonbondedMethod(potential_12.CutoffPeriodic)
+        if self._periodic_boundary_conditions:
+            potential_12.setNonbondedMethod(potential_12.CutoffPeriodic)
+        else:
+            potential_12.setNonbondedMethod(potential_12.CutoffNonPeriodic)
         potential_12.setCutoffDistance(r_values_12[-1])
         potential_12.setUseSwitchingFunction(True)
         potential_12.setSwitchingDistance((self._switch_off_distance

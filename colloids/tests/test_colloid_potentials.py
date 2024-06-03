@@ -68,7 +68,8 @@ class TestParameters(object):
 
     @pytest.fixture
     def colloid_potentials_algebraic(self, colloid_potentials_parameters):
-        return ColloidPotentialsAlgebraic(colloid_potentials_parameters=colloid_potentials_parameters, use_log=False)
+        return ColloidPotentialsAlgebraic(colloid_potentials_parameters=colloid_potentials_parameters, use_log=False,
+                                          cutoff_factor=21.0, periodic_boundary_conditions=True)
 
     @pytest.fixture
     def colloid_potentials_tabulated(self, radius_one, radius_two, surface_potential_one, surface_potential_two,
@@ -76,7 +77,8 @@ class TestParameters(object):
         return ColloidPotentialsTabulated(radius_one=radius_one, radius_two=radius_two,
                                           surface_potential_one=surface_potential_one,
                                           surface_potential_two=surface_potential_two,
-                                          colloid_potentials_parameters=colloid_potentials_parameters, use_log=False)
+                                          colloid_potentials_parameters=colloid_potentials_parameters, use_log=False,
+                                          cutoff_factor=21.0, periodic_boundary_conditions=True)
 
     @pytest.fixture(params=["algebraic", "tabulated"])
     def colloid_potentials(self, colloid_potentials_algebraic, colloid_potentials_tabulated,  request):
@@ -88,7 +90,8 @@ class TestParameters(object):
 
     @pytest.fixture
     def colloid_potentials_algebraic_log(self, colloid_potentials_parameters):
-        return ColloidPotentialsAlgebraic(colloid_potentials_parameters=colloid_potentials_parameters, use_log=True)
+        return ColloidPotentialsAlgebraic(colloid_potentials_parameters=colloid_potentials_parameters, use_log=True,
+                                          cutoff_factor=21.0, periodic_boundary_conditions=True)
 
     @pytest.fixture
     def colloid_potentials_tabulated_log(self, radius_one, radius_two, surface_potential_one, surface_potential_two,
@@ -97,7 +100,7 @@ class TestParameters(object):
                                           surface_potential_one=surface_potential_one,
                                           surface_potential_two=surface_potential_two,
                                           colloid_potentials_parameters=colloid_potentials_parameters,
-                                          use_log=True)
+                                          use_log=True, cutoff_factor=21.0, periodic_boundary_conditions=True)
 
     @pytest.fixture(params=["algebraic", "tabulated"])
     def colloid_potentials_log(self, colloid_potentials_algebraic_log, colloid_potentials_tabulated_log, request):

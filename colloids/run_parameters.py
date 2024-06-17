@@ -256,6 +256,12 @@ class RunParameters(Parameters):
         if self.integrator not in ["VerletIntegrator", "LangevinIntegator", "LangevinMiddleIntegrator", "BrownianIntegrator"]:
             raise ValueError("The integrator must be one of the following: 'VerletIntegrator', 'LangevinIntegator',"
                             "'LangevinMiddleIntegrator', 'BrownianIntegrator'.")
+        if self.integrator == "VerletIntegrator":
+            if self.collision_rate is not None:
+                raise ValueError("Collision rate must not be specified if using Verlet integrator.")
+        else:
+            if self.collision_rate is None:
+                raise ValueError("Collision rate must be specified if using Langevin, LangevinMiddle, or Brownian integrators.")
         if not self.temperature.unit.is_compatible(unit.kelvin):
             raise TypeError("The temperature must have a unit compatible with kelvin.")
         if self.temperature <= 0.0 * unit.kelvin:

@@ -95,6 +95,7 @@ class TestRunParameters(object):
         assert parameters.dielectric_constant == yaml_parameters.dielectric_constant
         assert parameters.use_log == yaml_parameters.use_log
         assert parameters.use_tabulated == yaml_parameters.use_tabulated
+        assert parameters.integrator == yaml_parameters.integrator
         assert parameters.integrator_seed == yaml_parameters.integrator_seed
         assert parameters.velocity_seed == yaml_parameters.velocity_seed
         assert parameters.run_steps == yaml_parameters.run_steps

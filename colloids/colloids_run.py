@@ -74,10 +74,18 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     # Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
-    # TODO: ALLOW FOR DIFFERENT INTEGRATORS?
-    integrator = openmm.LangevinIntegrator(parameters.temperature,
-                                           parameters.collision_rate,
-                                           parameters.timestep)
+    #integrator = openmm.LangevinIntegrator(parameters.temperature,
+     #                                      parameters.collision_rate,
+     #                                      parameters.timestep)
+
+    if parameters.integrator in ["LangevinIntegrator", "LangevinMiddleIntegrator", "BrownianIntegrator"]:
+        integrator = eval("openmm." + parameters.integrator)(parameters.temperature,
+                                                            parameters.collision_rate,
+                                                            parameters.timestep)
+    #verlet integrator only takes a timestep parameter
+    else:
+        integrator = eval("openmm." + parameters.integrator)(parameters.timestep)
+
     if parameters.integrator_seed is not None:
         integrator.setRandomNumberSeed(parameters.integrator_seed)
 

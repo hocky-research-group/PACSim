@@ -46,16 +46,23 @@ class RunParameters(Parameters):
         The name of the platform to use for the simulation.
         Defaults to "Reference". Other possible choices are "CPU", "CUDA", or "OpenCL".
     :type platform_name: str
+    :param integrator: 
+        The integrator to use for the molecular dynamics simultions. 
+        Defaults to "LangevinIntegrator". Other possible choices are "VerletIntegrator", "LangevinMiddleIntegrator",
+        or "BrownianIntegrator".
+    :type integrator: str
     :param temperature:
         The temperature of the system.
         The unit of the temperature must be compatible with kelvin and the value must be greater than zero.
         Defaults to 298.0 * unit.kelvin.
     :type temperature: unit.Quantity
     :param collision_rate:
-        The collision rate of the Langevin integrator.
+        The collision rate of the integrator.
+        If the integrator is LangevinIntegrator, LangevinMiddleIntegrator, or BrownianIntegrator, value must be specified.
         The unit of the collision_rate must be compatible with 1/picoseconds and the value must be greater than zero.
+        If the integrator is VerletIntegrator, value must be None.
         Defaults to 0.01 / (unit.pico * unit.second).
-    :type collision_rate: unit.Quantity
+    :type collision_rate: Optional[unit.Quantity]
     :param timestep:
         The timestep of the simulation.
         The unit of the timestep must be compatible with picoseconds and the value must be greater than zero.
@@ -188,8 +195,9 @@ class RunParameters(Parameters):
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
     platform_name: str = "Reference"
+    integrator: str = "Langevin"
     temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
-    collision_rate: unit.Quantity = field(default_factory=lambda: 0.001574074286750681 / (unit.pico * unit.second))
+    collision_rate: Optional[unit.Quantity] = field(default_factory=lambda: 0.001574074286750681 / (unit.pico * unit.second))
     timestep: unit.Quantity = field(default_factory=lambda: 0.03176470159055431 * (unit.pico * unit.second))
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
@@ -245,14 +253,18 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
+        if self.integrator not in ["VerletIntegrator", "LangevinIntegator", "LangevinMiddleIntegrator", "BrownianIntegrator"]:
+            raise ValueError("The integrator must be one of the following: 'VerletIntegrator', 'LangevinIntegator',"
+                            "'LangevinMiddleIntegrator', 'BrownianIntegrator'.")
         if not self.temperature.unit.is_compatible(unit.kelvin):
             raise TypeError("The temperature must have a unit compatible with kelvin.")
         if self.temperature <= 0.0 * unit.kelvin:
             raise ValueError("The temperature must be greater than zero.")
-        if not self.collision_rate.unit.is_compatible((unit.pico * unit.second) ** (-1)):
-            raise TypeError("The collision rate must have a unit compatible with 1/picoseconds.")
-        if self.collision_rate <= 0.0 * ((unit.pico * unit.second) ** (-1)):
-            raise ValueError("The collision rate must be greater than zero.")
+        if any(self.collision_rate):
+            if not self.collision_rate.unit.is_compatible((unit.pico * unit.second) ** (-1)):
+                raise TypeError("The collision rate must have a unit compatible with 1/picoseconds.")
+            if self.collision_rate <= 0.0 * ((unit.pico * unit.second) ** (-1)):
+                raise ValueError("The collision rate must be greater than zero.")
         if not self.timestep.unit.is_compatible(unit.pico * unit.second):
             raise TypeError("The timestep must have a unit compatible with picoseconds.")
         if self.timestep <= 0.0 * (unit.pico * unit.second):

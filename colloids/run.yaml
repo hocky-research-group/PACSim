@@ -19,6 +19,7 @@ epsilon: null
 final_configuration_gsd_filename: final_frame.gsd
 final_configuration_xyz_filename: final_frame.xyz
 initial_configuration: tests/first_frame.xyz
+integrator: LangevinIntegrator
 integrator_seed: null
 masses:
   N: !Quantity

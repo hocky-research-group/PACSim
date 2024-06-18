@@ -8,6 +8,7 @@ from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, C
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
 from colloids.run_parameters import RunParameters
+from colloids.integrators import Integrators
 from colloids.status_reporter import StatusReporter
 
 
@@ -78,14 +79,9 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
      #                                      parameters.collision_rate,
      #                                      parameters.timestep)
 
-    if parameters.integrator in ["LangevinIntegrator", "LangevinMiddleIntegrator", "BrownianIntegrator"]:
-        integrator = eval("openmm." + parameters.integrator)(parameters.temperature,
-                                                            parameters.collision_rate,
-                                                            parameters.timestep)
-    #verlet integrator only takes a timestep parameter
-    else:
-        integrator = eval("openmm." + parameters.integrator)(parameters.timestep)
-
+    integrator_constructor = getattr(Integrators, parameters.integrator) 
+    integrator = integrator_constructor(**parameters.integrator_parameters)
+    
     if parameters.integrator_seed is not None:
         integrator.setRandomNumberSeed(parameters.integrator_seed)
 

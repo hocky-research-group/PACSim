@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 from openmm import unit
 from colloids.abstracts import Parameters
+from colloids.integrators import Integrators
 from colloids.helper_functions import read_xyz_file
 
 
@@ -46,28 +47,22 @@ class RunParameters(Parameters):
         The name of the platform to use for the simulation.
         Defaults to "Reference". Other possible choices are "CPU", "CUDA", or "OpenCL".
     :type platform_name: str
-    :param integrator: 
-        The integrator to use for the molecular dynamics simultions. 
-        Defaults to "LangevinIntegrator". Other possible choices are "VerletIntegrator", "LangevinMiddleIntegrator",
-        or "BrownianIntegrator".
-    :type integrator: str
-    :param temperature:
+        :param temperature:
         The temperature of the system.
         The unit of the temperature must be compatible with kelvin and the value must be greater than zero.
         Defaults to 298.0 * unit.kelvin.
     :type temperature: unit.Quantity
-    :param collision_rate:
-        The collision rate of the integrator.
-        If the integrator is LangevinIntegrator, LangevinMiddleIntegrator, or BrownianIntegrator, value must be specified.
-        The unit of the collision_rate must be compatible with 1/picoseconds and the value must be greater than zero.
-        If the integrator is VerletIntegrator, value must be None.
-        Defaults to 0.01 / (unit.pico * unit.second).
-    :type collision_rate: Optional[unit.Quantity]
-    :param timestep:
-        The timestep of the simulation.
-        The unit of the timestep must be compatible with picoseconds and the value must be greater than zero.
-        Defaults to 0.05 * (unit.pico * unit.second).
-    :type timestep: unit.Quantity
+    :param integrator: 
+        The integrator to use for the molecular dynamics simultions. 
+        Defaults to "LangevinIntegrator". Other possible choices are "BrownianIntegrator", "LangevinMiddleIntegrator", 
+        "NoseHooverIntegrator", "VariableLangevinIntegrator", "VariableVerletIntegrator", and "VerletIntegrator".
+    :type integrator: str
+    :param integrator_parameters:
+        The parameters to use with the integrator for molecular dynamics.
+        Each integrator has specific parameters, and the parameters passed in here must be compatible with the chosen integrator.
+        If the integrator requires a temperature, the temperature passed in here must be compatible with the value passed 
+        into the temperature param.
+    :type integrator_parameters: dict[str, unit.Quantity]
     :param brush_density:
         The polymer surface density in the Alexander-de Gennes polymer brush model [i.e., sigma in eq. (1)].
         The unit of the brush_density must be compatible with 1/nanometer^2 and the value must be greater than zero.
@@ -195,10 +190,14 @@ class RunParameters(Parameters):
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
     platform_name: str = "Reference"
-    integrator: str = "Langevin"
     temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
-    collision_rate: Optional[unit.Quantity] = field(default_factory=lambda: 0.001574074286750681 / (unit.pico * unit.second))
-    timestep: unit.Quantity = field(default_factory=lambda: 0.03176470159055431 * (unit.pico * unit.second))
+    integrator: str = "LangevinIntegrator"
+    integrator_parameters: dict[str, unit.Quantity] = field(
+        default_factory=lambda: {"temperature": 298.0 * unit.kelvin, 
+                                "timestep": 0.0317647015905543  * (unit.pico * unit.second),
+                                 "collision_rate": 0.001574074286750681  / (unit.pico * unit.second)}) 
+    #collision_rate: Optional[unit.Quantity] = field(default_factory=lambda: 0.001574074286750681 / (unit.pico * unit.second))
+    #timestep: unit.Quantity = field(default_factory=lambda: 0.03176470159055431 * (unit.pico * unit.second))
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
     debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
@@ -253,20 +252,15 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
-        if self.integrator not in ["VerletIntegrator", "LangevinIntegator", "LangevinMiddleIntegrator", "BrownianIntegrator"]:
-            raise ValueError("The integrator must be one of the following: 'VerletIntegrator', 'LangevinIntegator',"
-                            "'LangevinMiddleIntegrator', 'BrownianIntegrator'.")
-        if self.integrator == "VerletIntegrator":
-            if self.collision_rate is not None:
-                raise ValueError("Collision rate must not be specified if using Verlet integrator.")
-        else:
-            if self.collision_rate is None:
-                raise ValueError("Collision rate must be specified if using Langevin, LangevinMiddle, or Brownian integrators.")
+        if self.integrator not in Integrators:
+            raise ValueError("The integrator must be one of the following: 'BrownianIntegrator', 'LangevinIntegator',"
+                            "LangevinMiddleIntegrator', 'NoseHooverIntegrator', 'VariableLangevinIntegrator', "
+                            "'VariableVerletIntegrator', 'VerletIntegrator'.")
         if not self.temperature.unit.is_compatible(unit.kelvin):
             raise TypeError("The temperature must have a unit compatible with kelvin.")
         if self.temperature <= 0.0 * unit.kelvin:
             raise ValueError("The temperature must be greater than zero.")
-        if any(self.collision_rate):
+        '''if any(self.collision_rate):
             if not self.collision_rate.unit.is_compatible((unit.pico * unit.second) ** (-1)):
                 raise TypeError("The collision rate must have a unit compatible with 1/picoseconds.")
             if self.collision_rate <= 0.0 * ((unit.pico * unit.second) ** (-1)):
@@ -274,7 +268,7 @@ class RunParameters(Parameters):
         if not self.timestep.unit.is_compatible(unit.pico * unit.second):
             raise TypeError("The timestep must have a unit compatible with picoseconds.")
         if self.timestep <= 0.0 * (unit.pico * unit.second):
-            raise ValueError("The timestep must be greater than zero.")
+            raise ValueError("The timestep must be greater than zero.")'''
         if not self.brush_density.unit.is_compatible((unit.nano * unit.meter) ** (-2)):
             raise TypeError("The brush density must have a unit compatible with 1/nanometer^2.")
         if self.brush_density <= 0.0 * ((unit.nano * unit.meter) ** (-2)):

@@ -77,12 +77,12 @@ class TestRunParameters(object):
         assert (parameters.temperature.value_in_unit(parameters.temperature.unit)
                 == pytest.approx(yaml_parameters.temperature.value_in_unit(parameters.temperature.unit), rel=1e-12,
                                  abs=1e-12))
-        assert (parameters.collision_rate.value_in_unit(parameters.collision_rate.unit)
-                == pytest.approx(yaml_parameters.collision_rate.value_in_unit(parameters.collision_rate.unit),
-                                 rel=1e-12, abs=1e-12))
-        assert (parameters.timestep.value_in_unit(parameters.timestep.unit)
-                == pytest.approx(yaml_parameters.timestep.value_in_unit(parameters.timestep.unit), rel=1e-12,
-                                 abs=1e-12))
+        #assert (parameters.collision_rate.value_in_unit(parameters.collision_rate.unit)
+         #       == pytest.approx(yaml_parameters.collision_rate.value_in_unit(parameters.collision_rate.unit),
+           #                      rel=1e-12, abs=1e-12))
+        #assert (parameters.timestep.value_in_unit(parameters.timestep.unit)
+           #     == pytest.approx(yaml_parameters.timestep.value_in_unit(parameters.timestep.unit), rel=1e-12,
+            #                     abs=1e-12))
         assert (parameters.brush_density.value_in_unit(parameters.brush_density.unit)
                 == pytest.approx(yaml_parameters.brush_density.value_in_unit(parameters.brush_density.unit), rel=1e-12,
                                  abs=1e-12))
@@ -96,6 +96,7 @@ class TestRunParameters(object):
         assert parameters.use_log == yaml_parameters.use_log
         assert parameters.use_tabulated == yaml_parameters.use_tabulated
         assert parameters.integrator == yaml_parameters.integrator
+        assert parameters.integrator_parameters == yaml_parameters.integrator_parameters
         assert parameters.integrator_seed == yaml_parameters.integrator_seed
         assert parameters.velocity_seed == yaml_parameters.velocity_seed
         assert parameters.run_steps == yaml_parameters.run_steps

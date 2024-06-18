@@ -22,7 +22,7 @@ integrator_parameters:
   frictionCoeff: !Quantity
     unit: /picosecond
     value: 0.01
-  stepSizs: !Quantity
+  stepSize: !Quantity
     unit: picosecond
     value: 0.05
 integrator_seed: null

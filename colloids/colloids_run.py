@@ -75,9 +75,6 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     # Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
-    #integrator = openmm.LangevinIntegrator(parameters.temperature,
-     #                                      parameters.collision_rate,
-     #                                      parameters.timestep)
 
     integrator_constructor = getattr(Integrators, parameters.integrator) 
     integrator = integrator_constructor(**parameters.integrator_parameters)

@@ -74,15 +74,9 @@ class TestRunParameters(object):
                         rel=1e-12, abs=1e-12))
 
         assert parameters.platform_name == yaml_parameters.platform_name
-        assert (parameters.temperature.value_in_unit(parameters.temperature.unit)
-                == pytest.approx(yaml_parameters.temperature.value_in_unit(parameters.temperature.unit), rel=1e-12,
+        assert (parameters.potential_temperature.value_in_unit(parameters.potential_temperature.unit)
+                == pytest.approx(yaml_parameters.potential_temperature.value_in_unit(parameters.potential_temperature.unit), rel=1e-12,
                                  abs=1e-12))
-        #assert (parameters.collision_rate.value_in_unit(parameters.collision_rate.unit)
-         #       == pytest.approx(yaml_parameters.collision_rate.value_in_unit(parameters.collision_rate.unit),
-           #                      rel=1e-12, abs=1e-12))
-        #assert (parameters.timestep.value_in_unit(parameters.timestep.unit)
-           #     == pytest.approx(yaml_parameters.timestep.value_in_unit(parameters.timestep.unit), rel=1e-12,
-            #                     abs=1e-12))
         assert (parameters.brush_density.value_in_unit(parameters.brush_density.unit)
                 == pytest.approx(yaml_parameters.brush_density.value_in_unit(parameters.brush_density.unit), rel=1e-12,
                                  abs=1e-12))

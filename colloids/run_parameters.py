@@ -198,7 +198,7 @@ class RunParameters(Parameters):
         default_factory=lambda: {"temperature": 298.0 * unit.kelvin, 
                                 "stepSize": 0.0317647015905543  * (unit.pico * unit.second),
                                  "frictionCoeff": 0.001574074286750681  / (unit.pico * unit.second)}) 
-    integrator_constructor = getattr(Integrators, str = "LangevinIntegrator") 
+    integrator_constructor = getattr(Integrators, "LangevinIntegrator") 
     integrator = integrator_constructor(integrator_parameters)
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))

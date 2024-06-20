@@ -257,12 +257,9 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
-        
-        integrator_options = inspect.isclass(Integrators) #, predicate=inspect.ismethod)
-        print(integrator_options)
-        
-        if self.integrator not in inspect.isclass(Integrators): #, predicate=inspect.ismethod):
-            print(self.integrator)
+        integrator_constructor = getattr(Integrators, self.integrator) 
+        integrator = integrator_constructor(**self.integrator_parameters)
+        if integrator not in inspect.getmembers(Integrators): #, predicate=inspect.ismethod):
             raise ValueError("The integrator must be one of the following: 'BrownianIntegrator', 'LangevinIntegrator',"
                             "LangevinMiddleIntegrator', 'NoseHooverIntegrator', 'VariableLangevinIntegrator', "
                             "'VariableVerletIntegrator', 'VerletIntegrator'.")

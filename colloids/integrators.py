@@ -1,4 +1,5 @@
 from dataclasses import field
+import openmm
 from openmm import unit
 
 class Integrators():

@@ -60,7 +60,7 @@ class RunParameters(Parameters):
         The integrator to use for the molecular dynamics simultions. 
         Defaults to "LangevinIntegrator". Other possible choices are "BrownianIntegrator", "LangevinMiddleIntegrator", 
         "NoseHooverIntegrator", "VariableLangevinIntegrator", "VariableVerletIntegrator", and "VerletIntegrator".
-    :type integrator: str
+    :type integrator: function
     :param integrator_parameters:
         The parameters to use with the integrator for molecular dynamics.
         Each integrator has specific parameters, and the parameters passed in here must be compatible with the chosen integrator.
@@ -193,11 +193,13 @@ class RunParameters(Parameters):
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
     platform_name: str = "Reference"
     potential_temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
-    integrator: str = "LangevinIntegrator"
+    #integrator: #str = "LangevinIntegrator"
     integrator_parameters: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"temperature": 298.0 * unit.kelvin, 
                                 "stepSize": 0.0317647015905543  * (unit.pico * unit.second),
                                  "frictionCoeff": 0.001574074286750681  / (unit.pico * unit.second)}) 
+    integrator_constructor = getattr(Integrators, str = "LangevinIntegrator") 
+    integrator = integrator_constructor(integrator_parameters)
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
     debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))

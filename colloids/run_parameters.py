@@ -4,6 +4,8 @@ from openmm import unit
 from colloids.abstracts import Parameters
 from colloids.integrators import Integrators
 from colloids.helper_functions import read_xyz_file
+import inspect
+
 
 
 @dataclass(order=True, frozen=True)
@@ -250,7 +252,7 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
-        if self.integrator not in Integrators:
+        if self.integrator not in inspect.getmembers(Integrators, predicate=inspect.ismethod):
             raise ValueError("The integrator must be one of the following: 'BrownianIntegrator', 'LangevinIntegator',"
                             "LangevinMiddleIntegrator', 'NoseHooverIntegrator', 'VariableLangevinIntegrator', "
                             "'VariableVerletIntegrator', 'VerletIntegrator'.")

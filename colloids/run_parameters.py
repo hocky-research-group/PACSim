@@ -199,7 +199,7 @@ class RunParameters(Parameters):
                                 "stepSize": 0.0317647015905543  * (unit.pico * unit.second),
                                  "frictionCoeff": 0.001574074286750681  / (unit.pico * unit.second)}) 
     integrator_constructor = getattr(Integrators, "LangevinIntegrator") 
-    integrator = integrator_constructor(integrator_parameters)
+    integrator = integrator_constructor(**integrator_parameters)
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
     debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))

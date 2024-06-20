@@ -258,7 +258,7 @@ class RunParameters(Parameters):
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
         integrator_constructor = getattr(Integrators, self.integrator) 
-        integrator = integrator_constructor(**self.integrator_parameters.values)
+        integrator = integrator_constructor(**self.integrator_parameters.values())
         if integrator not in inspect.getmembers(Integrators): #, predicate=inspect.ismethod):
             raise ValueError("The integrator must be one of the following: 'BrownianIntegrator', 'LangevinIntegrator',"
                             "LangevinMiddleIntegrator', 'NoseHooverIntegrator', 'VariableLangevinIntegrator', "

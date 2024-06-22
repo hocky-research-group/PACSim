@@ -1,12 +1,16 @@
 import argparse
+from typing import Iterable
+import numpy as np
 import numpy.typing as npt
+import numpy.random as npr
 import openmm
 from openmm import app
 from openmm import unit
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
                       ShiftedLennardJonesWalls)
 from colloids.gsd_reporter import GSDReporter
-from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
+from colloids.helper_functions import (generate_fibonacci_sphere_grid_points, read_xyz_file, write_gsd_file,
+                                       write_xyz_file)
 from colloids.run_parameters import RunParameters
 from colloids.status_reporter import StatusReporter
 
@@ -23,14 +27,15 @@ class ExampleAction(argparse.Action):
         parser.exit()
 
 
-def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
-                      cell: npt.NDArray[float]) -> app.Simulation:
+def set_up_simulation(parameters: RunParameters, types: Iterable[str],
+                      cell: npt.NDArray[float]) -> (app.Simulation, npt.NDArray[float]):
     topology = app.topology.Topology()
     chain = topology.addChain()
     residue = topology.addResidue("res1", chain)
 
+    atoms = []
     for t in types:
-        topology.addAtom(t, None, residue)
+        atoms.append(topology.addAtom(t, None, residue))
 
     system = openmm.System()
 
@@ -117,13 +122,42 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         slj_walls = ShiftedLennardJonesWalls(wall_distances, parameters.epsilon, parameters.alpha,
                                              parameters.wall_directions)
         for i, t in enumerate(types):
-            # noinspection PyTypeChecker
             slj_walls.add_particle(index=i, radius=parameters.radii[t])
-        for force in slj_walls.yield_potentials():
-            system.addForce(force)
+    else:
+        slj_walls = None
+
+    snowman_positions = []
+    if parameters.snowman_masses is not None:
+        assert parameters.snowman_radii is not None
+        assert parameters.snowman_distances is not None
+        if parameters.snowman_seed is not None:
+            npr.seed(parameters.snowman_seed)
+        nanometer = unit.nano * unit.meter
+        for i, t in enumerate(types):
+            snowman_type = t + t
+            if parameters.snowman_masses[snowman_type] is not None:
+                assert parameters.snowman_radii[snowman_type] is not None
+                assert parameters.snowman_distances[snowman_type] is not None
+                snowman_atom = topology.addAtom(snowman_type, None, residue)
+                topology.addBond(atoms[i], snowman_atom)
+                snowman_index = system.addParticle(parameters.snowman_masses[snowman_type])
+                colloid_potentials.add_particle(radius=parameters.snowman_radii[snowman_type],
+                                                surface_potential=parameters.snowman_surface_potentials[snowman_type])
+                system.addConstraint(i, snowman_index, parameters.snowman_distances[snowman_type])
+                colloid_potentials.add_exclusion(i, snowman_index)
+                if include_walls:
+                    slj_walls.add_particle(index=snowman_index, radius=parameters.snowman_radii[snowman_type])
+                pos = list(generate_fibonacci_sphere_grid_points(
+                    1, parameters.snowman_distances[snowman_type].value_in_unit(nanometer),
+                    True))[0]
+                snowman_positions.append(pos)
+    snowman_positions = np.array(snowman_positions)
 
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
+    if include_walls:
+        for force in slj_walls.yield_potentials():
+            system.addForce(force)
 
     if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":
         simulation = app.Simulation(topology, system, integrator, platform,
@@ -131,15 +165,15 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     else:
         simulation = app.Simulation(topology, system, integrator, platform)
 
-    return simulation
+    return simulation, snowman_positions
 
 
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
                      total_number_steps: int, cell: npt.NDArray[float]) -> None:
+    assert all(r not in parameters.snowman_radii for r in parameters.radii)
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
-                                            parameters.radii, parameters.surface_potentials, simulation,
-                                            append_file=append_file,
-                                            cell=cell * (unit.nano * unit.meter)))
+                                            parameters.radii | parameters.snowman_radii, parameters.surface_potentials,
+                                            simulation, append_file=append_file, cell=cell * (unit.nano * unit.meter)))
     simulation.reporters.append(StatusReporter(max(1, total_number_steps // 100), total_number_steps))
     simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
                                                       parameters.state_data_interval, time=True,
@@ -163,9 +197,9 @@ def main():
 
     types, positions, cell = read_xyz_file(parameters.initial_configuration)
 
-    simulation = set_up_simulation(parameters, types, cell)
+    simulation, extra_positions = set_up_simulation(parameters, types, cell)
 
-    simulation.context.setPositions(positions)
+    simulation.context.setPositions(np.concatenate(positions, extra_positions))
     if parameters.velocity_seed is not None:
         simulation.context.setVelocitiesToTemperature(parameters.temperature,
                                                       parameters.velocity_seed)

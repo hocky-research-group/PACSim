@@ -21,7 +21,7 @@ def main():
     parameters = RunParameters.from_yaml(args.yaml_file)
     types, _, cell = read_xyz_file(parameters.initial_configuration)
 
-    simulation = set_up_simulation(parameters, types, cell)
+    simulation, _ = set_up_simulation(parameters, types, cell)
 
     simulation.loadCheckpoint(args.checkpoint_file)
 

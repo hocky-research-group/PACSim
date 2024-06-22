@@ -235,15 +235,17 @@ class Parameters(object):
             stop_index = 0
             while stop_index < len(string_wo_whitespaces) and string_wo_whitespaces[stop_index] not in ["*", "/"]:
                 stop_index += 1
-            # The first unit in the composite unit may contain a SI prefix that must be found explicitly because units
-            # like millivolt are not directly recognized by openmm.
-            for si_prefix in unit.si_prefixes:
-                if string_wo_whitespaces.startswith(si_prefix.prefix):
-                    assert stop_index > len(si_prefix.prefix)
-                    openmm_unit = si_prefix * unit.__dict__[string_wo_whitespaces[len(si_prefix.prefix):stop_index]]
-                    break
-            else:
+            try:
                 openmm_unit = unit.__dict__[string_wo_whitespaces[:stop_index]]
+            except KeyError:
+                # The first unit in the composite unit may contain a SI prefix that must be found explicitly because
+                # units like millivolt are not directly recognized by openmm.
+                openmm_unit = None
+                for si_prefix in unit.si_prefixes:
+                    if string_wo_whitespaces.startswith(si_prefix.prefix):
+                        assert stop_index > len(si_prefix.prefix)
+                        openmm_unit = si_prefix * unit.__dict__[string_wo_whitespaces[len(si_prefix.prefix):stop_index]]
+                        break
             # If the composite unit only contains one unit, the conversion is finished.
             if stop_index == len(string_wo_whitespaces):
                 return openmm_unit

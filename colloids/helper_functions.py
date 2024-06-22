@@ -1,9 +1,13 @@
+from math import acos, cos, pi, sin, sqrt
+from typing import Iterator
 import ase.io
 import gsd.hoomd
+import numpy as np
 import numpy.typing as npt
 import openmm
 from openmm import app
 from openmm import unit
+from scipy.spatial.transform import Rotation
 
 
 def read_xyz_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[float]):
@@ -104,12 +108,24 @@ def write_xyz_file_from_gsd_frame(filename: str, gsd_frame: gsd.hoomd.Frame) -> 
             print(f"{t} {position[0]} {position[1]} {position[2]}", file=file)
 
 
+def generate_fibonacci_sphere_grid_points(number_points: int, radius: float,
+                                          random_rotation: bool) -> Iterator[npt.NDArray[np.floating]]:
+    # See https://extremelearning.com.au/how-to-evenly-distribute-points-on-a-sphere-more-effectively-than-the-canonical-fibonacci-lattice/
+    # Output, real xgB(3,ng): the grid points.
+    golden_ratio = (1.0 + sqrt(5.0)) / 2.0
+    epsilon = 0.36
+    random_rotation = Rotation.random() if random_rotation else Rotation.identity()
+    for i in range(number_points):
+        theta = 2.0 * pi * i / golden_ratio
+        phi = acos(1.0 - 2.0 * (i + epsilon) / (number_points - 1.0 + 2.0 * epsilon))
+        yield random_rotation.apply([cos(theta) * sin(phi) * radius, sin(theta) * sin(phi) * radius, cos(phi) * radius])
+
+
 def main() -> None:
     radius_positive = 105.0 * (unit.nano * unit.meter)
     radius_negative = 95.0 * (unit.nano * unit.meter)
     mass_positive = 1.0 * unit.amu
     mass_negative = (radius_negative / radius_positive) ** 3 * mass_positive
-    side_length = 12328.05 * (unit.nano * unit.meter)
     temperature = 298.0 * unit.kelvin
     # noinspection PyUnresolvedReferences
     collision_rate = 0.01 / (unit.pico * unit.second)

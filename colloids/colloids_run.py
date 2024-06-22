@@ -126,7 +126,7 @@ def set_up_simulation(parameters: RunParameters, types: Iterable[str],
     else:
         slj_walls = None
 
-    snowman_positions = []
+    snowman_offsets = []
     if parameters.snowman_masses is not None:
         assert parameters.snowman_radii is not None
         assert parameters.snowman_distances is not None
@@ -137,6 +137,7 @@ def set_up_simulation(parameters: RunParameters, types: Iterable[str],
             snowman_type = t + t
             if parameters.snowman_masses[snowman_type] is not None:
                 assert parameters.snowman_radii[snowman_type] is not None
+                assert parameters.snowman_surface_potentials[snowman_type] is not None
                 assert parameters.snowman_distances[snowman_type] is not None
                 snowman_atom = topology.addAtom(snowman_type, None, residue)
                 topology.addBond(atoms[i], snowman_atom)
@@ -147,11 +148,15 @@ def set_up_simulation(parameters: RunParameters, types: Iterable[str],
                 colloid_potentials.add_exclusion(i, snowman_index)
                 if include_walls:
                     slj_walls.add_particle(index=snowman_index, radius=parameters.snowman_radii[snowman_type])
-                pos = list(generate_fibonacci_sphere_grid_points(
+                offset = list(generate_fibonacci_sphere_grid_points(
                     1, parameters.snowman_distances[snowman_type].value_in_unit(nanometer),
                     True))[0]
-                snowman_positions.append(pos)
-    snowman_positions = np.array(snowman_positions)
+                snowman_offsets.append(offset)
+            else:
+                assert parameters.snowman_radii[snowman_type] is None
+                assert parameters.snowman_surface_potentials[snowman_type] is None
+                assert parameters.snowman_distances[snowman_type] is None
+                snowman_offsets.append(None)
 
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
@@ -165,7 +170,7 @@ def set_up_simulation(parameters: RunParameters, types: Iterable[str],
     else:
         simulation = app.Simulation(topology, system, integrator, platform)
 
-    return simulation, snowman_positions
+    return simulation, snowman_offsets
 
 
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
@@ -204,8 +209,11 @@ def main():
 
     types, positions, cell = read_xyz_file(parameters.initial_configuration)
 
-    simulation, extra_positions = set_up_simulation(parameters, types, cell)
+    simulation, snowman_offsets = set_up_simulation(parameters, types, cell)
 
+    assert len(snowman_offsets) == len(positions)
+    extra_positions = np.array([atom_pos + offset for atom_pos, offset in zip(positions, snowman_offsets)
+                                if offset is not None])
     simulation.context.setPositions(np.concatenate((positions, extra_positions)) if len(extra_positions) > 0
                                     else positions)
     if parameters.velocity_seed is not None:

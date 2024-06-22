@@ -77,9 +77,11 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         atoms.center(about=(0.0, 0.0, 0.0))
         new_atoms = []
         for atom in atoms:
+            # Tag for centers.
+            atom.tag = 0
             for satellite_position in self._generate_fibonacci_sphere_grid_points(
                     self._satellites_per_center, self._orbit_distance.value_in_unit(self._nanometer)):
-                new_atoms.append(Atom(symbol="Y", position=atom.position + satellite_position))
+                new_atoms.append(Atom(symbol="X", position=atom.position + satellite_position, tag=1))
         for new_atom in new_atoms:
             atoms.append(new_atom)
         atoms = atoms.repeat(self._lattice_repeats)
@@ -99,8 +101,9 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
             print(f"Lattice=\"{' '.join(map(str, scaled_cell.flatten()))}\" Properties=species:S:1:pos:R:3 "
                   f"Origin=\"{' '.join(map(str, origin_vector))}\"",
                   file=file)
+            tag_to_type_dictionary = {0: self._type_lattice, 1: self._type_satellite}
             for atom in atoms:
-                print(f"{self._type_lattice if atom.symbol=='X' else self._type_satellite} "
+                print(f"{tag_to_type_dictionary[atom.tag]} "
                       f"{atom.position[0]} {atom.position[1]} {atom.position[2]}", file=file)
 
 

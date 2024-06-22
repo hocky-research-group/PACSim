@@ -1,123 +1,258 @@
-from dataclasses import field
+from typing import Optional
 import openmm
 from openmm import unit
 
-class Integrators():
 
+# noinspection PyPep8Naming
+def BrownianIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity,
+                       stepSize: unit.Quantity) -> openmm.Integrator:
     """
-    Module to define the integrators for molecular dynamics simulations in OpenMM.
+    Function to return the OpenMM Brownian integrator that defines the keyword arguments (in contrast to OpenMM).
 
-    For information about the integrators, see http://docs.openmm.org/latest/userguide/theory/04_integrators.html.
+    The following is the OpenMM documentation for the Brownian integrator (see
+    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.BrownianIntegrator.html).
+
+    This is an Integrator which simulates a System using Brownian dynamics.
 
     :param temperature:
-        The temperature of the heat bath coupled to the system (for integration at constant temperature).
-        The unit of the temperature must be compatible with Kelvin and the value must be greater than zero.
-        Defaults to 298.0  * unit.kelvin.
+        The temperature of the heat bath (in Kelvin).
     :type temperature: unit.Quantity
-
     :param frictionCoeff:
-        The friction coefficient which couples the system to the heat bath (for integration at constant temperature).
-        The unit of the frictionCoeff must be compatible with inverse picoseconds and the value must be greater than zero.
-        Defaults to 0.01 / unit.picosecond.
+        The friction coefficient which couples the system to the heat bath, measured in 1/ps.
     :type frictionCoeff: unit.Quantity
-
     :param stepSize:
-        The timestep with which to integrate the system.
-        The unit of the stepSize must be compatible with picoseconds and the value must be greater than zero.
-        Defaults to 0.05 * unit.picosecond.
+        The step size with which to integrate the system (in picoseconds).
     :type stepSize: unit.Quantity
 
-    :param collisionFrequency:
-        The frequency of the system's interaction with the heat bath (for the Nose Hoover integrator).
-        The unit of the collisionFrequency must be compatible with inverse picoseconds and the value must be greater than zero.
-        Defaults to 0.01 / unit.picosecond.
-    :type collisionFrequency: unit.Quantity
+    :return:
+        The Brownian integrator.
+    :rtype: openmm.Integrator
+    """
+    # Checks of units and values are done within OpenMM.
+    return openmm.BrownianIntegrator(temperature, frictionCoeff, stepSize)
 
-    :param chainLength: 
-        The number of beads in the Nose-Hoover chain (for the Nose Hoover integrator).
+
+# noinspection PyPep8Naming
+def LangevinIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity,
+                       stepSize: unit.Quantity) -> openmm.Integrator:
+    """
+    Function to return the OpenMM Langevin integrator that defines the keyword arguments (in contrast to OpenMM).
+
+    The following is the OpenMM documentation for the Langevin integrator (see
+    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.LangevinIntegrator.html).
+
+    This is an Integrator which simulates a System using Langevin dynamics.
+
+    :param temperature:
+        The temperature of the heat bath (in Kelvin).
+    :type temperature: unit.Quantity
+    :param frictionCoeff:
+        The friction coefficient which couples the system to the heat bath (in inverse picoseconds).
+    :type frictionCoeff: unit.Quantity
+    :param stepSize:
+        The step size with which to integrate the system (in picoseconds).
+    :type stepSize: unit.Quantity
+
+    :return:
+        The Langevin integrator.
+    :rtype: openmm.Integrator
+    """
+    # Checks of units and values are done within OpenMM.
+    return openmm.LangevinIntegrator(temperature, frictionCoeff, stepSize)
+
+
+# noinspection PyPep8Naming
+def LangevinMiddleIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity,
+                             stepSize: unit.Quantity) -> openmm.Integrator:
+    """
+    Function to return the OpenMM Langevin middle integrator that defines the keyword arguments (in contrast to OpenMM).
+
+    The following is the OpenMM documentation for the Langevin middle integrator (see
+    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.LangevinMiddleIntegrator.html).
+
+    This is an Integrator which simulates a System using Langevin dynamics, with the LFMiddle discretization
+    (J. Phys. Chem. A 2019, 123, 28, 6056-6079). This method tend to produce more accurate configurational sampling
+    than other discretizations, such as the one used in LangevinIntegrator.
+
+    The algorithm is closely related to the BAOAB discretization (Proc. R. Soc. A. 472: 20160138). Both methods produce
+    identical trajectories, but LFMiddle returns half step (leapfrog) velocities, while BAOAB returns on-step
+    velocities. The former provide a much more accurate sampling of the thermal ensemble.
+
+    :param temperature:
+        The temperature of the heat bath (in Kelvin).
+    :type temperature: unit.Quantity
+    :param frictionCoeff:
+        The friction coefficient which couples the system to the heat bath (in inverse picoseconds).
+    :type frictionCoeff: unit.Quantity
+    :param stepSize:
+        The step size with which to integrate the system (in picoseconds).
+    :type stepSize: unit.Quantity
+
+    :return:
+        The Langevin middle integrator.
+    :rtype: openmm.Integrator
+    """
+    # Checks of units and values are done within OpenMM.
+    return openmm.LangevinMiddleIntegrator(temperature, frictionCoeff, stepSize)
+
+
+# noinspection PyPep8Naming
+def NoseHooverIntegrator(temperature: unit.Quantity, collisionFrequency: unit.Quantity, stepSize: unit.Quantity,
+                         chainLength: int = 3, numMTS: int = 3, numYoshidaSuzuki: int = 7) -> openmm.Integrator:
+    """
+    Function to return the OpenMM Nose-Hoover integrator that defines the keyword arguments (in contrast to OpenMM).
+
+    The following is the OpenMM documentation for the Nose-Hoover integrator (see
+    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.NoseHooverIntegrator.html).
+
+    This is an Integrator which simulates a System using one or more Nose Hoover chain thermostats, using the "middle"
+    leapfrog propagation algorithm described in J. Phys. Chem. A 2019, 123, 6056-6079.
+
+    :param temperature:
+        The target temperature for the system (in Kelvin).
+    :type temperature: unit.Quantity
+    :param collisionFrequency:
+        The frequency of the interaction with the heat bath (in inverse picoseconds).
+    :type collisionFrequency: unit.Quantity
+    :param stepSize:
+        The step size with which to integrate the system (in picoseconds).
+    :type stepSize: unit.Quantity
+    :param chainLength:
+        The number of beads in the Nose-Hoover chain.
         Defaults to 3.
     :type chainLength: int
-
-    :param numMTS: 
-        The number of steps in the multiple-timestep chain propagation algorithm (for the Nose Hoover integrator).
+    :param numMTS:
+        The number of step in the multiple time step chain propagation algorithm.
         Defaults to 3.
     :type numMTS: int
-
-    :param numYoshidaSuzuki: 
-        The number of terms in the Yoshida-Suzuki multi-timestep decomposition used in the chain propagation algorithm.
-        The value of numYoshidaSuzuki must be 1, 3, 5, or 7. 
-        Defaults to 7. 
+    :param numYoshidaSuzuki:
+        The number of terms in the Yoshida-Suzuki multi time step decomposition used in the chain propagation algorithm
+        (must be 1, 3, 5, or 7).
+        Defaults to 7.
     :type numYoshidaSuzuki: int
 
-    :param errorTol:
-        The error tolerance for integrators that use variable timestep.
-        The value of errorTol must be greater than 0.
-        Defaults to 0.001.
-    :type errorTol: float
-
+    :return:
+        The Nose-Hoover integrator.
+    :rtype: openmm.Integrator
     """
+    # Checks of units and values are done within OpenMM.
+    return openmm.NoseHooverIntegrator(temperature, collisionFrequency, stepSize, chainLength, numMTS,
+                                       numYoshidaSuzuki)
 
-    def BrownianIntegrator(temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin), 
-                            frictionCoeff: unit.Quantity = field(default_factory=lambda: 0.01 / unit.picosecond), 
-                            stepSize:unit.Quantity = field(default_factory=lambda: 0.05 * unit.picosecond)):
-        """
-        Returns the OpenMM Brownian integrator. This integrator uses Brownian dynamics to simulate a system 
-        at constant temperature in contact with a heat bath.
-        """
-        return openmm.BrownianIntegrator(temperature, frictionCoeff, stepSize)
 
-    def LangevinIntegrator(temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin), 
-                            frictionCoeff: unit.Quantity = field(default_factory=lambda: 0.01 / unit.picosecond), 
-                            stepSize:unit.Quantity = field(default_factory=lambda: 0.05 * unit.picosecond)):
-        """
-        Returns the OpenMM Langevin integrator. This integrator uses Langevin dynamics to simulate a system 
-        at constant temperature in contact with a heat bath.
-        """
-        return openmm.LangevinIntegrator(temperature, frictionCoeff, stepSize)
+# noinspection PyPep8Naming
+def VariableLangevinIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity, errorTol: float,
+                               maximumStepSize: Optional[unit.Quantity] = None) -> openmm.Integrator:
+    """
+    Function to return the OpenMM variable Langevin integrator that defines the keyword arguments (in contrast to
+    OpenMM).
 
-    def LangevinMiddleIntegrator(temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin), 
-                                frictionCoeff: unit.Quantity = field(default_factory=lambda: 0.01 / unit.picosecond), 
-                                stepSize:unit.Quantity = field(default_factory=lambda: 0.05 * unit.picosecond)):
-        """
-        Returns the OpenMM Langevin middle integrator. This integrator uses Langevin dynamics, like the Langevin 
-        integrator, but with LFMiddle discretization (half-step velocities) to more accurately sample the configuration 
-        space at the expense of less accuracy for kinetic properties.
-        """
-        return openmm.LangevinMiddleIntegrator(temperature, frictionCoeff, stepSize)
+    The following is the OpenMM documentation for the variable Langevin integrator (see
+    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.VariableLangevinIntegrator.html).
 
-    def NoseHooverIntegrator(temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin), 
-                            collisionFrequency: unit.Quantity = field(default_factory=lambda: 0.01 / unit.picosecond),
-                            stepSize: unit.Quantity = field(default_factory=lambda: 0.05 * unit.picosecond),
-                            chainLength: int = 3,
-                            numMTS: int = 3,
-                            numYoshidaSuzuki: int = 7):
-        """
-        Returns the OpenMM Nose Hoover integrator. This integrator simulates a system at constant temperature in contact 
-        with a heat bath using a chain of one or more Nose Hoover thermostats.
-        """
-        return openmm.NoseHooverIntegrator(temperature, collisionFrequency, stepSize, chainLength, numMTS, numYoshidaSuzuki)
+    This is an error controlled, variable time step Integrator that simulates a System using Langevin dynamics. It
+    compares the result of the Langevin integrator to that of an explicit Euler integrator, takes the difference between
+    the two as a measure of the integration error in each time step, and continuously adjusts the step size to keep the
+    error below a specified tolerance. This both improves the stability of the integrator and allows it to take larger
+    steps on average, while still maintaining comparable accuracy to a fixed step size integrator.
 
-    def VariableLangevinIntegrator(temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin), 
-                                frictionCoeff: unit.Quantity = field(default_factory=lambda: 0.01 / unit.picosecond), 
-                                errorTol: float = 0.001):
-        """
-        Returns the OpenMM variable Langevin integrator. This integrator uses the Langevin integration method, but 
-        instead of a fixed timestep, the timestep is continuously adjusted such that the error in the integration remains
-        below a specified error tolerance.
-        """
-        return openmm.VariableLangevinIntegrator(temperature, frictionCoeff, errorTol)
-    
-    def VariableVerletIntegrator(errorTol: float = 0.001):
-        """
-        Returns the OpenMM variable Verlet integrator. This integrator uses the Verlet integration method, but 
-        instead of a fixed timestep, the timestep is continuously adjusted such that the error in the integration remains
-        below a specified error tolerance.
-        """
-        return openmm.VariableVerletIntegrator(errorTol)
+    It is best not to think of the error tolerance as having any absolute meaning. It is just an adjustable parameter
+    that affects the step size and integration accuracy. You should try different values to find the largest one that
+    produces a trajectory sufficiently accurate for your purposes. 0.001 is often a good starting point.
 
-    def VerletIntegrator(stepSize:unit.Quantity = field(default_factory=lambda: 0.05 * unit.picosecond)):
-        """
-        Returns the OpenMM Verlet integrator. This integrator implements the leap-frog Verlet integration method.
-        """
-        return openmm.VerletIntegrator(stepSize)
-        
+    You can optionally set a maximum step size it will ever use. This is useful to prevent it from taking excessively
+    large steps in usual situations, such as when the system is right at a local energy minimum.
+
+    :param temperature:
+        The temperature of the heat bath (in Kelvin).
+    :type temperature: unit.Quantity
+    :param frictionCoeff:
+        The friction coefficient which couples the system to the heat bath (in inverse picoseconds).
+    :type frictionCoeff: unit.Quantity
+    :param errorTol:
+        The error tolerance.
+    :type errorTol: float
+    :param maximumStepSize:
+        The maximum step size the integrator will ever use, in ps.
+        If None, the integrator will not have a maximum step size.
+        Defaults to None.
+    :type maximumStepSize: Optional[unit.Quantity]
+
+    :return:
+        The variable Langevin integrator.
+    :rtype: openmm.Integrator
+    """
+    # Checks of units and values are done within OpenMM.
+    integrator = openmm.VariableLangevinIntegrator(temperature, frictionCoeff, errorTol)
+    if maximumStepSize is not None:
+        integrator.setMaximumStepSize(maximumStepSize)
+    return integrator
+
+
+# noinspection PyPep8Naming
+def VariableVerletIntegrator(errorTol: float, maximumStepSize: Optional[unit.Quantity] = None) -> openmm.Integrator:
+    """
+    Function to return the OpenMM variable Verlet integrator that defines the keyword arguments (in contrast to OpenMM).
+
+    The following is the OpenMM documentation for the variable Verlet integrator (see
+    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.VariableVerletIntegrator.html).
+
+    This is an error controlled, variable time step Integrator that simulates a System using the leap-frog Verlet
+    algorithm. It compares the result of the Verlet integrator to that of an explicit Euler integrator, takes the
+    difference between the two as a measure of the integration error in each time step, and continuously adjusts the
+    step size to keep the error below a specified tolerance. This both improves the stability of the integrator and
+    allows it to take larger steps on average, while still maintaining comparable accuracy to a fixed step size
+    integrator.
+
+    It is best not to think of the error tolerance as having any absolute meaning. It is just an adjustable parameter
+    that affects the step size and integration accuracy. You should try different values to find the largest one that
+    produces a trajectory sufficiently accurate for your purposes. 0.001 is often a good starting point.
+
+    Unlike a fixed step size Verlet integrator, variable step size Verlet is not symplectic. This means that at a given
+    accuracy level, energy is not as precisely conserved over long time periods. This makes it most appropriate for
+    constant temperate simulations. In constant energy simulations where precise energy conservation over long time
+    periods is important, a fixed step size Verlet integrator may be more appropriate.
+
+    You can optionally set a maximum step size it will ever use. This is useful to prevent it from taking excessively
+    large steps in usual situations, such as when the system is right at a local energy minimum.
+
+    :param errorTol:
+        The error tolerance.
+    :type errorTol: float
+    :param maximumStepSize:
+        The maximum step size the integrator will ever use, in ps.
+        If None, the integrator will not have a maximum step size.
+        Defaults to None.
+    :type maximumStepSize: Optional[unit.Quantity]
+
+    :return:
+        The variable Verlet integrator.
+    :rtype: openmm.Integrator
+    """
+    # Checks of units and values are done within OpenMM.
+    integrator = openmm.VariableVerletIntegrator(errorTol)
+    if maximumStepSize is not None:
+        integrator.setMaximumStepSize(maximumStepSize)
+    return integrator
+
+
+# noinspection PyPep8Naming
+def VerletIntegrator(stepSize: unit.Quantity) -> openmm.Integrator:
+    """
+    Function to return the OpenMM Verlet integrator that defines the keyword arguments (in contrast to OpenMM).
+
+    The following is the OpenMM documentation for the Verlet integrator (see
+    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.VerletIntegrator.html).
+
+    This is an Integrator which simulates a System using the leap-frog Verlet algorithm.
+
+    :param stepSize:
+        The step size with which to integrate the system (in picoseconds).
+    :type stepSize: unit.Quantity
+
+    :return:
+        The Verlet integrator.
+    :rtype: openmm.Integrator
+    """
+    # Checks of units and values are done within OpenMM.
+    return openmm.VerletIntegrator(stepSize)

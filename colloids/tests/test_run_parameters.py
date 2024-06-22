@@ -51,7 +51,7 @@ class TestRunParameters(object):
     def test_run_parameters(self, parameters, yaml_parameters):
         # Because we cannot compare openmm quantities directly (see above), we have to compare all fields explicitly.
         # When new fields are added to the RunParameters dataclass, this test must be updated accordingly.
-        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 30
+        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 35
         assert parameters.initial_configuration == yaml_parameters.initial_configuration
         assert len(parameters.masses) == len(yaml_parameters.masses)
         assert len(parameters.radii) == len(yaml_parameters.radii)
@@ -72,7 +72,45 @@ class TestRunParameters(object):
                     == pytest.approx(
                         yaml_parameters.surface_potentials[t].value_in_unit(parameters.surface_potentials[t].unit),
                         rel=1e-12, abs=1e-12))
-
+        assert ((parameters.snowman_masses is None and yaml_parameters.snowman_masses is None) or
+                len(parameters.snowman_masses) == len(yaml_parameters.snowman_masses))
+        assert ((parameters.snowman_radii is None and yaml_parameters.snowman_radii is None) or
+                len(parameters.snowman_radii) == len(yaml_parameters.snowman_radii))
+        assert ((parameters.snowman_surface_potentials is None and yaml_parameters.snowman_surface_potentials is None)
+                   or len(parameters.snowman_surface_potentials) == len(yaml_parameters.snowman_surface_potentials))
+        assert ((parameters.snowman_distances is None and yaml_parameters.snowman_distances is None) or
+                len(parameters.snowman_distances) == len(yaml_parameters.snowman_distances))
+        if parameters.snowman_masses is not None:
+            for t in parameters.snowman_masses:
+                assert t in yaml_parameters.snowman_masses
+                assert ((parameters.snowman_masses[t] is None and yaml_parameters.snowman_masses[t] is None) or
+                        parameters.snowman_masses[t].value_in_unit(parameters.snowman_masses[t].unit)
+                        == pytest.approx(yaml_parameters.snowman_masses[t].value_in_unit(
+                            parameters.snowman_masses[t].unit), rel=1e-12, abs=1e-12))
+        if parameters.snowman_radii is not None:
+            for t in parameters.snowman_radii:
+                assert t in yaml_parameters.snowman_radii
+                assert ((parameters.snowman_radii[t] is None and yaml_parameters.snowman_radii[t] is None) or
+                        parameters.snowman_radii[t].value_in_unit(parameters.snowman_radii[t].unit)
+                        == pytest.approx(yaml_parameters.snowman_radii[t].value_in_unit(parameters.snowman_radii[t].unit),
+                                         rel=1e-12, abs=1e-12))
+        if parameters.snowman_surface_potentials is not None:
+            for t in parameters.snowman_surface_potentials:
+                assert t in yaml_parameters.snowman_surface_potentials
+                assert ((parameters.snowman_surface_potentials[t] is None
+                         and yaml_parameters.snowman_surface_potentials[t] is None) or
+                        parameters.snowman_surface_potentials[t].value_in_unit(
+                    parameters.snowman_surface_potentials[t].unit) == pytest.approx(
+                            yaml_parameters.snowman_surface_potentials[t].value_in_unit(
+                                parameters.snowman_surface_potentials[t].unit), rel=1e-12, abs=1e-12))
+        if parameters.snowman_distances is not None:
+            for t in parameters.snowman_distances:
+                assert t in yaml_parameters.snowman_distances
+                assert ((parameters.snowman_distances[t] is None and yaml_parameters.snowman_distances[t] is None) or
+                        parameters.snowman_distances[t].value_in_unit(parameters.snowman_distances[t].unit)
+                        == pytest.approx(yaml_parameters.snowman_distances[t].value_in_unit(
+                            parameters.snowman_distances[t].unit), rel=1e-12, abs=1e-12))
+        assert parameters.snowman_seed == yaml_parameters.snowman_seed
         assert parameters.platform_name == yaml_parameters.platform_name
         assert (parameters.temperature.value_in_unit(parameters.temperature.unit)
                 == pytest.approx(yaml_parameters.temperature.value_in_unit(parameters.temperature.unit), rel=1e-12,

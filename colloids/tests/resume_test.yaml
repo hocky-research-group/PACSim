@@ -37,6 +37,19 @@ radii:
     unit: nanometer
     value: 105.0
 run_steps: 50
+snowman_distances:
+  NN: null
+  PP: null
+snowman_masses:
+  NN: null
+  PP: null
+snowman_radii:
+  NN: null
+  PP: null
+snowman_seed: null
+snowman_surface_potentials:
+  NN: null
+  PP: null
 state_data_filename: test_run_and_resume/state_data_resume.csv
 state_data_interval: 10
 surface_potentials:

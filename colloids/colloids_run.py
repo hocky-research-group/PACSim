@@ -170,9 +170,15 @@ def set_up_simulation(parameters: RunParameters, types: Iterable[str],
 
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
                      total_number_steps: int, cell: npt.NDArray[float]) -> None:
-    assert all(r not in parameters.snowman_radii for r in parameters.radii)
+    snowman_radii = parameters.snowman_radii if parameters.snowman_radii is not None else {}
+    snowman_surface_potentials = (parameters.snowman_surface_potentials
+                                  if parameters.snowman_surface_potentials is not None else {})
+    assert all(r not in snowman_radii for r in parameters.radii)
+    assert all(r not in snowman_surface_potentials for r in parameters.surface_potentials)
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
-                                            parameters.radii | parameters.snowman_radii, parameters.surface_potentials,
+                                            parameters.radii | {k: v for k, v in snowman_radii.items() if v is not None},
+                                            parameters.surface_potentials |
+                                            {k: v for k, v in snowman_surface_potentials.items() if v is not None},
                                             simulation, append_file=append_file, cell=cell * (unit.nano * unit.meter)))
     simulation.reporters.append(StatusReporter(max(1, total_number_steps // 100), total_number_steps))
     simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
@@ -199,7 +205,8 @@ def main():
 
     simulation, extra_positions = set_up_simulation(parameters, types, cell)
 
-    simulation.context.setPositions(np.concatenate(positions, extra_positions))
+    simulation.context.setPositions(np.concatenate(positions, extra_positions) if len(extra_positions) > 0
+                                    else positions)
     if parameters.velocity_seed is not None:
         simulation.context.setVelocitiesToTemperature(parameters.temperature,
                                                       parameters.velocity_seed)

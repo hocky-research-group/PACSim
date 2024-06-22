@@ -157,6 +157,20 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         self._electrostatic_potential.addParticle([radius.value_in_unit(self._nanometer),
                                                    surface_potential.value_in_unit(self._millivolt)])
 
+    def add_exclusion(self, particle_one: int, particle_two: int) -> None:
+        """
+        Exclude a particle pair from the interactions handled by this class.
+
+        :param particle_one:
+            The index of the first particle.
+        :type particle_one: int
+        :param particle_two:
+            The index of the second particle.
+        :type particle_two: int
+        """
+        self._steric_potential.addExclusion(particle_one, particle_two)
+        self._electrostatic_potential.addExclusion(particle_one, particle_two)
+
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """
         Generate all potentials in the systems that are necessary to properly include the steric and electrostatic pair

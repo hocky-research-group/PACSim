@@ -9,10 +9,12 @@ from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
 class OpenMMPotentialAbstract(ABC):
     """
-    Abstract class for a potential implemented with the CustomNonbondedForces class of openmm.
+    Abstract wrapper class for a potential of OpenMM.
 
-    The inheriting classes must implement the add_particle and yield_potentials methods so that they can be conveniently
-    added to an openmm system.
+    This class is a convenience wrapper for interactions that are handled by several OpenMM potentials
+
+    The inheriting classes must implement the add_particle, add_exclusion, and yield_potentials methods so that they can
+    be conveniently added to an openmm system.
 
     The add_particle method should be called for every particle in the system before the method yield_potentials is
     used in order to add the potential to the openmm system.
@@ -26,7 +28,7 @@ class OpenMMPotentialAbstract(ABC):
     @abstractmethod
     def add_particle(self, *args: Any, **kwargs: Any) -> None:
         """
-        Add a particle with the given parameters to the system.
+        Add a particle with the given parameters to the handled OpenMM potentials.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -47,6 +49,20 @@ class OpenMMPotentialAbstract(ABC):
             raise RuntimeError("method add_particle must be called for every particle in the system before the method "
                                "yield_potentials is used")
         self._add_particle_called = True
+
+    @abstractmethod
+    def add_exclusion(self, particle_one: int, particle_two: int) -> None:
+        """
+        Exclude a particle pair from the interactions handled by this class.
+
+        :param particle_one:
+            The index of the first particle.
+        :type particle_one: int
+        :param particle_two:
+            The index of the second particle.
+        :type particle_two: int
+        """
+        raise NotImplementedError
 
     # noinspection PyTypeChecker
     @abstractmethod

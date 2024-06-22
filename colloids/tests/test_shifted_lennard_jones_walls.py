@@ -130,6 +130,16 @@ class TestShiftedLennardJonesWallsExceptions(TestShiftedLennardJonesWallsParamet
         with pytest.raises(RuntimeError):
             slj_potential_some.add_particle(index=1, radius=radius)
 
+    def test_exception_add_exclusion(self, radius, slj_potential_all, slj_potential_some):
+        slj_potential_all.add_particle(index=0, radius=radius)
+        slj_potential_all.add_particle(index=0, radius=radius)
+        with pytest.raises(RuntimeError):
+            slj_potential_all.add_exclusion(0, 1)
+        slj_potential_some.add_particle(index=0, radius=radius)
+        slj_potential_some.add_particle(index=0, radius=radius)
+        with pytest.raises(RuntimeError):
+            slj_potential_some.add_exclusion(0, 1)
+
     def test_exception_alpha(self):
         # Test exception on negative alpha
         with pytest.raises(ValueError):

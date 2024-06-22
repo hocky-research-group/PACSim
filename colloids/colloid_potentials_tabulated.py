@@ -292,6 +292,21 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         self._potential_12.addParticle([])
         self._current_particle_index += 1
 
+    def add_exclusion(self, particle_one: int, particle_two: int) -> None:
+        """
+        Exclude a particle pair from the interactions handled by this class.
+
+        :param particle_one:
+            The index of the first particle.
+        :type particle_one: int
+        :param particle_two:
+            The index of the second particle.
+        :type particle_two: int
+        """
+        self._potential_11.addExclusion(particle_one, particle_two)
+        self._potential_22.addExclusion(particle_one, particle_two)
+        self._potential_12.addExclusion(particle_one, particle_two)
+
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """
         Generate all potentials in the systems that are necessary to properly include the steric and electrostatic pair

@@ -164,7 +164,7 @@ def set_up_simulation(parameters: RunParameters, types: Iterable[str],
         for force in slj_walls.yield_potentials():
             system.addForce(force)
 
-    if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":
+    if parameters.platform_name == "CUDA":
         simulation = app.Simulation(topology, system, integrator, platform,
                                     platformProperties={"Precision": "mixed"})
     else:

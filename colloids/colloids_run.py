@@ -176,7 +176,8 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
     assert all(r not in snowman_radii for r in parameters.radii)
     assert all(r not in snowman_surface_potentials for r in parameters.surface_potentials)
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
-                                            parameters.radii | {k: v for k, v in snowman_radii.items() if v is not None},
+                                            parameters.radii |
+                                            {k: v for k, v in snowman_radii.items() if v is not None},
                                             parameters.surface_potentials |
                                             {k: v for k, v in snowman_surface_potentials.items() if v is not None},
                                             simulation, append_file=append_file, cell=cell * (unit.nano * unit.meter)))
@@ -205,7 +206,7 @@ def main():
 
     simulation, extra_positions = set_up_simulation(parameters, types, cell)
 
-    simulation.context.setPositions(np.concatenate(positions, extra_positions) if len(extra_positions) > 0
+    simulation.context.setPositions(np.concatenate((positions, extra_positions)) if len(extra_positions) > 0
                                     else positions)
     if parameters.velocity_seed is not None:
         simulation.context.setVelocitiesToTemperature(parameters.temperature,

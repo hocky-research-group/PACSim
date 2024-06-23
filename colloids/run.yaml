@@ -21,11 +21,11 @@ integrator_parameters:
   frictionCoeff: !Quantity
     unit: /picosecond
     value: 0.001574074286750681
+  randomNumberSeed: null
   stepSize: !Quantity
     unit: picosecond
     value: 0.00317647015905543
   temperature: potential_temperature
-integrator_seed: null
 masses:
   N: !Quantity
     unit: dalton

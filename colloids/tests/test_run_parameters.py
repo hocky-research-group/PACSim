@@ -51,7 +51,7 @@ class TestRunParameters(object):
     def test_run_parameters(self, parameters, yaml_parameters):
         # Because we cannot compare openmm quantities directly (see above), we have to compare all fields explicitly.
         # When new fields are added to the RunParameters dataclass, this test must be updated accordingly.
-        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 30
+        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 29
         assert parameters.initial_configuration == yaml_parameters.initial_configuration
         assert len(parameters.masses) == len(yaml_parameters.masses)
         assert len(parameters.radii) == len(yaml_parameters.radii)
@@ -75,8 +75,9 @@ class TestRunParameters(object):
 
         assert parameters.platform_name == yaml_parameters.platform_name
         assert (parameters.potential_temperature.value_in_unit(parameters.potential_temperature.unit)
-                == pytest.approx(yaml_parameters.potential_temperature.value_in_unit(parameters.potential_temperature.unit), rel=1e-12,
-                                 abs=1e-12))
+                == pytest.approx(
+                    yaml_parameters.potential_temperature.value_in_unit(parameters.potential_temperature.unit),
+                    rel=1e-12, abs=1e-12))
         assert (parameters.brush_density.value_in_unit(parameters.brush_density.unit)
                 == pytest.approx(yaml_parameters.brush_density.value_in_unit(parameters.brush_density.unit), rel=1e-12,
                                  abs=1e-12))
@@ -91,7 +92,6 @@ class TestRunParameters(object):
         assert parameters.use_tabulated == yaml_parameters.use_tabulated
         assert parameters.integrator == yaml_parameters.integrator
         assert parameters.integrator_parameters == yaml_parameters.integrator_parameters
-        assert parameters.integrator_seed == yaml_parameters.integrator_seed
         assert parameters.velocity_seed == yaml_parameters.velocity_seed
         assert parameters.run_steps == yaml_parameters.run_steps
         assert parameters.state_data_interval == yaml_parameters.state_data_interval

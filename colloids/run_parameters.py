@@ -66,7 +66,7 @@ class RunParameters(Parameters):
         http://docs.openmm.org/latest/api-python/library.html#integrators for the possible arguments (or, alternatively,
         the colloids.integrators module).
         Defaults to sensible values for the LangevinIntegrator (temperature of 298 K, frictionCoeff of
-        0.001574074286750681 / ps, and stepSize of 0.00317647015905543 ps).
+        0.001574074286750681 / ps, stepSize of 0.00317647015905543 ps, and no specified random number seed).
     :type integrator_parameters: dict[str, Any]
     :param brush_density:
         The polymer surface density in the Alexander-de Gennes polymer brush model [i.e., sigma in eq. (1)].
@@ -100,11 +100,6 @@ class RunParameters(Parameters):
         If False, the steric and electrostatic forces are computed based on algebraic expressions.
         Defaults to False.
     :type use_tabulated: bool
-    :param integrator_seed:
-        The seed for the random number generator of the integrator.
-        If None, a random seed is used.
-        Defaults to None.
-    :type integrator_seed: Optional[int]
     :param velocity_seed:
         The seed for the random number generator that is used to sample the initial velocities.
         If None, a random seed is used.
@@ -201,7 +196,8 @@ class RunParameters(Parameters):
         default_factory=lambda: {
             "temperature": 298.0 * unit.kelvin,
             "stepSize": 0.00317647015905543 * (unit.pico * unit.second),
-            "frictionCoeff": 0.001574074286750681 / (unit.pico * unit.second)
+            "frictionCoeff": 0.001574074286750681 / (unit.pico * unit.second),
+            "randomNumberSeed": None
         })
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
@@ -210,7 +206,6 @@ class RunParameters(Parameters):
     cutoff_factor: float = 21.0
     use_log: bool = False
     use_tabulated: bool = False
-    integrator_seed: Optional[int] = None
     velocity_seed: Optional[int] = None
     run_steps: int = 100
     state_data_interval: int = 100

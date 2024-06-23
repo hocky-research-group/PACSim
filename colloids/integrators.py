@@ -1,11 +1,12 @@
 from typing import Optional
+import warnings
 import openmm
 from openmm import unit
 
 
 # noinspection PyPep8Naming
-def BrownianIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity,
-                       stepSize: unit.Quantity) -> openmm.Integrator:
+def BrownianIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity, stepSize: unit.Quantity,
+                       randomNumberSeed: Optional[int] = None) -> openmm.Integrator:
     """
     Function to return the OpenMM Brownian integrator that defines the keyword arguments (in contrast to OpenMM).
 
@@ -23,18 +24,35 @@ def BrownianIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity,
     :param stepSize:
         The step size with which to integrate the system (in picoseconds).
     :type stepSize: unit.Quantity
+    :param randomNumberSeed:
+        Set the random number seed. The precise meaning of this parameter is undefined, and is left up to each Platform
+        to interpret in an appropriate way. It is guaranteed that if two simulations are run with different random
+        number seeds, the sequence of random forces will be different. On the other hand, no guarantees are made about
+        the behavior of simulations that use the same seed. In particular, Platforms are permitted to use
+        non-deterministic algorithms which produce different results on successive runs, even if those runs were
+        initialized identically.
+        If seed is set to 0 or None, a unique seed is chosen when a Context is created from this Integrator. This is
+        done to ensure that each Context receives unique random seeds without you needing to set them explicitly.
+        Defaults to None.
+    :type randomNumberSeed: Optional[int]
 
     :return:
         The Brownian integrator.
     :rtype: openmm.Integrator
     """
     # Checks of units and values are done within OpenMM.
-    return openmm.BrownianIntegrator(temperature, frictionCoeff, stepSize)
+    integrator = openmm.BrownianIntegrator(temperature, frictionCoeff, stepSize)
+    if randomNumberSeed is not None:
+        if randomNumberSeed == 0:
+            warnings.warn(f"The random number seed for the Brownian integrator is set to 0 which, possibly unexpected, "
+                          f"results in a unique seed being chosen when a Context is created from this integrator.")
+        integrator.setRandomNumberSeed(randomNumberSeed)
+    return integrator
 
 
 # noinspection PyPep8Naming
-def LangevinIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity,
-                       stepSize: unit.Quantity) -> openmm.Integrator:
+def LangevinIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity, stepSize: unit.Quantity,
+                       randomNumberSeed: Optional[int] = None) -> openmm.Integrator:
     """
     Function to return the OpenMM Langevin integrator that defines the keyword arguments (in contrast to OpenMM).
 
@@ -52,18 +70,35 @@ def LangevinIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity,
     :param stepSize:
         The step size with which to integrate the system (in picoseconds).
     :type stepSize: unit.Quantity
+    :param randomNumberSeed:
+        Set the random number seed. The precise meaning of this parameter is undefined, and is left up to each Platform
+        to interpret in an appropriate way. It is guaranteed that if two simulations are run with different random
+        number seeds, the sequence of random forces will be different. On the other hand, no guarantees are made about
+        the behavior of simulations that use the same seed. In particular, Platforms are permitted to use
+        non-deterministic algorithms which produce different results on successive runs, even if those runs were
+        initialized identically.
+        If seed is set to 0 or None, a unique seed is chosen when a Context is created from this Integrator. This is
+        done to ensure that each Context receives unique random seeds without you needing to set them explicitly.
+        Defaults to None.
+    :type randomNumberSeed: Optional[int]
 
     :return:
         The Langevin integrator.
     :rtype: openmm.Integrator
     """
     # Checks of units and values are done within OpenMM.
-    return openmm.LangevinIntegrator(temperature, frictionCoeff, stepSize)
+    integrator = openmm.LangevinIntegrator(temperature, frictionCoeff, stepSize)
+    if randomNumberSeed is not None:
+        if randomNumberSeed == 0:
+            warnings.warn(f"The random number seed for the Langevin integrator is set to 0 which, possibly unexpected, "
+                          f"results in a unique seed being chosen when a Context is created from this integrator.")
+        integrator.setRandomNumberSeed(randomNumberSeed)
+    return integrator
 
 
 # noinspection PyPep8Naming
-def LangevinMiddleIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity,
-                             stepSize: unit.Quantity) -> openmm.Integrator:
+def LangevinMiddleIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity, stepSize: unit.Quantity,
+                             randomNumberSeed: Optional[int] = None) -> openmm.Integrator:
     """
     Function to return the OpenMM Langevin middle integrator that defines the keyword arguments (in contrast to OpenMM).
 
@@ -87,13 +122,31 @@ def LangevinMiddleIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Qua
     :param stepSize:
         The step size with which to integrate the system (in picoseconds).
     :type stepSize: unit.Quantity
+    :param randomNumberSeed:
+        Set the random number seed. The precise meaning of this parameter is undefined, and is left up to each Platform
+        to interpret in an appropriate way. It is guaranteed that if two simulations are run with different random
+        number seeds, the sequence of random forces will be different. On the other hand, no guarantees are made about
+        the behavior of simulations that use the same seed. In particular, Platforms are permitted to use
+        non-deterministic algorithms which produce different results on successive runs, even if those runs were
+        initialized identically.
+        If seed is set to 0 or None, a unique seed is chosen when a Context is created from this Integrator. This is
+        done to ensure that each Context receives unique random seeds without you needing to set them explicitly.
+        Defaults to None.
+    :type randomNumberSeed: Optional[int]
 
     :return:
         The Langevin middle integrator.
     :rtype: openmm.Integrator
     """
     # Checks of units and values are done within OpenMM.
-    return openmm.LangevinMiddleIntegrator(temperature, frictionCoeff, stepSize)
+    integrator = openmm.LangevinMiddleIntegrator(temperature, frictionCoeff, stepSize)
+    if randomNumberSeed is not None:
+        if randomNumberSeed == 0:
+            warnings.warn(f"The random number seed for the Langevin middle integrator is set to 0 which, possibly "
+                          f"unexpected, results in a unique seed being chosen when a Context is created from this "
+                          f"integrator.")
+        integrator.setRandomNumberSeed(randomNumberSeed)
+    return integrator
 
 
 # noinspection PyPep8Naming
@@ -142,7 +195,8 @@ def NoseHooverIntegrator(temperature: unit.Quantity, collisionFrequency: unit.Qu
 
 # noinspection PyPep8Naming
 def VariableLangevinIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity, errorTol: float,
-                               maximumStepSize: Optional[unit.Quantity] = None) -> openmm.Integrator:
+                               maximumStepSize: Optional[unit.Quantity] = None,
+                               randomNumberSeed: Optional[int] = None) -> openmm.Integrator:
     """
     Function to return the OpenMM variable Langevin integrator that defines the keyword arguments (in contrast to
     OpenMM).
@@ -177,6 +231,17 @@ def VariableLangevinIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Q
         If None, the integrator will not have a maximum step size.
         Defaults to None.
     :type maximumStepSize: Optional[unit.Quantity]
+    :param randomNumberSeed:
+        Set the random number seed. The precise meaning of this parameter is undefined, and is left up to each Platform
+        to interpret in an appropriate way. It is guaranteed that if two simulations are run with different random
+        number seeds, the sequence of random forces will be different. On the other hand, no guarantees are made about
+        the behavior of simulations that use the same seed. In particular, Platforms are permitted to use
+        non-deterministic algorithms which produce different results on successive runs, even if those runs were
+        initialized identically.
+        If seed is set to 0 or None, a unique seed is chosen when a Context is created from this Integrator. This is
+        done to ensure that each Context receives unique random seeds without you needing to set them explicitly.
+        Defaults to None.
+    :type randomNumberSeed: Optional[int]
 
     :return:
         The variable Langevin integrator.
@@ -186,6 +251,12 @@ def VariableLangevinIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Q
     integrator = openmm.VariableLangevinIntegrator(temperature, frictionCoeff, errorTol)
     if maximumStepSize is not None:
         integrator.setMaximumStepSize(maximumStepSize)
+    if randomNumberSeed is not None:
+        if randomNumberSeed == 0:
+            warnings.warn(f"The random number seed for the variable Langevin integrator is set to 0 which, possibly "
+                          f"unexpected, results in a unique seed being chosen when a Context is created from this "
+                          f"integrator.")
+        integrator.setRandomNumberSeed(randomNumberSeed)
     return integrator
 
 

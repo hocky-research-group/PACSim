@@ -18,13 +18,13 @@ final_configuration_xyz_filename: final_frame.xyz
 initial_configuration: tests/first_frame.xyz
 integrator: LangevinIntegrator
 integrator_parameters:
-  temperature: potential_temperature
   frictionCoeff: !Quantity
     unit: /picosecond
-    value: 0.01
+    value: 0.001574074286750681
   stepSize: !Quantity
     unit: picosecond
-    value: 0.05
+    value: 0.00317647015905543
+  temperature: potential_temperature
 integrator_seed: null
 masses:
   N: !Quantity

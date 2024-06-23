@@ -7,8 +7,8 @@ from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, C
                       ShiftedLennardJonesWalls)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
+import colloids.integrators as integrators
 from colloids.run_parameters import RunParameters
-from colloids.integrators import Integrators
 from colloids.status_reporter import StatusReporter
 
 
@@ -75,16 +75,11 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     # Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
-
-    integrator_constructor = getattr(Integrators, parameters.integrator) 
-    integrator = integrator_constructor(**parameters.integrator_parameters)
-    
-    if parameters.integrator_seed is not None:
-        integrator.setRandomNumberSeed(parameters.integrator_seed)
+    integrator = getattr(integrators, parameters.integrator)(**parameters.integrator_parameters)
 
     potentials_parameters = ColloidPotentialsParameters(
         brush_density=parameters.brush_density, brush_length=parameters.brush_length,
-        debye_length=parameters.debye_length, temperature=parameters.temperature,
+        debye_length=parameters.debye_length, temperature=parameters.potential_temperature,
         dielectric_constant=parameters.dielectric_constant
     )
 
@@ -168,10 +163,10 @@ def main():
 
     simulation.context.setPositions(positions)
     if parameters.velocity_seed is not None:
-        simulation.context.setVelocitiesToTemperature(parameters.temperature,
+        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
                                                       parameters.velocity_seed)
     else:
-        simulation.context.setVelocitiesToTemperature(parameters.temperature)
+        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature)
 
     if parameters.minimize_energy_initially:
         # TODO: Do we want this?

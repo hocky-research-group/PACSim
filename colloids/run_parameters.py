@@ -1,11 +1,10 @@
 from dataclasses import dataclass, field
-from typing import Optional
+import inspect
+from typing import Any, Optional
 from openmm import unit
 from colloids.abstracts import Parameters
-from colloids.integrators import Integrators
+import colloids.integrators as integrators
 from colloids.helper_functions import read_xyz_file
-import inspect
-
 
 
 @dataclass(order=True, frozen=True)
@@ -50,21 +49,25 @@ class RunParameters(Parameters):
         Defaults to "Reference". Other possible choices are "CPU", "CUDA", or "OpenCL".
     :type platform_name: str
     :param potential_temperature:
-        The temperature of the system.
+        The temperature that is used for the colloid potentials.
         The unit of the temperature must be compatible with kelvin and the value must be greater than zero.
         Defaults to 298.0 * unit.kelvin.
-        This is also the value of temperture passed into the integrator for molecular dynamics, if the chosen integrator
-        requires  temperature parameter.
     :type potential_temperature: unit.Quantity
     :param integrator: 
-        The integrator to use for the molecular dynamics simultions. 
-        Defaults to "LangevinIntegrator". Other possible choices are "BrownianIntegrator", "LangevinMiddleIntegrator", 
+        The name of the OpenMM integrator to use for the molecular-dynamics simulations.
+        Possible choices are "BrownianIntegrator", "LangevinIntegrator", LangevinMiddleIntegrator",
         "NoseHooverIntegrator", "VariableLangevinIntegrator", "VariableVerletIntegrator", and "VerletIntegrator".
-    :type integrator: function
+        Defaults to "LangevinIntegrator".
+    :type integrator: str
     :param integrator_parameters:
-        The parameters to use with the integrator for molecular dynamics.
-        Each integrator has specific parameters, and the parameters passed in here must be compatible with the chosen integrator.
-    :type integrator_parameters: dict[str, unit.Quantity]
+        The parameters that are forwarded to initialize the OpenMM integrator.
+        Each integrator has specific parameters, and the parameters passed in here must be compatible with the chosen
+        integrator. See the corresponding integrator in the OpenMM documentation
+        http://docs.openmm.org/latest/api-python/library.html#integrators for the possible arguments (or, alternatively,
+        the colloids.integrators module).
+        Defaults to sensible values for the LangevinIntegrator (temperature of 298 K, frictionCoeff of
+        0.001574074286750681 / ps, and stepSize of 0.00317647015905543 ps).
+    :type integrator_parameters: dict[str, Any]
     :param brush_density:
         The polymer surface density in the Alexander-de Gennes polymer brush model [i.e., sigma in eq. (1)].
         The unit of the brush_density must be compatible with 1/nanometer^2 and the value must be greater than zero.
@@ -194,15 +197,12 @@ class RunParameters(Parameters):
     platform_name: str = "Reference"
     potential_temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
     integrator: str = "LangevinIntegrator"
-    integrator_parameters: dict[str, unit.Quantity] = field(
-        default_factory=lambda: {"temperature": 298.0 * unit.kelvin, 
-                                "stepSize": 0.0317647015905543  * (unit.pico * unit.second),
-                                 "frictionCoeff": 0.001574074286750681  / (unit.pico * unit.second)}) 
-    #integrator_parameters = {"temperature": 298.0 * unit.kelvin, 
-    #                            "stepSize": 0.0317647015905543  * (unit.pico * unit.second),
-    #                             "frictionCoeff": 0.001574074286750681  / (unit.pico * unit.second)}
-    #integrator_constructor = getattr(Integrators, "LangevinIntegrator") 
-    #integrator = integrator_constructor(**integrator_parameters)
+    integrator_parameters: dict[str, Any] = field(
+        default_factory=lambda: {
+            "temperature": 298.0 * unit.kelvin,
+            "stepSize": 0.00317647015905543 * (unit.pico * unit.second),
+            "frictionCoeff": 0.001574074286750681 / (unit.pico * unit.second)
+        })
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
     debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
@@ -257,12 +257,17 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
-        integrator_constructor = getattr(Integrators, self.integrator) 
-        integrator = integrator_constructor(**self.integrator_parameters.values())
-        if integrator not in inspect.getmembers(Integrators): #, predicate=inspect.ismethod):
-            raise ValueError("The integrator must be one of the following: 'BrownianIntegrator', 'LangevinIntegrator',"
-                            "LangevinMiddleIntegrator', 'NoseHooverIntegrator', 'VariableLangevinIntegrator', "
-                            "'VariableVerletIntegrator', 'VerletIntegrator'.")
+        possible_integrators = [name for name, _ in inspect.getmembers(integrators, inspect.isfunction)]
+        if self.integrator not in possible_integrators:
+            raise ValueError(f"Integrator {self.integrator} not available, the integrator must be one of the "
+                             f"following: {', '.join(possible_integrators)}.")
+        integrator_getter = getattr(integrators, self.integrator)
+        try:
+            integrator_getter(**self.integrator_parameters)
+        except TypeError:
+            raise TypeError(f"Integrator {self.integrator} does not accept the given arguments "
+                            f"{self.integrator_parameters}. The expected signature is "
+                            f"{inspect.signature(integrator_getter)}")
         if not self.potential_temperature.unit.is_compatible(unit.kelvin):
             raise TypeError("The temperature must have a unit compatible with kelvin.")
         if self.potential_temperature <= 0.0 * unit.kelvin:

@@ -213,6 +213,8 @@ class RunParameters(Parameters):
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
+    phi: Optional[float] = None
+    radius_depletant: Optional[unit.Quantity] = field(default_factory=lambda: 5.0 * (unit.nano * unit.meter))
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""

@@ -235,8 +235,15 @@ def main():
     # TODO: CHECK ALL SURFACE SEPARATIONS
 
     if parameters.final_configuration_gsd_filename is not None:
-        write_gsd_file(parameters.final_configuration_gsd_filename, simulation, parameters.radii,
-                       parameters.surface_potentials)
+        snowman_radii = parameters.snowman_radii if parameters.snowman_radii is not None else {}
+        snowman_surface_potentials = (parameters.snowman_surface_potentials
+                                      if parameters.snowman_surface_potentials is not None else {})
+        assert all(r not in snowman_radii for r in parameters.radii)
+        assert all(r not in snowman_surface_potentials for r in parameters.surface_potentials)
+        write_gsd_file(
+            parameters.final_configuration_gsd_filename, simulation,
+            parameters.radii | {k: v for k, v in snowman_radii.items() if v is not None},
+            parameters.surface_potentials | {k: v for k, v in snowman_surface_potentials.items() if v is not None})
 
     if parameters.final_configuration_xyz_filename is not None:
         write_xyz_file(parameters.final_configuration_xyz_filename, simulation)

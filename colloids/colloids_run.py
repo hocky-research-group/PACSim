@@ -4,7 +4,7 @@ import openmm
 from openmm import app
 from openmm import unit
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
-                      ShiftedLennardJonesWalls)
+                      ShiftedLennardJonesWalls, Gravity)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
 from colloids.run_parameters import RunParameters
@@ -71,6 +71,8 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
 
+    add_gravity = any(parameters.gravitational_constant)
+    
     # Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
@@ -120,6 +122,15 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
             # noinspection PyTypeChecker
             slj_walls.add_particle(index=i, radius=parameters.radii[t])
         for force in slj_walls.yield_potentials():
+            system.addForce(force)
+    
+    if add_gravity:
+        gravitational_potential = Gravity(parameters.gravitational_constant, parameters.water_density)
+        
+        for i, t in enumerate(types):
+            # noinspection PyTypeChecker
+            gravitational_potential.add_particle(index=i, radius=parameters.radii[t], particle_density=parameters.particle_density[t])
+        for force in gravitational_potential.yield_potentials():
             system.addForce(force)
 
     for force in colloid_potentials.yield_potentials():

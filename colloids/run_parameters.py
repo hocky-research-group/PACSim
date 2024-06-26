@@ -173,6 +173,28 @@ class RunParameters(Parameters):
         If any wall direction is True, alpha must be not None and 0 <= alpha <= 1.
         Note that the force of this potential is only continuous if alpha = 1.
     :type alpha: Optional[float]
+    :param gravity_on: bool
+        A boolean indicating whether gravitational force is turned on for the simulation.
+        If true, the gravitational constant, particle density, and water density parameters must be specified.
+        Defaults to false.
+    :param gravitational_constant: 
+        The acceleration due to gravity.
+        If gravity is on, the value of the gravitational constant must be specified.
+        The unit must be compatible with meters per second squared.
+        Defaults to None.
+    :type gravitational_constant: Optional[unit.Quantity]
+    :param water_density: 
+        The density of water. This is used to compute relative particle densities when calculating gravitational force.
+        If gravity is on, the density of water must be specified.
+        The units must be compatible with grams per centimeter cubed.
+    :type water_density: Optional[unit.Quantity]
+    :param particle_densities: 
+        The densities of the different types of colloidal particles. This is used to calculate gravitational force.
+        The keys of the dictionary are the types of the colloidal particles and the values are the densities of the particles.
+        If gravity is on, the particle densities must be specified.
+        The units of the particle densities must be compatible with grams per centimeter cubed.
+        Defaults to None.
+    :type particle_densities: Optional[dict[str, unit.Quantity]]
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -187,8 +209,7 @@ class RunParameters(Parameters):
         default_factory=lambda: {"P": 105.0 * (unit.nano * unit.meter), "N": 95.0 * (unit.nano * unit.meter)})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
-    particle_densities = Optional[dict[str, unit.Quantity]] = field(
-        default_factory=lambda: {"P": 0.85 * unit.gram/unit.centimeter**3, "N": 1.05 unit.gram/unit.centimeter**3})
+    particle_densities = Optional[dict[str, unit.Quantity]] = None
     platform_name: str = "Reference"
     temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
     collision_rate: unit.Quantity = field(default_factory=lambda: 0.001574074286750681 / (unit.pico * unit.second))
@@ -215,6 +236,7 @@ class RunParameters(Parameters):
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
+    gravity_on: bool = False
     gravitational_constant: Optional[unit.Quantity] = None
     water_density: Optional[unit.Quantity] = None
 
@@ -232,7 +254,7 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the masses dictionary is not in radii dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the masses dictionary is not in surface potentials dictionary.")
-            if self.particle_densities:
+            if self.gravity_on and self.particle_densities is not None:
                 if t not in self.particle_densities:
                     raise ValueError(f"Type {t} of the masses dictionary is not in particle densities dictionary.")
         for t in self.radii:
@@ -244,7 +266,7 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the radii dictionary is not in masses dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
-            if self.particle_densities:
+            if self.gravity_on and self.particle_densities is not None:
                 if t not in self.particle_densities:
                     raise ValueError(f"Type {t} of the radii dictionary is not in particle densities dictionary.")
         for t in self.surface_potentials:
@@ -254,18 +276,9 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
             if t not in self.radii:
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
-        if self.particle_densities:
-            for t in self.particle_densities:
-                if not self.particle_densities[t].unit.is_compatible(unit.gram/unit.centimeter**3):
-                    raise TypeError(f"Particle density of type {t} must have a unit compatible with grams per centimeter cubed.")
-                if self.particle_densities[t] <= 0.0 * unit.gram/unit.centimeter**3:
-                    raise ValueError(f"Particle density of type {t} must be greater than zero.")
-                if t not in self.masses:
-                    raise ValueError(f"Type {t} of the particle density dictionary is not in masses dictionary.")
-                if t not in self.radii:
-                    raise ValueError(f"Type {t} of the particle density dictionary is not in radii dictionary.")
-                if t not in self.surface_potentials:
-                    raise ValueError(f"Type {t} of the particle density dictionary is not in surface potentials dictionary.")
+            if self.gravity_on and self.particle_densities is not None:
+                if t not in self.particle_densities:
+                    raise ValueError(f"Type {t} of the surface potentials dictionary is not in particle densities dictionary.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
         if not self.temperature.unit.is_compatible(unit.kelvin):
@@ -336,12 +349,37 @@ class RunParameters(Parameters):
                 raise ValueError("Epsilon must not be specified if walls are not active.")
             if self.alpha is not None:
                 raise ValueError("Alpha must not be specified if walls are not active.")
-        if not self.gravitational_constant.unit.is_compatible(unit.meter/ unit.second**2):
-            raise TypeError("The gravitational cnostant must have a unit compatible with meters per second squared.")
-        if not self.water_density.unit.is_compatible(unit.gram / unit.centimeter**3):
-            raise TypeError("The water density must have a unit compatible with grams per centimeter cubed.")
-        if self.water_density <= 0.0 * (unit.gram / unit.centimeter**3):
-            raise ValueError("The water density must be greater than zero.")
+        if self.gravity_on:
+            if self.gravitational_constant is None:
+                raise ValueError("Gravitational constant must be specified if gravity is on.")
+            if not self.gravitational_constant.unit.is_compatible(unit.meter/ unit.second**2):
+                raise TypeError("The gravitational cnostant must have a unit compatible with meters per second squared.")
+            if self.water_density is None:
+                raise ValueError("Density of water must be specified if gravity is on.")
+            if not self.water_density.unit.is_compatible(unit.gram / unit.centimeter**3):
+                raise TypeError("The water density must have a unit compatible with grams per centimeter cubed.")
+            if self.water_density <= 0.0 * (unit.gram / unit.centimeter**3):
+                raise ValueError("The water density must be greater than zero.")
+            if self.particle_densities is None:
+                raise ValueError("Density of particles must be specified if gravity is on.")
+            for t in self.particle_densities:
+                if not self.particle_densities[t].unit.is_compatible(unit.gram/unit.centimeter**3):
+                    raise TypeError(f"Particle density of type {t} must have a unit compatible with grams per centimeter cubed.")
+                if self.particle_densities[t] <= 0.0 * unit.gram/unit.centimeter**3:
+                    raise ValueError(f"Particle density of type {t} must be greater than zero.")
+                if t not in self.masses:
+                    raise ValueError(f"Type {t} of the particle density dictionary is not in masses dictionary.")
+                if t not in self.radii:
+                    raise ValueError(f"Type {t} of the particle density dictionary is not in radii dictionary.")
+                if t not in self.surface_potentials:
+                    raise ValueError(f"Type {t} of the particle density dictionary is not in surface potentials dictionary.")
+        else:
+            if self.gravitational_constant is not None:
+                raise ValueError("Gravitational constant must not be specified if gravity is not on.")
+            if self.water_density is not None:
+                raise ValueError("Density of water must not be specified if gravity is not on.")
+            if self.particle_densities is not None:
+                raise ValueError("Particle densities must not be specified if gravity is not on.")
 
     def check_types_of_initial_configuration(self):
         """
@@ -370,9 +408,10 @@ class RunParameters(Parameters):
         for t in self.surface_potentials:
             if t not in types:
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in the initial configuration.")
-        for t in self.particle_densities:
-            if t not in types:
-                raise ValueError(f"Type {t} of the particle densities dictionary is not in the initial configuration.")
+        if self.gravity_on and self.particle_densities is not None:
+            for t in self.particle_densities:
+                if t not in types:
+                    raise ValueError(f"Type {t} of the particle densities dictionary is not in the initial configuration.")
 
 
 if __name__ == '__main__':

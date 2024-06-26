@@ -71,7 +71,7 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
 
-    add_gravity = any(parameters.gravitational_constant)
+    add_gravity = parameters.gravity_on
     
     # Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)

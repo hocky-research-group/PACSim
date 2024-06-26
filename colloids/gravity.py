@@ -1,7 +1,6 @@
-from typing import Iterator, Optional, Sequence
+from typing import Iterator
 from openmm import CustomExternalForce, unit
 from colloids.abstracts import OpenMMPotentialAbstract
-import warnings
 import numpy as np
 
 
@@ -34,17 +33,12 @@ class Gravity(OpenMMPotentialAbstract):
 
         if not gravitational_constant.unit.is_compatible(unit.meter/unit.second**2):
             raise TypeError("argument gravitational constant must have a unit that is compatible with meters per second squared")
-        #if not particle_density.unit.is_compatible(unit.gram/unit.centimeter**3):
-         #   raise TypeError("argument particle_density must have a unit compatible with grams per centimeter cubed.")
-        #if not particle_density.value_in_unit(unit.gram/unit.centimeter**3) > 0.0:
-        #    raise ValueError("argument particle_density must have a value greater than zero")
         if not water_density.unit.is_compatible(unit.gram/unit.centimeter**3):
             raise TypeError("argument water_density must have a unit compatible with grams per centimeter cubed.")
         if not water_density.value_in_unit(unit.gram/unit.centimeter**3) > 0.0:
             raise ValueError("argument water_density must have a value greater than zero")
 
         self._gravitational_constant = gravitational_constant
-        #self._particle_density = particle_density
         self._water_density = water_density
       
         self._gravitational_potential = self._set_up_gravitational_potential()
@@ -63,7 +57,6 @@ class Gravity(OpenMMPotentialAbstract):
         gravitational_potential = CustomExternalForce(u_grav)
         gravitational_potential.addGlobalParameter("gravitational_constant", self._gravitational_constant.value_in_unit(unit.meter/unit.second**2))
         gravitational_potential.addGlobalParameter("pi", pi)
-        #gravitational_potential.addGlobalParameter("particle_density", self._particle_density.value_in_unit(unit.gram/unit.centimer**3))
         gravitational_potential.addGlobalParameter("water_density", self._water_density.value_in_unit(unit.gram/unit.centimeter**3))
         
         gravitational_potential.addPerParticleParameter("radius")
@@ -85,6 +78,9 @@ class Gravity(OpenMMPotentialAbstract):
             The unit of the radius must be compatible with nanometers and the value must be greater than zero.
         :type radius: unit.Quantity
         :param particle_density:
+            The density of the colloid particle.
+            The unit of the particle_density must be compatible with grams per cubic centimeter and the value 
+            must be greater than 0.
         :type particle_density: unit.Quantity
         
         :raises TypeError:

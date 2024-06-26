@@ -19,6 +19,7 @@ epsilon: null
 final_configuration_gsd_filename: final_frame.gsd
 final_configuration_xyz_filename: final_frame.xyz
 gravitational_constant: null
+gravity_on: false
 initial_configuration: tests/first_frame.xyz
 integrator_seed: null
 masses:

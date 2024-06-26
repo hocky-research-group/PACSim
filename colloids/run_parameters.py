@@ -173,6 +173,21 @@ class RunParameters(Parameters):
         If any wall direction is True, alpha must be not None and 0 <= alpha <= 1.
         Note that the force of this potential is only continuous if alpha = 1.
     :type alpha: Optional[float]
+    :param depletion_on:
+        A boolean indicating whether to turn on the depletion attraction for the simulation.
+        If depletion attraction is on, phi and depletant radius must be specified.
+        Defaults to False.
+    :type depletion_on: bool
+    :param phi:
+        The number density of polymers in the solution.
+        If depletion attraction is on, the value of phi must not be None and 0<= phi <=1.
+        Defaults to None.
+    :type phi: Optional[float]
+    :param depletant_radius: 
+        The radius of the polymers in solution for a system with depletion attraction.
+        If depletion attraction is on, depletant_radius must not be None, its unit must be compatible with nanometers,
+        and the value must be greater than zero.
+    :type depletant_radius: Optional[unit.Quantity]
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -214,7 +229,7 @@ class RunParameters(Parameters):
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
     phi: Optional[float] = None
-    radius_depletant: Optional[unit.Quantity] = field(default_factory=lambda: 5.0 * (unit.nano * unit.meter))
+    radius_depletant: Optional[unit.Quantity] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -315,6 +330,22 @@ class RunParameters(Parameters):
                 raise ValueError("Epsilon must not be specified if walls are not active.")
             if self.alpha is not None:
                 raise ValueError("Alpha must not be specified if walls are not active.")
+        if self.depletion_on:
+            if self.phi is None:
+                raise ValueError("Phi must be specified if depletion is on.")
+            if not 0.0 <= self.phi <= 1.0:
+                raise ValueError("Phi must be between zero and one.")
+            if self.radius_depletant is None:
+                raise ValueError("Depletant radius must be specified if depletion is on.")
+            if not self.radius_depletant.unit.is_compatible(unit.nano * unit.meter):
+                raise TypeError("Depletant radius must have a unit compatible with nanometers.")
+            if self.radius_depletant <= 0.0 * (unit.nano * unit.meter):
+                raise ValueError("Depletant radius must be greater than zero.")
+        else:
+            if self.phi is not None:
+                raise ValueError("Phi must not be specified if walls are not active.")
+            if self.radius_depletant is not None:
+                raise ValueError("Depletant radius must not be specified if walls are not active.")
 
     def check_types_of_initial_configuration(self):
         """

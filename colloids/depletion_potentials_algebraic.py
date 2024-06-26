@@ -1,11 +1,35 @@
 import math
 from typing import Iterator
-import openmm
 from openmm import unit
 from openmm import CustomNonbondedForce
 from colloids.abstracts import OpenMMPotentialAbstract
 
 class DepletionPotentialsAlgebraic(OpenMMPotentialAbstract):
+
+    """
+    This class sets up the depletion potential between colloids in a solution with a nonadsorbing polymer background. 
+    Since the attractive force arises from the fact that the polymer molecules are depleted at the surface of the colloids, 
+    the force is called the depletion force. The depletion force is well-modeled by the Asakura-Oosawa potential. 
+    Here, we use a modified form of the potential, adapted for two asymmetrical spheres, to handle a binary solution with
+    two different types of colloidal particles.
+
+    :param phi:
+        The number density of polymers in the solution.
+        The value must be between 0 and 1.
+    :type phi: float
+    :param depletant_radius:
+        The "radius" of the polymers, if treated as hard spheres.
+        The unit of the depletant_radius must be compatible with nanometers and the value must be greater than zero.
+    :type depletant_radius: unit.Quantity
+    :param brush_length:
+        The thickness of the polymer brush as described by the Alexander-de Gennes polymer brush model.
+        (See ColloidPotentialsParameters() for more information.)
+        The unit of the brush_length must be compatible with nanometers and the value must be greater than zero.
+        Defaults to 10.0 nanometers.
+    :type brush_length: unit.Quantity
+
+
+    """
     
     _nanometer = unit.nano * unit.meter
     

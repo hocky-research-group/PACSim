@@ -209,6 +209,7 @@ class RunParameters(Parameters):
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
     debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
+    depletion_on: bool = False
     dielectric_constant: float = 80.0
     cutoff_factor: float = 21.0
     use_log: bool = False
@@ -341,6 +342,9 @@ class RunParameters(Parameters):
                 raise TypeError("Depletant radius must have a unit compatible with nanometers.")
             if self.radius_depletant <= 0.0 * (unit.nano * unit.meter):
                 raise ValueError("Depletant radius must be greater than zero.")
+            for t in self.radii:
+                if not all(t == self.radii[0] for t in self.radii):
+                    raise ValueError("All colloidal particles must have the same radius if depletion is on.")
         else:
             if self.phi is not None:
                 raise ValueError("Phi must not be specified if walls are not active.")

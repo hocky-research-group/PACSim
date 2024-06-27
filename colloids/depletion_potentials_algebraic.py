@@ -10,8 +10,8 @@ class DepletionPotentialsAlgebraic(OpenMMPotentialAbstract):
     This class sets up the depletion potential between colloids in a solution with a nonadsorbing polymer background. 
     Since the attractive force arises from the fact that the polymer molecules are depleted at the surface of the colloids, 
     the force is called the depletion force. The depletion force is well-modeled by the Asakura-Oosawa potential. 
-    Here, we use a modified form of the potential, adapted for two asymmetrical spheres, to handle a binary solution with
-    two different types of colloidal particles.
+    This attractive force is paired with the repulsive force as described by the Alexander-de Gennes polymer brush model 
+    between two colloids. (See ColloidPotentialsParameters() for more information.)
 
     :param phi:
         The number density of polymers in the solution.
@@ -41,52 +41,26 @@ class DepletionPotentialsAlgebraic(OpenMMPotentialAbstract):
         self._phi = phi
         self._depletant_radius = depletant_radius
         self._brush_length = brush_length
-        self._depletion_potential = self._set_up_depletion_potential()
-         #self._steric_potential = self._set_up_steric_potential()
+        self._AO_potential = self._set_up_depletion_potential()
+        #self._steric_potential = self._set_up_steric_potential()
         self._max_radius = -math.inf * self._nanometer
-        
-    '''def _set_up_steric_potential(self) -> CustomNonbondedForce:
-        """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer 
-        brush model."""
-        steric_potential = CustomNonbondedForce(
-            "step(two_l - h) * "
-            "steric_prefactor * rs / 2.0 * brush_length * brush_length * ("
-            "28.0 * ((two_l / h)^0.25 - 1.0) "
-            "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
-            "+ 12.0 * (h / two_l - 1.0)); "
-            "h = r - rs;"
-            "rs = radius1 + radius2;"
-            "two_l = 2.0 * brush_length"
-        )
-        # Prefactor is k_B * T * 16 * pi * sigma^(3/2) / 35 (see Hocky paper)
-        steric_potential.addGlobalParameter(
-            "steric_prefactor",
-            (unit.BOLTZMANN_CONSTANT_kB * self._parameters.temperature
-             * 16.0 * math.pi * (self._parameters.brush_density ** (3 / 2)) / 35.0
-             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole / (self._nanometer ** 3))
-        )
-        # Brush length L (see Hocky paper)
-        steric_potential.addGlobalParameter("brush_length",
-                                            self._parameters.brush_length.value_in_unit(self._nanometer))
-        steric_potential.addPerParticleParameter("radius")
-        return steric_potential'''
 
     def _set_up_depletion_potential(self) -> CustomNonbondedForce:
-        """Set up the basic functional form of the Asakura-Oosawa potential (generalized to asymmetric sphere) 
-        for a colloidal solution in a background of non-adsorbing polymers."""
+        """Set up the basic functional form of the Asakura-Oosawa potential for a colloidal solution 
+        in a background of non-adsorbing polymers."""
 
         depletion_potential = CustomNonbondedForce(
-            "step(sigmaD1 + sigmaD2 + 2*depletant_radius - rcc) * "
-            "depletion_prefactor * (q1+q2+2-n)**2*(n+2*(q1+q2+2)-3/n*(q1**2+q2**2-2*q1*q2));"
-            "sigmaD1 = brush_length + radius1;"
-            "sigmaD2 = brush_length + radius2;"
-            "rcc = h + radius1 + radius2;"
-            "q1 = sigmaD1/depletant_radius;"
-            "q2 = sigmaD2/depletant_radius;"
-            "n = rcc/depletant_radius;"
+            "step(sigma_colloid + sigma_depletant - r) * "
+            "(AO_prefactor * (1 - term1 + term2));"
+            "AO_prefactor =  -phi * (1+q)^3/q^3;"
+            "term1 = 3*radius/ (2 * sigma_colloid * (1+q))";
+            "term2 = radius**3 / (2 * sigma_colloid**3 *(1+q)**3):"
+            "sigma_colloid = ((2 * radius) + 2*brush_length) ;
+            "sigma_depletant = ((2 * radius_depletant) + 2*brush_length) ;"
+            "q = sigma_depletant/sigma_colloid"
         )
 
-        depletion_potential.addGlobalParameter("depletion_prefactor", (self._phi / 16.0))
+        depletion_potential.addGlobalParameter("phi", (self._phi))
         
         depletion_potential.addGlobalParameter("depletant_radius",
                                             self._depletant_radius.value_in_unit(self._nanometer))

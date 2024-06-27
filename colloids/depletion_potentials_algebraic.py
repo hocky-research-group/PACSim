@@ -53,10 +53,10 @@ class DepletionPotentialsAlgebraic(OpenMMPotentialAbstract):
             "step(sigma_colloid + sigma_depletant - r) * "
             "(AO_prefactor * (1 - term1 + term2));"
             "AO_prefactor =  -phi * (1+q)^3/q^3;"
-            "term1 = 3*radius/ (2 * sigma_colloid * (1+q))";
-            "term2 = radius**3 / (2 * sigma_colloid**3 *(1+q)**3):"
-            "sigma_colloid = ((2 * radius) + 2*brush_length) ;
-            "sigma_depletant = ((2 * radius_depletant) + 2*brush_length) ;"
+            "term1 = 3*radius/ (2 * sigma_colloid * (1+q));"
+            "term2 = radius**3 / (2 * sigma_colloid**3 *(1+q)**3);"
+            "sigma_colloid = ((2 * radius) + 2*brush_length);"
+            "sigma_depletant = ((2 * radius_depletant) + 2*brush_length);"
             "q = sigma_depletant/sigma_colloid"
         )
 

@@ -10,7 +10,8 @@ class DepletionPotentialsAlgebraic(OpenMMPotentialAbstract):
     This class sets up the depletion potential between colloids in a solution with a nonadsorbing polymer background. 
     Since the attractive force arises from the fact that the polymer molecules are depleted at the surface of the colloids, 
     the force is called the depletion force. The depletion force is well-modeled by the Asakura-Oosawa potential. 
-    This attractive force is paired with the repulsive force as described by the Alexander-de Gennes polymer brush model 
+    To completely describe the pair potentials in a system of colloids within solution of nonadsorbing polymers, this attractive
+    depletion force can be paired with the repulsive force as described by the Alexander-de Gennes polymer brush model 
     between two colloids. (See ColloidPotentialsParameters() for more information.)
 
     :param phi:
@@ -41,23 +42,22 @@ class DepletionPotentialsAlgebraic(OpenMMPotentialAbstract):
         self._phi = phi
         self._depletant_radius = depletant_radius
         self._brush_length = brush_length
-        self._AO_potential = self._set_up_depletion_potential()
-        #self._steric_potential = self._set_up_steric_potential()
+        self._depletion_potential = self._set_up_depletion_potential()
         self._max_radius = -math.inf * self._nanometer
 
     def _set_up_depletion_potential(self) -> CustomNonbondedForce:
-        """Set up the basic functional form of the Asakura-Oosawa potential for a colloidal solution 
+        """Set up the basic functional form of the Asakura-Oosawa depletion potential for a colloidal solution 
         in a background of non-adsorbing polymers."""
 
         depletion_potential = CustomNonbondedForce(
             "step(sigma_colloid + sigma_depletant - r) * "
             "(AO_prefactor * (1 - term1 + term2));"
             "AO_prefactor =  -phi * (1+q)^3/q^3;"
-            "term1 = 3*radius/ (2 * sigma_colloid * (1+q));"
-            "term2 = radius**3 / (2 * sigma_colloid**3 *(1+q)**3);"
+            "term1 = 3*r/ (2 * sigma_colloid * (1+q));"
+            "term2 = r^3 / (2 * sigma_colloid^3 *(1+q)^3);"
+            "q = sigma_depletant/sigma_colloid;"
             "sigma_colloid = ((2 * radius) + 2*brush_length);"
             "sigma_depletant = ((2 * radius_depletant) + 2*brush_length);"
-            "q = sigma_depletant/sigma_colloid"
         )
 
         depletion_potential.addGlobalParameter("phi", (self._phi))

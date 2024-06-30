@@ -345,6 +345,9 @@ class RunParameters(Parameters):
             for t in self.radii:
                 if not all(t == self.radii[0] for t in self.radii):
                     raise ValueError("All colloidal particles must have the same radius if depletion is on.")
+            if self.radius_depletant/self.radii[0] > 0.1547:
+                raise ValueError("Size ratio of depletant to colloid particles is too large."
+                                " Analytical computation of depletion potential will be invalid.")
         else:
             if self.phi is not None:
                 raise ValueError("Phi must not be specified if walls are not active.")

@@ -34,8 +34,7 @@ class TestGravityParameters(object):
  """for the functions wall_distances, num_test_values, and test_positions below, is the test_positions just taking
  the dimensions of the box and creating an evenly spaced sequence with 1000-step intervals? If so, should I keep this
  or does it not pertain to the gravity function?"""
-
-#openmm function begins here 
+ 
     @pytest.fixture
     def openmm_system(self, box_length):
         system = System()

@@ -230,7 +230,7 @@ class RunParameters(Parameters):
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
     phi: Optional[float] = None
-    radius_depletant: Optional[unit.Quantity] = None
+    depletant_radius: Optional[unit.Quantity] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -336,23 +336,25 @@ class RunParameters(Parameters):
                 raise ValueError("Phi must be specified if depletion is on.")
             if not 0.0 <= self.phi <= 1.0:
                 raise ValueError("Phi must be between zero and one.")
-            if self.radius_depletant is None:
+            if self.depletant_radius is None:
                 raise ValueError("Depletant radius must be specified if depletion is on.")
-            if not self.radius_depletant.unit.is_compatible(unit.nano * unit.meter):
+            if not self.depletant_radius.unit.is_compatible(unit.nano * unit.meter):
                 raise TypeError("Depletant radius must have a unit compatible with nanometers.")
-            if self.radius_depletant <= 0.0 * (unit.nano * unit.meter):
+            if self.depletant_radius <= 0.0 * (unit.nano * unit.meter):
                 raise ValueError("Depletant radius must be greater than zero.")
-            for t in self.radii:
-                if not all(t == self.radii[0] for t in self.radii):
+            radius_list = [str(val) for t, val in self.radii.items()]
+            for r in radius_list:
+                if not r == radius_list[0]:
                     raise ValueError("All colloidal particles must have the same radius if depletion is on.")
-            if self.radius_depletant/self.radii[0] > 0.1547:
-                raise ValueError("Size ratio of depletant to colloid particles is too large."
-                                " Analytical computation of depletion potential will be invalid.")
+            for t in self.radii:
+                if self.depletant_radius/self.radii[t] > 0.1547:
+                    raise ValueError("Size ratio of depletant to colloid particles is too large."
+                                    " Analytical computation of depletion potential will be invalid.")
         else:
             if self.phi is not None:
-                raise ValueError("Phi must not be specified if walls are not active.")
-            if self.radius_depletant is not None:
-                raise ValueError("Depletant radius must not be specified if walls are not active.")
+                raise ValueError("Phi must not be specified if depletion potential is not on.")
+            if self.depletant_radius is not None:
+                raise ValueError("Depletant radius must not be specified if depletion potential is not on.")
 
     def check_types_of_initial_configuration(self):
         """

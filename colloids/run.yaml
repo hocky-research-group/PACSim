@@ -14,7 +14,7 @@ cutoff_factor: 21.0
 debye_length: !Quantity
   unit: nanometer
   value: 5.726968
-depletion_on: false
+depletion_on: true
 depletant_radius: !Quantity
   unit: nanometer
   value: 5.0
@@ -37,7 +37,7 @@ platform_name: CPU
 radii:
   N: !Quantity
     unit: nanometer
-    value: 95.0
+    value: 105.0
   P: !Quantity
     unit: nanometer
     value: 105.0

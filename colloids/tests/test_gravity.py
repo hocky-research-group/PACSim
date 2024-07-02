@@ -10,19 +10,17 @@ class TestGravityParameters(object):
         return (g * particle_mass * z / energy_conversion_factor) 
 
     @pytest.fixture
-    def radius(self):
+    def particle_mass(self):
         return 105.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
     def energy_conversion_factor(self):
         return 10 ** 36
 
- ## should i be adding the units to g 
     @pytest.fixture
     def g(self):
         return 9.8 * unit.meters / unit.second**2
 
-  ## should i add amu?
     @pytest.fixture
     def particle_mass(self):
         return 1.0 
@@ -30,11 +28,7 @@ class TestGravityParameters(object):
     @pytest.fixture
     def box_length(self):
         return 1000.0 * unit.nanometer 
-
- """for the functions wall_distances, num_test_values, and test_positions below, is the test_positions just taking
- the dimensions of the box and creating an evenly spaced sequence with 1000-step intervals? If so, should I keep this
- or does it not pertain to the gravity function?"""
- 
+    
     @pytest.fixture
     def openmm_system(self, box_length):
         system = System()
@@ -42,6 +36,12 @@ class TestGravityParameters(object):
                                             Vec3(0.0, box_length, 0.0),
                                             Vec3(0.0, 0.0, box_length))
         return system
+    
+    @pytest.fixture
+    def test_z_positions(self, box_length):
+            # noinspection PyUnresolvedReferences
+            return [z_positions = np.linspace(-box_length / 2 + 100, box_length / 2 - 100, num=1000)
+                    for _ in box_length]
 
     @pytest.fixture
     def openmm_platform(self):
@@ -61,23 +61,9 @@ class TestGravityExceptions(TestGravityParameters):
         with pytest.raises(TypeError):
             expected_gravitational_potential.add_particle(index=0, g=g / ((unit.nanometer) ** 2))
         # Test exception on negative g.
-    ## confused with what the noinspetion PyTypeChecker means
         with pytest.raises(ValueError):
             # noinspection PyTypeChecker
             expected_gravitational_potential.add_particle(index=0, g = -g)
-
-##Do i need to keep this test?
-    def test_exception_radius_too_large(self, expected_gravitational_potential):
-        # This is fine for the smallest wall distance of 1000 nm.
-        expected_gravitational_potential.add_particle(index=0, radius=236.0 * (unit.nanometer))
-        # This is not fine for the smallest wall distance of 1000 nm.
-        with pytest.raises(ValueError):
-            expected_gravitational_potential.add_particle(index=1, radius=237.0 * (unit.nano * unit.meter))
-        # This is fine for the smallest relevant wall distance of 1500 nm.
-       expected_gravitational_potential.add_particle(index=0, radius=353.0 * (unit.nano * unit.meter))
-        # This is not fine for the smallest relevant wall distance of 1500 nm.
-        with pytest.raises(ValueError):
-           expected_gravitational_potential.add_particle(index=1, radius=354.0 * (unit.nano * unit.meter))
 
     def test_exception_no_particles_added(self, expected_gravitational_potential):
         with pytest.raises(RuntimeError):
@@ -86,25 +72,26 @@ class TestGravityExceptions(TestGravityParameters):
         with pytest.raises(RuntimeError):
             for _ in expected_gravitational_potential.yield_potentials():
                 pass
-## I don't understand what this test is doing
-    def test_exception_add_particle_after_yield_potentials(self, radius, expected_gravitational_potential):
-        expected_gravitational_potential.add_particle(index=0, radius=radius)
+
+## throws exception if you try to add the potentials before you add the particles
+    def test_exception_add_particle_after_yield_potentials(self, particle_mass, expected_gravitational_potential):
+        expected_gravitational_potential.add_particle(index=0, particle_mass=particle_mass)
         for _ in expected_gravitational_potential.yield_potentials():
             pass
         with pytest.raises(RuntimeError):
-            expected_gravitational_potential.add_particle(index=1, radius=radius)
-       expected_gravitational_potential.add_particle(index=0, radius=radius)
-        for _ inexpected_gravitational_potential.yield_potentials():
+            expected_gravitational_potential.add_particle(index=1, particle_mass=particle_mass)
+        expected_gravitational_potential.add_particle(index=0, particle_mass=particle_mass)
+        for _ in expected_gravitational_potential.yield_potentials():
             pass
         with pytest.raises(RuntimeError):
-           expected_gravitational_potential.add_particle(index=1, radius=radius)
+           expected_gravitational_potential.add_particle(index=1, particle_mass=particle_mass)
 
     def test_exception_mass_negative(self, particle_mass, expected_gravitational_potential):
         # Test exception mass is negative
         with pytest.raises(ValueError):
             expected_gravitational_potential.add_particle(index=0, particle_mass = -particle_mass)
 
-    def test_exception_z(self):
+    def test_exception_z(self, z, expected_gravitational_potential):
         # Test exception on wrong units of z
         with pytest.raises(TypeError):
             expected_gravitational_potential.add_particle(index=0, z=z / ((unit.nanometer) ** 2))
@@ -113,9 +100,9 @@ class TestGravityExceptions(TestGravityParameters):
 class  TestGravityParameters(TestGravityParameters):
     
     @pytest.fixture(autouse=True)
-    def add_particle(self, openmm_system, expected_gravitational_potential, radius):
+    def add_particle(self, openmm_system, expected_gravitational_potential, particle_mass):
         openmm_system.addParticle(mass=1.0)
-        expected_gravitational_potential.add_particle(index=0, radius=radius)
+        expected_gravitational_potential.add_particle(index=0, particle_mass=particle_mass)
         for potential in expected_gravitational_potential.yield_potentials():
             openmm_system.addForce(potential)
 
@@ -131,7 +118,7 @@ class  TestGravityParameters(TestGravityParameters):
                                  (1,  TestGravityParameters.slj_walls_potential_active),
                                  (2,  TestGravityParameters.slj_walls_potential_active)
                              ])
-    def test_slj_walls_potential(self, openmm_context, test_positions, wall_distances, epsilon, alpha_all, radius,
+    def test_slj_walls_potential(self, openmm_context, test_positions, wall_distances, epsilon, alpha_all, particle_mass,
                                  all_wall_directions, direction, expected_function):
         openmm_potentials = np.empty(len(test_positions[direction]))
         for index, dir_position in enumerate(test_positions[direction]):
@@ -143,11 +130,11 @@ class  TestGravityParameters(TestGravityParameters):
 
         assert all_wall_directions[direction]
         wall_distance = wall_distances[direction].value_in_unit(unit.nano * unit.meter)
-        rcut = radius.value_in_unit(unit.nano * unit.meter) * 2**(1.0/6.0)
-        delta = radius.value_in_unit(unit.nano * unit.meter) - 1.0
+        rcut = particle_mass.value_in_unit(unit.nano * unit.meter) * 2**(1.0/6.0)
+        delta = particle_mass.value_in_unit(unit.nano * unit.meter) - 1.0
         expected_potentials = expected_function(test_positions[direction], wall_distance, rcut, delta,
                                                 epsilon.value_in_unit(unit.kilojoule_per_mole),
-                                                radius.value_in_unit(unit.nano * unit.meter), alpha_all)
+                                                particle_mass.value_in_unit(unit.nano * unit.meter), alpha_all)
         assert np.any(expected_potentials > 0.0)
         assert np.all(expected_potentials >= 0.0)
         assert openmm_potentials == pytest.approx(expected_potentials, rel=1.0e-7, abs=1.0e-13)
@@ -155,9 +142,9 @@ class  TestGravityParameters(TestGravityParameters):
 
 class TestShiftedLennardJonesWallPotentialsSome( TestGravityParameters):
     @pytest.fixture(autouse=True)
-    def add_particle(self, openmm_system,expected_gravitational_potential, radius):
+    def add_particle(self, openmm_system,expected_gravitational_potential, particle_mass):
         openmm_system.addParticle(mass=1.0)
-       expected_gravitational_potential.add_particle(index=0, radius=radius)
+       expected_gravitational_potential.add_particle(index=0, particle_mass=particle_mass)
         for potential inexpected_gravitational_potential.yield_potentials():
             openmm_system.addForce(potential)
 
@@ -173,7 +160,7 @@ class TestShiftedLennardJonesWallPotentialsSome( TestGravityParameters):
                                  (1,  TestGravityParameters.slj_walls_potential_active),
                                  (2, lambda pos, *args: np.zeros_like(pos))
                              ])
-    def test_slj_walls_potential(self, openmm_context, test_positions, wall_distances, epsilon, alpha_some, radius,
+    def test_slj_walls_potential(self, openmm_context, test_positions, wall_distances, epsilon, alpha_some, particle_mass,
                                  some_wall_directions, direction, expected_function):
         openmm_potentials = np.empty(len(test_positions[direction]))
         for index, dir_position in enumerate(test_positions[direction]):
@@ -184,11 +171,11 @@ class TestShiftedLennardJonesWallPotentialsSome( TestGravityParameters):
             openmm_potentials[index] = openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
 
         wall_distance = wall_distances[direction].value_in_unit(unit.nano * unit.meter)
-        rcut = radius.value_in_unit(unit.nano * unit.meter) * 2 ** (1.0 / 6.0)
-        delta = radius.value_in_unit(unit.nano * unit.meter) - 1.0
+        rcut = particle_mass.value_in_unit(unit.nano * unit.meter) * 2 ** (1.0 / 6.0)
+        delta = particle_mass.value_in_unit(unit.nano * unit.meter) - 1.0
         expected_potentials = expected_function(test_positions[direction], wall_distance, rcut, delta,
                                                 epsilon.value_in_unit(unit.kilojoule_per_mole),
-                                                radius.value_in_unit(unit.nano * unit.meter), alpha_some)
+                                                particle_mass.value_in_unit(unit.nano * unit.meter), alpha_some)
         if some_wall_directions[direction]:
             assert np.any(expected_potentials > 0.0)
             assert np.all(expected_potentials >= 0.0)

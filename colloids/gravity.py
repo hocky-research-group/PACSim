@@ -1,7 +1,7 @@
 from typing import Iterator
 from openmm import CustomExternalForce, unit
 from colloids.abstracts import OpenMMPotentialAbstract
-import numpy as np
+import math
 
 
 class Gravity(OpenMMPotentialAbstract):
@@ -46,17 +46,14 @@ class Gravity(OpenMMPotentialAbstract):
     def _set_up_gravitational_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the gravitational potential."""
 
-        pi = np.pi
-
         u_grav = CustomExternalForce(
                 "(gravitational_constant * particle_mass * z);"
                 "density_difference = particle_density - water_density;"
-                "particle_mass = (particle_density - water_density) * 4/3 * pi * radius^3;"
+                "particle_mass = (particle_density - water_density) * 4/3 * math.pi * radius^3;"
             )
 
         gravitational_potential = CustomExternalForce(u_grav)
         gravitational_potential.addGlobalParameter("gravitational_constant", self._gravitational_constant.value_in_unit(unit.meter/unit.second**2))
-        gravitational_potential.addGlobalParameter("pi", pi)
         gravitational_potential.addGlobalParameter("water_density", self._water_density.value_in_unit(unit.gram/unit.centimeter**3))
         
         gravitational_potential.addPerParticleParameter("radius")

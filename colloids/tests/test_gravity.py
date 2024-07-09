@@ -1,6 +1,6 @@
 from openmm import Context, LangevinIntegrator, Platform, System, unit, Vec3
 import pytest
-from colloids import gravity
+from colloids import Gravity
 import numpy as np
 
 '''In this file, you want to test if the implementation of gravitational force is working properly.
@@ -195,14 +195,13 @@ class TestGravity(TestGravityParameters):
     def test_gravitational_potentials(self, openmm_context, test_z_positions, expected_function):
         # create an empty array to fill with gravitational potential values for each z position
         openmm_grav_potentials = np.empty(len(test_z_positions))
-
         # for each test position, set that as the particle's z position and get the openmm state/energy . save the energy
-        for index, dir_z_position in enumerate(test_z_positions):
+        for dir_z_position in enumerate(test_z_positions):
             position = [0.0, 0.0, 0.0]
             position[2] = [0.0, 0.0, dir_z_position]
-            openmm_context.setPositions([position])
+            openmm_context.setPositions([position[2]])
             openmm_state = openmm_context.getState(getEnergy=True)
-            openmm_grav_potentials[index] = openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+            openmm_grav_potentials = openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
 
         # get the gravitational potentials for each z position from the numpy function
         expected_numpy_grav_potentials = expected_function(test_z_positions)

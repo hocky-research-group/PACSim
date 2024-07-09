@@ -3,28 +3,42 @@ import pytest
 from colloids import gravity
 import numpy as np
 
+'''In this file, you want to test if the implementation of gravitational force is working properly.
+To do so, you will create a dummy system with a single particle, obtain its gravitational force from 
+your openmm gravity function,and compare it to the force expected using a simple function in numpy that 
+calculates "mgh"
+You are going to compute the gravitational force as the particle moves along the z-axis, so you are calculating 
+force as a function of z position.
+There is no molecular dynamics happening, hence the dummy integrator that is necessary to initialize the system 
+but won't actually do anything'''
+
 
 class TestGravityParameters(object):
-    @staticmethod
-    def expected_gravitational_potential(z, g, particle_mass, energy_conversion_factor):
-        return (g * particle_mass * z / energy_conversion_factor) 
-
+    '''Define the parameters you will need for the tests in this file. Use the decorator @pytest.fixture'''
+   
+   # Define density of a particle whose gravitational force will be measured. not mass
+   ## if you look at gravity.py the function does not take mass as an argument
+    
     @pytest.fixture
-    def particle_mass(self):
+    def particle_density(self):
+        return 1.05 * (unit.gram * unit.centimeter**3)
+
+   # Define radius of a particle whose gravitational force will be measured
+    @pytest.fixture
+    def particle_radius(self):
         return 105.0 * (unit.nano * unit.meter)
 
-    @pytest.fixture
-    def energy_conversion_factor(self):
-        return 10 ** 36
-
+   # Define the gravitational constant
     @pytest.fixture
     def g(self):
-        return 9.8 * unit.meters / unit.second**2
+        return 9.8 * unit.meter / unit.second**2
 
+    # Define density of water
     @pytest.fixture
-    def particle_mass(self):
-        return 1.0 
+    def water_density(self):
+        return 0.998 * (unit.gram * unit.centimeter**3)
 
+   # Define things you need for setting up the simulation: box length, openmm system, platform, dummy integrator
     @pytest.fixture
     def box_length(self):
         return 1000.0 * unit.nanometer 
@@ -38,12 +52,6 @@ class TestGravityParameters(object):
         return system
     
     @pytest.fixture
-    def test_z_positions(self, box_length):
-            # noinspection PyUnresolvedReferences
-            return [z_positions = np.linspace(-box_length / 2 + 100, box_length / 2 - 100, num=1000)
-                    for _ in box_length]
-
-    @pytest.fixture
     def openmm_platform(self):
         return Platform.getPlatformByName("Reference")
 
@@ -51,20 +59,67 @@ class TestGravityParameters(object):
     def openmm_dummy_integrator(self):
         return LangevinIntegrator(0.0, 0.0, 0.0)
 
+
+    # Define a function that returns your Gravity function from gravity.py
+    def gravitational_potential(self, gravitational_constant, water_density):
+        return gravity(gravitational_constant, water_density)
+    
+    # Define an array of z positions to use to calculate the gravitational potential
     @pytest.fixture
-    def expected_gravitational_potential(self, z, g, particle_mass):
-        return gravity(self, z, g, particle_mass)
+    def z_num_test_values(self):
+        return 1000
+
+    @pytest.fixture
+    def test_z_positions(self, box_length, z_num_test_values):
+        # noinspection PyUnresolvedReferences
+        return [np.linspace(-box_length.value_in_unit(unit.nanometer) / 2.0 + 200.0, 
+                            box_length.value_in_unit(unit.nanometer) / 2.0 - 200.0, num=z_num_test_values)
+                            for _ in box_length]
+
+    # Using @staticmethod decorator, create a numpy function to calculate the expected gravitational force
+    #given a particle's effective mass, z coordinate, and gravitational constant
+    ##look up what a staticmethod decorator is to understand why it is being used here.
+
+    """staticmethod decorater doesn't require self argument because it tells the interpretor that the method (function)
+    is static and should be called on the class, not on an instance of the class. In other words, it can't modify
+    the class state
+    """
+    @staticmethod
+    def gravitational_force_exp(particle_density, water_density, particle_radius, z, g):
+        return (np.absolute(water_density - particle_density))* 4/3 * np.pi * particle_radius**3
 
 class TestGravityExceptions(TestGravityParameters):
-    def test_exception_g(self, g, expected_gravitational_potential):
-        # Test exception on wrong unit of g.
+    '''Test to make sure all of the variables being defined for use in gravity.py are properly initialized'''
+
+    # test that radius has the right unit
+    # test that radius >0
+    def test_exception_radius(self, radius, gravitational_force_exp):
+        # Test exception on wrong unit.
         with pytest.raises(TypeError):
-            expected_gravitational_potential.add_particle(index=0, g=g / ((unit.nanometer) ** 2))
-        # Test exception on negative g.
+           gravitational_force_exp.add_particle(index=0, radius=radius / ((unit.nano * unit.meter) ** 2))
+        # Test exception on negative radius.
         with pytest.raises(ValueError):
             # noinspection PyTypeChecker
-            expected_gravitational_potential.add_particle(index=0, g = -g)
+            gravitational_force_exp.add_particle(index=0, radius=-radius)
+        with pytest.raises(ValueError):
+            # noinspection PyTypeChecker
+            gravitational_force_exp.add_particle(index=0, radius=0)
+    
+    # test that particle density has the right unit
+    # test that particle density >0
+    def test_exception_particle_density(self, particle_density, gravitational_force_exp):
+        # Test exception on wrong unit.
+        with pytest.raises(TypeError):
+           gravitational_force_exp.add_particle(index=0, particle_density=particle_density / (unit.gram / unit.centimeter** 2))
+        # Test exception on negative radius.
+        with pytest.raises(ValueError):
+            # noinspection PyTypeChecker
+            gravitational_force_exp.add_particle(index=0, particle_density=-particle_density)
+        with pytest.raises(ValueError):
+            # noinspection PyTypeChecker
+            gravitational_force_exp.add_particle(index=0, particle_density=0)
 
+    # test to make sure a particle is added to the system
     def test_exception_no_particles_added(self, expected_gravitational_potential):
         with pytest.raises(RuntimeError):
             for _ in expected_gravitational_potential.yield_potentials():
@@ -72,8 +127,8 @@ class TestGravityExceptions(TestGravityParameters):
         with pytest.raises(RuntimeError):
             for _ in expected_gravitational_potential.yield_potentials():
                 pass
-
-## throws exception if you try to add the potentials before you add the particles
+    
+    #test to make sure particles are added before getting the potential
     def test_exception_add_particle_after_yield_potentials(self, particle_mass, expected_gravitational_potential):
         expected_gravitational_potential.add_particle(index=0, particle_mass=particle_mass)
         for _ in expected_gravitational_potential.yield_potentials():
@@ -85,103 +140,77 @@ class TestGravityExceptions(TestGravityParameters):
             pass
         with pytest.raises(RuntimeError):
            expected_gravitational_potential.add_particle(index=1, particle_mass=particle_mass)
-
-    def test_exception_mass_negative(self, particle_mass, expected_gravitational_potential):
-        # Test exception mass is negative
-        with pytest.raises(ValueError):
-            expected_gravitational_potential.add_particle(index=0, particle_mass = -particle_mass)
-
-    def test_exception_z(self, z, expected_gravitational_potential):
-        # Test exception on wrong units of z
-        with pytest.raises(TypeError):
-            expected_gravitational_potential.add_particle(index=0, z=z / ((unit.nanometer) ** 2))
-
-
-class  TestGravityParameters(TestGravityParameters):
     
+    # test that gravitational constant has the right units
+    # note you don't need to test if g>0. technically someone can define negative acceleration for a system, it's valid
+    ##if you look at run_parameters.py, there is no exception for negative g
+    
+    def test_exception_g(self, g, expected_gravitational_potential):
+        # Test exception on wrong unit of g.
+        with pytest.raises(TypeError):
+            expected_gravitational_potential.add_particle(index=0, g=g / (unit.nanometer))
+
+
+    # test that water density has the right unit
+    # test that water density >0
+    def test_exception_water_density(self, water_density, gravitational_force_exp):
+            # Test exception on wrong unit.
+            with pytest.raises(TypeError):
+                gravitational_force_exp.add_particle(index=0, water_density=water_density / (unit.gram / unit.centimeter** 2))
+            # Test exception on density > 0.
+            with pytest.raises(ValueError):
+                # noinspection PyTypeChecker
+                gravitational_force_exp.add_particle(index=0, water_density=-water_density)
+            with pytest.raises(ValueError):
+                # noinspection PyTypeChecker
+                gravitational_force_exp.add_particle(index=0, water_density=0)
+  
+
+class TestGravity(TestGravityParameters):
+    '''Test to compare the force of gravity calculated in openmm with that in the numpy function'''
+
+    #autouse=True automatically executes the fixture before the test fxn; no need to initialize openmm_system and gravitational_potential in the test fxn
     @pytest.fixture(autouse=True)
-    def add_particle(self, openmm_system, expected_gravitational_potential, particle_mass):
+    def add_particle(self, openmm_system, gravitational_potential, radius):
         openmm_system.addParticle(mass=1.0)
-        expected_gravitational_potential.add_particle(index=0, particle_mass=particle_mass)
-        for potential in expected_gravitational_potential.yield_potentials():
+        gravitational_potential.add_particle(index=0, radius=radius)
+        for potential in gravitational_potential.yield_potentials():
             openmm_system.addForce(potential)
 
-    # This function cannot be moved to TestParameters class because add_particle fixture should be called before
-    # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
     @pytest.fixture
     def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
         return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
 
-    @pytest.mark.parametrize("direction,expected_function",
+    
+    ## see https://realpython.com/pytest-python-testing/#what-makes-pytest-so-useful to read about the mark.parametrize decorator
+    # and understand what to pass in 
+
+    """""we can use @pytest.mark.parameterize to parameterize a single test definition, and the create variants of the 
+    test with the parameters I specify"""
+    @pytest.mark.parametrize("direction, expected_function",
                              [
-                                 (0,  TestGravityParameters.slj_walls_potential_active),
-                                 (1,  TestGravityParameters.slj_walls_potential_active),
-                                 (2,  TestGravityParameters.slj_walls_potential_active)
+                                 2, TestGravityParameters.gravitational_force_exp
                              ])
-    def test_slj_walls_potential(self, openmm_context, test_positions, wall_distances, epsilon, alpha_all, particle_mass,
-                                 all_wall_directions, direction, expected_function):
-        openmm_potentials = np.empty(len(test_positions[direction]))
-        for index, dir_position in enumerate(test_positions[direction]):
+    
+    def test_gravitational_potentials(self, openmm_context, test_z_positions, expected_function):
+        # create an empty array to fill with gravitational potential values for each z position
+        openmm_grav_potentials = np.empty(len(test_z_positions))
+
+        # for each test position, set that as the particle's z position and get the openmm state/energy . save the energy
+        for index, dir_z_position in enumerate(test_z_positions):
             position = [0.0, 0.0, 0.0]
-            position[direction] = dir_position
+            position[2] = [0.0, 0.0, dir_z_position]
             openmm_context.setPositions([position])
             openmm_state = openmm_context.getState(getEnergy=True)
-            openmm_potentials[index] = openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+            openmm_grav_potentials[index] = openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
 
-        assert all_wall_directions[direction]
-        wall_distance = wall_distances[direction].value_in_unit(unit.nano * unit.meter)
-        rcut = particle_mass.value_in_unit(unit.nano * unit.meter) * 2**(1.0/6.0)
-        delta = particle_mass.value_in_unit(unit.nano * unit.meter) - 1.0
-        expected_potentials = expected_function(test_positions[direction], wall_distance, rcut, delta,
-                                                epsilon.value_in_unit(unit.kilojoule_per_mole),
-                                                particle_mass.value_in_unit(unit.nano * unit.meter), alpha_all)
-        assert np.any(expected_potentials > 0.0)
-        assert np.all(expected_potentials >= 0.0)
-        assert openmm_potentials == pytest.approx(expected_potentials, rel=1.0e-7, abs=1.0e-13)
+        # get the gravitational potentials for each z position from the numpy function
+        expected_numpy_grav_potentials = expected_function(test_z_positions)
+        
+        #use an assert statement to compare the two arrays of gravitational potentials and make sure they're the same
+        assert openmm_grav_potentials == pytest.approx(expected_numpy_grav_potentials, rel=1.0e-7, abs=1.0e-13)
 
-
-class TestShiftedLennardJonesWallPotentialsSome( TestGravityParameters):
-    @pytest.fixture(autouse=True)
-    def add_particle(self, openmm_system,expected_gravitational_potential, particle_mass):
-        openmm_system.addParticle(mass=1.0)
-       expected_gravitational_potential.add_particle(index=0, particle_mass=particle_mass)
-        for potential inexpected_gravitational_potential.yield_potentials():
-            openmm_system.addForce(potential)
-
-    # This function cannot be moved to TestParameters class because add_particle fixture should be called before
-    # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
-    @pytest.fixture
-    def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
-        return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
-
-    @pytest.mark.parametrize("direction,expected_function",
-                             [
-                                 (0, lambda pos, *args: np.zeros_like(pos)),
-                                 (1,  TestGravityParameters.slj_walls_potential_active),
-                                 (2, lambda pos, *args: np.zeros_like(pos))
-                             ])
-    def test_slj_walls_potential(self, openmm_context, test_positions, wall_distances, epsilon, alpha_some, particle_mass,
-                                 some_wall_directions, direction, expected_function):
-        openmm_potentials = np.empty(len(test_positions[direction]))
-        for index, dir_position in enumerate(test_positions[direction]):
-            position = [0.0, 0.0, 0.0]
-            position[direction] = dir_position
-            openmm_context.setPositions([position])
-            openmm_state = openmm_context.getState(getEnergy=True)
-            openmm_potentials[index] = openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-
-        wall_distance = wall_distances[direction].value_in_unit(unit.nano * unit.meter)
-        rcut = particle_mass.value_in_unit(unit.nano * unit.meter) * 2 ** (1.0 / 6.0)
-        delta = particle_mass.value_in_unit(unit.nano * unit.meter) - 1.0
-        expected_potentials = expected_function(test_positions[direction], wall_distance, rcut, delta,
-                                                epsilon.value_in_unit(unit.kilojoule_per_mole),
-                                                particle_mass.value_in_unit(unit.nano * unit.meter), alpha_some)
-        if some_wall_directions[direction]:
-            assert np.any(expected_potentials > 0.0)
-            assert np.all(expected_potentials >= 0.0)
-        else:
-            assert np.all(expected_potentials == 0.0)
-        assert openmm_potentials == pytest.approx(expected_potentials, rel=1.0e-7, abs=1.0e-13)
+        ## see the jupyter notebook on github for reference about how we compare the openmm and numpy function values
 
 
 if __name__ == '__main__':

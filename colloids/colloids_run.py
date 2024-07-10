@@ -4,7 +4,7 @@ import openmm
 from openmm import app
 from openmm import unit
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
-                      ShiftedLennardJonesWalls)
+                      ShiftedLennardJonesWalls, DepletionPotential)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
 from colloids.run_parameters import RunParameters
@@ -71,6 +71,8 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
 
+    add_depletion = parameters.depletion_on
+
     # Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
@@ -124,6 +126,16 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
 
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
+    
+    if add_depletion:
+        depletion_potential = DepletionPotential(parameters.phi, parameters.depletant_radius, parameters.brush_length,
+                                                periodic_boundary_conditions=not all_walls)
+        
+        for i, t in enumerate(types):
+            # noinspection PyTypeChecker
+            depletion_potential.add_particle(index=i, radius=parameters.radii[t])
+        for force in depletion_potential.yield_potentials():
+            system.addForce(force)
 
     if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":
         simulation = app.Simulation(topology, system, integrator, platform,

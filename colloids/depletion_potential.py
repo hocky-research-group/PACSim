@@ -14,9 +14,10 @@ class DepletionPotential(OpenMMPotentialAbstract):
     depletion force can be paired with the repulsive force as described by the Alexander-de Gennes polymer brush model 
     between two colloids. (See ColloidPotentialsParameters() for more information.)
 
-    The cutoff distance for the depletion potential is set to 2.0 * r_max + 2.0 * brush_length, where brush_length is the thickness
-    of the polymer brush. A switching function is used to make the potential and forces go smoothly to 0 at the cutoff distance. 
-    The cutoff can be set to be periodic or non-periodic.
+    The cutoff distance for the depletion potential is set to max(sigma_colloid) + sigma_depletant where sigma_colloid is the 
+    diameter of the largest particle in the system plus two lengths of the polymer brush, and sigma_depletant is the diameter
+    of the depletant plus two lengths of the polymer brush. A switching function is used to make the potential and forces go 
+    smoothly to 0 at the cutoff distance. The cutoff can be set to be periodic or non-periodic.
 
     :param phi:
         The number density of polymers in the solution.
@@ -126,11 +127,14 @@ class DepletionPotential(OpenMMPotentialAbstract):
         else:
             self._depletion_potential.setNonbondedMethod(self._depletion_potential.CutoffNonPeriodic)
         self._depletion_potential.setCutoffDistance(
-            (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(self._nanometer))
+            ((2.0 * self._max_radius + 2.0 * self._parameters.brush_length)
+            + (2.0 * self._depletant_radius + 2.0 * self._parameters.brush_length)).value_in_unit(self._nanometer))
         self._depletion_potential.setUseLongRangeCorrection(False)
         self._depletion_potential.setUseSwitchingFunction(False)
 
         yield self._depletion_potential
+
+        max(sigma_colloid) + sigma_depletion 
 
 
     

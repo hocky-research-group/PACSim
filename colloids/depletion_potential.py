@@ -95,6 +95,8 @@ class DepletionPotential(OpenMMPotentialAbstract):
 
         if radius.in_units_of(self._nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(self._nanometer)
+        
+        self._depletion_potential.addParticle([radius.value_in_unit(self._nanometer)])
 
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """

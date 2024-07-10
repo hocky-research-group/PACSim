@@ -14,6 +14,10 @@ class DepletionPotential(OpenMMPotentialAbstract):
     depletion force can be paired with the repulsive force as described by the Alexander-de Gennes polymer brush model 
     between two colloids. (See ColloidPotentialsParameters() for more information.)
 
+    The cutoff distance for the depletion potential is set to 2.0 * r_max + 2.0 * brush_length, where brush_length is the thickness
+    of the polymer brush. A switching function is used to make the potential and forces go smoothly to 0 at the cutoff distance. 
+    The cutoff can be set to be periodic or non-periodic.
+
     :param phi:
         The number density of polymers in the solution.
         The value must be between 0 and 1.
@@ -28,14 +32,17 @@ class DepletionPotential(OpenMMPotentialAbstract):
         The unit of the brush_length must be compatible with nanometers and the value must be greater than zero.
         Defaults to 10.0 nanometers.
     :type brush_length: unit.Quantity
-
+    :param periodic_boundary_conditions:
+        Whether this force should use periodic cutoffs for the depletion potential.
+    :type periodic_boundary_conditions: bool
 
     """
     
     _nanometer = unit.nano * unit.meter
     
-    def __init__(self, phi: float, depletant_radius: unit.Quantity, brush_length: unit.Quantity):
-        """Constructor of the DepletionPotentialsAlgebraic class."""
+    def __init__(self, phi: float, depletant_radius: unit.Quantity, brush_length: unit.Quantity,
+                            periodic_boundary_conditions: bool = True):
+        """Constructor of the DepletionPotential class."""
         
         super().__init__()
 
@@ -44,6 +51,7 @@ class DepletionPotential(OpenMMPotentialAbstract):
         self._brush_length = brush_length
         self._depletion_potential = self._set_up_depletion_potential()
         self._max_radius = -math.inf * self._nanometer
+
 
     def _set_up_depletion_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the Asakura-Oosawa depletion potential for a colloidal solution 
@@ -83,7 +91,6 @@ class DepletionPotential(OpenMMPotentialAbstract):
             The unit of the radius must be compatible with nanometers and the value must be greater than zero.
         :type radius: unit.Quantity
 
-
         :raises TypeError:
             If the radius is not a Quantity with a proper unit (via the abstract base class).
         :raises ValueError:
@@ -100,13 +107,12 @@ class DepletionPotential(OpenMMPotentialAbstract):
 
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """
-        Generate all potentials in the systems that are necessary to properly include the steric (brush) and depletion pair
-        potentials between colloids in a solution in an openmm system.
+        Generate the depletion pair potential between colloids in a solution in an openmm system.
 
-        This method has to be called after the method add_particle was called for every particle in the system.
+        This method has to be called after the method add_particle is called for every particle in the system.
 
         :return:
-            A generator that yields the steric and AO potentials handled by this class.
+            A generator that yields the depletion potential handled by this class.
         :rtype: Iterator[CustomNonbondedForce]
 
         :raises RuntimeError:
@@ -115,8 +121,15 @@ class DepletionPotential(OpenMMPotentialAbstract):
         super().yield_potentials()
         assert not math.isinf(self._max_radius.value_in_unit(self._nanometer))
 
+        if self._periodic_boundary_conditions:
+            self._depletion_potential.setNonbondedMethod(self._depletion_potential.CutoffPeriodic)
+        else:
+            self._depletion_potential.setNonbondedMethod(self._depletion_potential.CutoffNonPeriodic)
+        self._depletion_potential.setCutoffDistance(
+            (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(self._nanometer))
+        self._depletion_potential.setUseLongRangeCorrection(False)
+        self._depletion_potential.setUseSwitchingFunction(False)
 
-        #yield self._steric_potential
         yield self._depletion_potential
 
 

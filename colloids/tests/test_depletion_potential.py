@@ -1,6 +1,6 @@
 from openmm import Context, LangevinIntegrator, Platform, System, unit, Vec3
 import pytest
-from colloids.depletion_potentials_algebraic import DepletionPotentialsAlgebraic
+from colloids.depletion_potential import DepletionPotential
 import numpy as np
 
 
@@ -82,13 +82,9 @@ class TestParameters(object):
         return system
 
     @pytest.fixture
-    def depletion_potentials_algebraic(self, phi, depletant_radius, brush_length):
-        return DepletionPotentialsAlgebraic(self, phi, depletant_radius, brush_length)
+    def depletion_potential(self, phi, depletant_radius, brush_length):
+        return DepletionPotential(self, phi, depletant_radius, brush_length)
 
-    # Keep this to adjust for future implementation of tabulated pair potentials
-    @pytest.fixture
-    def depletion_potentials(self, depletion_potentials_algebraic):
-        return depletion_potentials_algebraic 
 
     '''@pytest.fixture
     def colloid_potentials_tabulated(self, radius_one, radius_two, surface_potential_one, surface_potential_two,
@@ -117,59 +113,59 @@ class TestParameters(object):
         return LangevinIntegrator(0.0, 0.0, 0.0)
 
 
-class TestDepletionPotentialsAlgebraicExceptions(TestParameters):
-    def test_exception_radius(self, depletion_potentials, radius_one):
+class TestDepletionPotentialExceptions(TestParameters):
+    def test_exception_radius(self, depletion_potential, radius_one):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
-            depletion_potentials.add_particle(
+            depletion_potential.add_particle(
                 radius=radius_one / ((unit.nano * unit.meter) ** 2))
         # Test exception on negative radius.
         with pytest.raises(ValueError):
             # noinspection PyTypeChecker
-            depletion_potentials.add_particle(
+            depletion_potential.add_particle(
                 radius=-radius_one)
 
 
-    def test_exception_no_particles_added(self, depletion_potentials):
+    def test_exception_no_particles_added(self, depletion_potential):
         with pytest.raises(RuntimeError):
-            for _ in depletion_potentials.yield_potentials():
+            for _ in depletion_potential.yield_potentials():
                 pass
 
-    def test_exception_add_particle_after_yield_potentials(self, depletion_potentials, radius_one):
-        depletion_potentials.add_particle(radius=radius_one)
-        for _ in depletion_potentials.yield_potentials():
+    def test_exception_add_particle_after_yield_potentials(self, depletion_potential, radius_one):
+        depletion_potential.add_particle(radius=radius_one)
+        for _ in depletion_potential.yield_potentials():
             pass
         with pytest.raises(RuntimeError):
-            depletion_potentials.add_particle(radius=radius_one)
+            depletion_potential.add_particle(radius=radius_one)
 
-    def test_exception_wrong_particle_size_ratio(self, depletion_potentials):
+    def test_exception_wrong_particle_size_ratio(self, depletion_potential):
         # This is fine for a depletant of radius 5nm.
-        depletion_potentials.add_particle(index=0, radius=236.0 * (unit.nano * unit.meter))
+        depletion_potential.add_particle(index=0, radius=236.0 * (unit.nano * unit.meter))
         # This is not fine for a depletant radius of 5 nm.
         with pytest.raises(ValueError):
-            depletion_potentials.add_particle(index=1, radius=23.0 * (unit.nano * unit.meter))
+            depletion_potential.add_particle(index=1, radius=23.0 * (unit.nano * unit.meter))
 
-    def test_exception_phi(self, depletion_potentials):
+    def test_exception_phi(self, depletion_potential):
         # Test exception on negative phi
         with pytest.raises(ValueError):
-            depletion_potentials(phi = -0.5, depletant_radius=5* (unit.nano * unit.meter), 
+            depletion_potential(phi = -0.5, depletant_radius=5* (unit.nano * unit.meter), 
                                         brush_length=10* (unit.nano * unit.meter))
 
         # Test exception on phi > 1
         with pytest.raises(ValueError):
-            depletion_potentials(phi = 2.0, depletant_radius=5* (unit.nano * unit.meter), 
+            depletion_potential(phi = 2.0, depletant_radius=5* (unit.nano * unit.meter), 
                                         brush_length=10* (unit.nano * unit.meter))
 
 
-    def test_exception_depletant_radius(self, depletion_potentials):
+    def test_exception_depletant_radius(self, depletion_potential):
         # Test exception on wrong unit.
         with pytest.raises(ValueError):
-            depletion_potentials(phi = 0.5, depletant_radius=5/ ((unit.nano * unit.meter) ** 2), 
+            depletion_potential(phi = 0.5, depletant_radius=5/ ((unit.nano * unit.meter) ** 2), 
                                         brush_length=10* (unit.nano * unit.meter))
 
         # Test exception on negative depletant radius
         with pytest.raises(TypeError):
-            depletion_potentials(phi = 0.5, depletant_radius=-5* (unit.nano * unit.meter), 
+            depletion_potential(phi = 0.5, depletant_radius=-5* (unit.nano * unit.meter), 
                                         brush_length=10* (unit.nano * unit.meter))
 
 
@@ -194,14 +190,14 @@ class TestDepletionPotentialsAlgebraicExceptions(TestParameters):
 
 
 # noinspection DuplicatedCode
-class TestDepletionPotentialsForTwoParticles(TestParameters):
+class TestDepletionPotentialForTwoParticles(TestParameters):
     @pytest.fixture(autouse=True)
-    def add_two_particles(self, openmm_system, depletion_potentials, radius_one, radius_two):
+    def add_two_particles(self, openmm_system, depletion_potential, radius_one, radius_two):
         openmm_system.addParticle(mass=1.0)
-        depletion_potentials.add_particle(radius=radius_one)
+        depletion_potential.add_particle(radius=radius_one)
         openmm_system.addParticle(mass=1.0)
-        depletion_potentials.add_particle(radius=radius_two)
-        for potential in depletion_potentials.yield_potentials():
+        depletion_potential.add_particle(radius=radius_two)
+        for potential in depletion_potential.yield_potentials():
             openmm_system.addForce(potential)
 
     # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
@@ -217,7 +213,7 @@ class TestDepletionPotentialsForTwoParticles(TestParameters):
                              TestParameters.depletion_potential_expected)
                       ])
 
-    def test_depletion_potentials(self, openmm_context, test_positions, radius_one, brush_length, phi, radius_depletant, 
+    def test_depletion_potential(self, openmm_context, test_positions, radius_one, brush_length, phi, radius_depletant, 
         expected_function):
 
         openmm_potentials = np.zeros(len(test_positions)) #use surface separation as test positions

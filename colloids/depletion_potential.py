@@ -4,7 +4,7 @@ from openmm import unit
 from openmm import CustomNonbondedForce
 from colloids.abstracts import OpenMMPotentialAbstract
 
-class DepletionPotentialsAlgebraic(OpenMMPotentialAbstract):
+class DepletionPotential(OpenMMPotentialAbstract):
 
     """
     This class sets up the depletion potential between colloids in a solution with a nonadsorbing polymer background. 
@@ -117,7 +117,6 @@ class DepletionPotentialsAlgebraic(OpenMMPotentialAbstract):
         #yield self._steric_potential
         yield self._depletion_potential
 
-if __name__ == '__main__':
-    DepletionPotentialsAlgebraic()
+
     
     

@@ -2,9 +2,10 @@ import math
 from typing import Iterator
 from openmm import unit
 from openmm import CustomNonbondedForce
-from colloids.abstracts import OpenMMPotentialAbstract
+from colloids.abstracts import ColloidPotentialsAbstract
+from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
-class DepletionPotential(OpenMMPotentialAbstract):
+class DepletionPotential(ColloidPotentialsAbstract):
 
     """
     This class sets up the depletion potential between colloids in a solution with a nonadsorbing polymer background. 
@@ -41,15 +42,15 @@ class DepletionPotential(OpenMMPotentialAbstract):
     
     _nanometer = unit.nano * unit.meter
     
-    def __init__(self, phi: float, depletant_radius: unit.Quantity, brush_length: unit.Quantity,
-                            periodic_boundary_conditions: bool = True):
+    def __init__(self, phi: float, depletant_radius: unit.Quantity, 
+                colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(), 
+                periodic_boundary_conditions: bool = True):
         """Constructor of the DepletionPotential class."""
         
-        super().__init__()
+        super().__init__(colloid_potentials_parameters, periodic_boundary_conditions)
 
         self._phi = phi
         self._depletant_radius = depletant_radius
-        self._brush_length = brush_length
         self._depletion_potential = self._set_up_depletion_potential()
         self._max_radius = -math.inf * self._nanometer
 
@@ -65,8 +66,8 @@ class DepletionPotential(OpenMMPotentialAbstract):
             "term1 = 3*r/ (2 * sigma_colloid * (1+q));"
             "term2 = r^3 / (2 * sigma_colloid^3 *(1+q)^3);"
             "q = sigma_depletant/sigma_colloid;"
-            "sigma_colloid = ((2 * radius) + 2*brush_length);"
-            "sigma_depletant = ((2 * radius_depletant) + 2*brush_length);"
+            "sigma_colloid = ((2 * radius1) + 2*brush_length);"
+            "sigma_depletant = ((2 * depletant_radius) + 2*brush_length);"
         )
 
         depletion_potential.addGlobalParameter("phi", (self._phi))
@@ -75,15 +76,15 @@ class DepletionPotential(OpenMMPotentialAbstract):
                                             self._depletant_radius.value_in_unit(self._nanometer))
         
         depletion_potential.addGlobalParameter("brush_length",
-                                            self._brush_length.value_in_unit(self._nanometer))
+                                            self._parameters.brush_length.value_in_unit(self._nanometer))
 
         depletion_potential.addPerParticleParameter("radius")
 
         return depletion_potential
     
-    def add_particle(self, radius: unit.Quantity) -> None:
+    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:
         """
-        Add a colloid with a given radius to the system.
+        Add a colloid with a given radius and surface potential to the system.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -92,14 +93,19 @@ class DepletionPotential(OpenMMPotentialAbstract):
             The unit of the radius must be compatible with nanometers and the value must be greater than zero.
         :type radius: unit.Quantity
 
+
         :raises TypeError:
             If the radius is not a Quantity with a proper unit (via the abstract base class).
         :raises ValueError:
             If the radius is not greater than zero (via the abstract base class).
+        :param surface_potential:
+            The surface potential of the colloid.
+            The unit of the surface_potential must be compatible with millivolts.
+        :type surface_potential: unit.Quantity
         :raises RuntimeError:
             If the method yield_potentials was called before this method (via the abstract base class).
         """
-        super().add_particle(radius)
+        super().add_particle(radius, surface_potential)
 
         if radius.in_units_of(self._nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(self._nanometer)
@@ -133,9 +139,6 @@ class DepletionPotential(OpenMMPotentialAbstract):
         self._depletion_potential.setUseSwitchingFunction(False)
 
         yield self._depletion_potential
-
-        max(sigma_colloid) + sigma_depletion 
-
 
     
     

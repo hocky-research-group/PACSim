@@ -128,12 +128,13 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         system.addForce(force)
     
     if add_depletion:
-        depletion_potential = DepletionPotential(parameters.phi, parameters.depletant_radius, parameters.brush_length,
+        depletion_potential = DepletionPotential(parameters.phi, parameters.depletant_radius, 
+                                                colloid_potentials_parameters=potentials_parameters,
                                                 periodic_boundary_conditions=not all_walls)
         
         for i, t in enumerate(types):
             # noinspection PyTypeChecker
-            depletion_potential.add_particle(index=i, radius=parameters.radii[t])
+            depletion_potential.add_particle(radius=parameters.radii[t], surface_potential=parameters.surface_potentials[t])
         for force in depletion_potential.yield_potentials():
             system.addForce(force)
 

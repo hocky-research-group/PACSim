@@ -56,8 +56,9 @@ class TestGravityParameters(object):
 
     @staticmethod
     def gravitational_force_exp(particle_density, water_density, particle_radius, z, g):
-        return (np.absolute(water_density - particle_density))* 4/3 * np.pi * particle_radius**3
+        return (((np.absolute(water_density - particle_density))* 4/3 * np.pi * particle_radius**3) * z * g) / (10**36)
 
+    @pytest.fixture
     # Define a function that returns your Gravity function from gravity.py (openmm version)
     def gravitational_potential(self, gravitational_constant, water_density):
         return Gravity(gravitational_constant, water_density)
@@ -87,7 +88,7 @@ class TestGravityExceptions(TestGravityParameters):
         # Test exception on negative radius. 
         with pytest.raises(ValueError):
             # noinspection PyTypeChecker
-            gravitational_force_exp.add_particle(index=0, radius=-radius, particle_density=particle_density)
+            gravitational_force_exp.add_particle(index=0, radius=-particle_radius, particle_density=particle_density)
     
     # test that particle density has the right unit
     # test that particle density >0
@@ -96,16 +97,13 @@ class TestGravityExceptions(TestGravityParameters):
         with pytest.raises(TypeError):
            gravitational_force_exp.add_particle(index=0, radius=particle_radius, 
                                                 particle_density=particle_density / (unit.gram / unit.centimeter** 2))
-        # Test exception on negative radius.
+        # Test exception on negative particle density.
         with pytest.raises(ValueError):
             # noinspection PyTypeChecker
             gravitational_force_exp.add_particle(index=0, radius=particle_radius, particle_density=-particle_density)
 
     # test to make sure a particle is added to the system
     def test_exception_no_particles_added(self, expected_gravitational_potential):
-        with pytest.raises(RuntimeError):
-            for _ in expected_gravitational_potential.yield_potentials():
-                pass
         with pytest.raises(RuntimeError):
             for _ in expected_gravitational_potential.yield_potentials():
                 pass
@@ -117,26 +115,19 @@ class TestGravityExceptions(TestGravityParameters):
             pass
         with pytest.raises(RuntimeError):
             expected_gravitational_potential.add_particle(index=1, radius=particle_radius, particle_density=particle_density)
-        expected_gravitational_potential.add_particle(index=0, radius=particle_radius, particle_density=particle_density)
-        for _ in expected_gravitational_potential.yield_potentials():
-            pass
-        with pytest.raises(RuntimeError):
-           expected_gravitational_potential.add_particle(index=1, radius=particle_radius, particle_density=particle_density)
     
     # test that gravitational constant has the right units
-    def test_exception_g(self, g, particle_radius, particle_density, expected_gravitational_potential):
-        # Test exception on wrong unit of g.
-        with pytest.raises(TypeError):
-            expected_gravitational_potential.add_particle(index=0, radius=particle_radius, particle_density=particle_density,
-                                                          g=g / (unit.nanometer))
+    def test_exception_g(self):
+       with pytest.raises(ValueError):
+                Gravity(gravitational_constant = 9.8 / (unit.meter / unit.second**2),
+                                    water_density = -0.998 * (unit.gram / unit.centimeter**3))
 
 
     # test that water density has the right unit
-    # test that water density >0
     def test_exception_water_density(self):
-            with pytest.raises(ValueError):
-                Gravity(gravitational_constant = 9.8 * (unit.meter / unit.second**2),
-                                    water_density = -0.998 * (unit.gram / unit.centimeter**3))
+        with pytest.raises(ValueError):
+            Gravity(gravitational_constant = 9.8 * (unit.meter / unit.second**2),
+                            water_density = -0.998 / (unit.gram / unit.centimeter**3))
 
 class TestGravity(TestGravityParameters):
     '''Test to compare the force of gravity calculated in openmm with that in the numpy function'''
@@ -154,8 +145,8 @@ class TestGravity(TestGravityParameters):
 
     @pytest.mark.parametrize("expected_function", TestGravityParameters.gravitational_force_exp)
     
-    def test_gravitational_potentials(self, openmm_context, particle_density, water_density, particle_radius,
-                                      test_z_positions, expected_function):
+    def test_gravitational_potentials(self, openmm_context, particle_density, particle_radius,
+                                      test_z_positions, g, expected_function):
         
         openmm_grav_potentials = np.empty(len(test_z_positions))
         
@@ -166,7 +157,8 @@ class TestGravity(TestGravityParameters):
             openmm_grav_potentials = openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
 
         # get the gravitational potentials for each z position from the numpy function
-        expected_numpy_grav_potentials = expected_function(particle_density, water_density, particle_radius, test_z_positions)
+        expected_numpy_grav_potentials = expected_function(particle_density, water_density, particle_radius, 
+                        test_z_positions, g)
         
         #use an assert statement to compare the two arrays of gravitational potentials and make sure they're the same
         assert openmm_grav_potentials == pytest.approx(expected_numpy_grav_potentials, rel=1.0e-7, abs=1.0e-13)

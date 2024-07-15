@@ -118,4 +118,5 @@ def lattice_particle_positions(nparticles, box_vectors):
     box_nm = box_vectors[0][0] / unit.nanometer
     xyz, box = build_lattice(nparticles)
     xyz *= (box_nm / box)
+    xyz -= np.array([box_nm, box_nm, box_nm]) / 2.0
     return xyz

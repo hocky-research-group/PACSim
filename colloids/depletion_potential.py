@@ -137,6 +137,7 @@ class DepletionPotential(ColloidPotentialsAbstract):
             + (2.0 * self._depletant_radius + 2.0 * self._parameters.brush_length)).value_in_unit(self._nanometer))
         self._depletion_potential.setUseLongRangeCorrection(False)
         self._depletion_potential.setUseSwitchingFunction(False)
+        self._depletion_potential.setForceGroup(2)
 
         yield self._depletion_potential
 

@@ -3,6 +3,7 @@ from typing import Optional
 from openmm import unit
 from colloids.abstracts import Parameters
 from colloids.helper_functions import read_xyz_file
+import warnings
 
 
 @dataclass(order=True, frozen=True)
@@ -348,7 +349,7 @@ class RunParameters(Parameters):
                     raise ValueError("All colloidal particles must have the same radius if depletion is on.")
             for t in self.radii:
                 if self.depletant_radius/self.radii[t] > 0.1547:
-                    raise ValueError("Size ratio of depletant to colloid particles is too large."
+                    warnings.warn("Size ratio of depletant to colloid particles is too large."
                                     " Analytical computation of depletion potential will be invalid.")
         else:
             if self.phi is not None:

@@ -12,10 +12,10 @@ def main():
     mass = 39.9 * unit.amu  # argon
     sigma = 3.4 * unit.angstrom  # argon
     epsilon = 0.238 * unit.kilocalories_per_mole  # argon
-    cutoff = 7.0 * sigma
+    cutoff = 5.0 * sigma
     switch_width = 3.4 * unit.angstrom  # argon
     temperature = epsilon / unit.BOLTZMANN_CONSTANT_kB / unit.AVOGADRO_CONSTANT_NA  # kT/epsilon = 1
-    reduced_time_step = 0.005
+    reduced_time_step = 0.001
     number_equilibration_steps = 100000
     number_production_steps = 1000000
     platform = "CPU"  # "Reference", "CPU", "CUDA", or "OpenCL"

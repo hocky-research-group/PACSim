@@ -133,7 +133,7 @@ def main():
 
     simulation.reporters.append(StatusReporter(max(1, number_production_steps // 100), number_production_steps))
     simulation.reporters.append(GSDReporter(trajectory_filename, trajectory_interval,
-                                            {"Ar": sigma}, {"Ar": 0.0 * unit.volt},
+                                            {"Ar": sigma / 2.0}, {"Ar": 0.0 * unit.volt},
                                             simulation))
     simulation.reporters.append(app.StateDataReporter(state_data_filename, state_data_interval, step=True,
                                                       time=True, kineticEnergy=True, potentialEnergy=True,

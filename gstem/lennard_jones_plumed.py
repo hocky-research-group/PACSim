@@ -19,14 +19,14 @@ def main():
     temperature = epsilon / unit.BOLTZMANN_CONSTANT_kB / unit.AVOGADRO_CONSTANT_NA  # kT/epsilon = 1
     reduced_time_step = 0.001
     number_equilibration_steps = 0
-    number_production_steps = 1000000
+    number_production_steps = 10
     platform = "CPU"  # "Reference", "CPU", "CUDA", or "OpenCL"
     trajectory_filename = "trajectory.gsd"
     trajectory_interval = 1000
     state_data_filename = "state_data.csv"
     state_data_interval = 100
     initial = "lattice"  # "lattice" or "random"
-    use_plumed = False
+    use_plumed = True
 
     # Create topology with Argon atoms.
     topology = app.Topology()
@@ -70,7 +70,7 @@ def main():
 
     if use_plumed:
         # See https://www.plumed-nest.org/eggs/19/049/data/plumed_GeTe.dat.html
-        distance_threshold_first_coordination_sphere = 5.29  # TODO: SET ACCORDING TO SIMULATIONS!
+        distance_threshold_first_coordination_sphere = 0.4  # TODO: SET ACCORDING TO SIMULATIONS!
         switch_width = 0.01
         script = f"""
         # Calculate the Steinhardt Q6 vector for each of the atoms in the system
@@ -133,7 +133,7 @@ def main():
 
     simulation.reporters.append(StatusReporter(max(1, number_production_steps // 100), number_production_steps))
     simulation.reporters.append(GSDReporter(trajectory_filename, trajectory_interval,
-                                            {"Ar" : sigma}, {"Ar": 0.0 * unit.volt},
+                                            {"Ar": sigma}, {"Ar": 0.0 * unit.volt},
                                             simulation))
     simulation.reporters.append(app.StateDataReporter(state_data_filename, state_data_interval, step=True,
                                                       time=True, kineticEnergy=True, potentialEnergy=True,

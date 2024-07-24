@@ -96,7 +96,7 @@ class GSDReporter(object):
         if not report_interval > 0:
             raise ValueError("The report interval must be greater than zero.")
         assert simulation.topology.getNumChains() == 1
-        assert simulation.topology.getNumResidues() == 1
+        assert simulation.topology.getNumResidues() == simulation.topology.getNumAtoms()
         assert simulation.topology.getNumAtoms() == simulation.system.getNumParticles()
         types = list(dict.fromkeys(atom.name for atom in simulation.topology.atoms()))
         if not all(t in radii for t in types):

@@ -174,16 +174,16 @@ class RunParameters(Parameters):
         If any wall direction is True, alpha must be not None and 0 <= alpha <= 1.
         Note that the force of this potential is only continuous if alpha = 1.
     :type alpha: Optional[float]
-    :param depletion_on:
+    :param use_depletion:
         A boolean indicating whether to turn on the depletion attraction for the simulation.
         If depletion attraction is on, phi and depletant radius must be specified.
         Defaults to False.
-    :type depletion_on: bool
-    :param phi:
+    :type use_depletion: bool
+    :param depletion_phi:
         The number density of polymers in the solution.
-        If depletion attraction is on, the value of phi must not be None and 0<= phi <=1.
+        If depletion attraction is on, the value of depletion_phi must not be None and 0<= depletion_phi <=1.
         Defaults to None.
-    :type phi: Optional[float]
+    :type depletion_phi: Optional[float]
     :param depletant_radius: 
         The radius of the polymers in solution for a system with depletion attraction.
         If depletion attraction is on, depletant_radius must not be None, its unit must be compatible with nanometers,
@@ -210,7 +210,7 @@ class RunParameters(Parameters):
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
     debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
-    depletion_on: bool = False
+    use_depletion: bool = False
     dielectric_constant: float = 80.0
     cutoff_factor: float = 21.0
     use_log: bool = False
@@ -230,7 +230,7 @@ class RunParameters(Parameters):
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
-    phi: Optional[float] = None
+    depletion_phi: Optional[float] = None
     depletant_radius: Optional[unit.Quantity] = None
 
     def __post_init__(self) -> None:
@@ -332,10 +332,10 @@ class RunParameters(Parameters):
                 raise ValueError("Epsilon must not be specified if walls are not active.")
             if self.alpha is not None:
                 raise ValueError("Alpha must not be specified if walls are not active.")
-        if self.depletion_on:
-            if self.phi is None:
+        if self.use_depletion:
+            if self.depletion_phi is None:
                 raise ValueError("Phi must be specified if depletion is on.")
-            if not 0.0 <= self.phi <= 1.0:
+            if not 0.0 <= self.depletion_phi <= 1.0:
                 raise ValueError("Phi must be between zero and one.")
             if self.depletant_radius is None:
                 raise ValueError("Depletant radius must be specified if depletion is on.")
@@ -352,7 +352,7 @@ class RunParameters(Parameters):
                     warnings.warn("Size ratio of depletant to colloid particles is too large."
                                     " Analytical computation of depletion potential will be invalid.")
         else:
-            if self.phi is not None:
+            if self.depletion_phi is not None:
                 raise ValueError("Phi must not be specified if depletion potential is not on.")
             if self.depletant_radius is not None:
                 raise ValueError("Depletant radius must not be specified if depletion potential is not on.")

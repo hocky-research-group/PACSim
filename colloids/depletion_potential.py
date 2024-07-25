@@ -20,10 +20,10 @@ class DepletionPotential(ColloidPotentialsAbstract):
     of the depletant plus two lengths of the polymer brush. A switching function is used to make the potential and forces go 
     smoothly to 0 at the cutoff distance. The cutoff can be set to be periodic or non-periodic.
 
-    :param phi:
+    :param depletion_phi:
         The number density of polymers in the solution.
         The value must be between 0 and 1.
-    :type phi: float
+    :type depletion_phi: float
     :param depletant_radius:
         The "radius" of the polymers, if treated as hard spheres.
         The unit of the depletant_radius must be compatible with nanometers and the value must be greater than zero.
@@ -42,14 +42,14 @@ class DepletionPotential(ColloidPotentialsAbstract):
     
     _nanometer = unit.nano * unit.meter
     
-    def __init__(self, phi: float, depletant_radius: unit.Quantity, 
+    def __init__(self, depletion_phi: float, depletant_radius: unit.Quantity, 
                 colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(), 
                 periodic_boundary_conditions: bool = True):
         """Constructor of the DepletionPotential class."""
         
         super().__init__(colloid_potentials_parameters, periodic_boundary_conditions)
 
-        self._phi = phi
+        self._depletion_phi = depletion_phi
         self._depletant_radius = depletant_radius
         self._depletion_potential = self._set_up_depletion_potential()
         self._max_radius = -math.inf * self._nanometer
@@ -70,7 +70,7 @@ class DepletionPotential(ColloidPotentialsAbstract):
             "sigma_depletant = ((2 * depletant_radius) + 2*brush_length);"
         )
 
-        depletion_potential.addGlobalParameter("phi", (self._phi))
+        depletion_potential.addGlobalParameter("phi", (self._depletion_phi))
         
         depletion_potential.addGlobalParameter("depletant_radius",
                                             self._depletant_radius.value_in_unit(self._nanometer))

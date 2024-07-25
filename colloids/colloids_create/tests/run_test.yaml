@@ -14,6 +14,8 @@ cutoff_factor: 21.0
 debye_length: !Quantity
   unit: nanometer
   value: 3.675205
+depletion_on: false
+depletant_radius: null
 dielectric_constant: 80.0
 epsilon: null
 final_configuration_gsd_filename: final_frame.gsd
@@ -28,6 +30,7 @@ masses:
     unit: dalton
     value: 1.0
 minimize_energy_initially: false
+phi: null
 platform_name: Reference
 radii:
   N: !Quantity

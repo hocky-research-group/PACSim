@@ -45,7 +45,7 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
                 box_vector_three[0] == 0.0 and box_vector_three[1] == 0.0):
             raise ValueError("If any wall is included, the box vectors must be parallel to the coordinate axes.")
         wall_distances = (box_vector_one[0] * (unit.nano * unit.meter) if parameters.wall_directions[0] else None,
-                          box_vector_two[1] * (unit.nano * unit.meter)if parameters.wall_directions[1] else None,
+                          box_vector_two[1] * (unit.nano * unit.meter) if parameters.wall_directions[1] else None,
                           box_vector_three[2] * (unit.nano * unit.meter) if parameters.wall_directions[2] else None)
         final_cell = cell.copy()
         if not all_walls:
@@ -126,19 +126,41 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
 
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
-    
+
     if add_depletion:
-        depletion_potential = DepletionPotential(parameters.phi, parameters.depletant_radius, 
-                                                colloid_potentials_parameters=potentials_parameters,
-                                                periodic_boundary_conditions=not all_walls)
-        
+        depletion_potential = DepletionPotential(parameters.phi, parameters.depletant_radius,
+                                                 colloid_potentials_parameters=potentials_parameters,
+                                                 periodic_boundary_conditions=not all_walls)
+
         for i, t in enumerate(types):
             # noinspection PyTypeChecker
-            depletion_potential.add_particle(radius=parameters.radii[t], surface_potential=parameters.surface_potentials[t])
+            depletion_potential.add_particle(radius=parameters.radii[t],
+                                             surface_potential=parameters.surface_potentials[t])
         for force in depletion_potential.yield_potentials():
             system.addForce(force)
 
     if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":
+        # Set different force groups for the nonbonded potentials to allow for different cutoffs on the OpenCL and CUDA
+        # platforms.
+        cutoffs = []
+        for force in system.getForces():
+            if isinstance(force, (openmm.NonbondedForce, openmm.CustomNonbondedForce)):
+                assert (force.getNonbondedMethod() == openmm.NonbondedForce.CutoffPeriodic
+                        or force.getNonbondedMethod() == openmm.NonbondedForce.CutoffNonPeriodic)
+                cutoff_distance = force.getCutoffDistance()
+                cutoff_distance_index = -1
+                for other_cutoff_index in range(len(cutoffs)):
+                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(
+                            unit.nano * unit.meter)) < 1.0e-6:
+                        cutoff_distance_index = other_cutoff_index
+                if cutoff_distance_index == -1:
+                    cutoffs.append(cutoff_distance)
+                    cutoff_distance_index = len(cutoffs) - 1
+                else:
+                    force.setCutoffDistance(cutoffs[cutoff_distance_index])
+                force.setForceGroup(cutoff_distance_index)
+
+    if parameters.platform_name == "CUDA":
         simulation = app.Simulation(topology, system, integrator, platform,
                                     platformProperties={"Precision": "mixed"})
     else:

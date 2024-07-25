@@ -182,9 +182,6 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(self._nanometer))
         self._steric_potential.setUseLongRangeCorrection(False)
         self._steric_potential.setUseSwitchingFunction(False)
-        # Set different force groups for steric and electrostatic potentials to allow for different cutoffs on the
-        # OpenCL and CUDA platforms.
-        self._steric_potential.setForceGroup(0)
 
         if self._periodic_boundary_conditions:
             self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffPeriodic)
@@ -198,7 +195,6 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         self._electrostatic_potential.setSwitchingDistance(
             (2.0 * self._max_radius
              + (self._cutoff_factor - 1.0) * self._parameters.debye_length).value_in_unit(self._nanometer))
-        self._electrostatic_potential.setForceGroup(1)
 
         yield self._steric_potential
         yield self._electrostatic_potential

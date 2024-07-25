@@ -85,25 +85,6 @@ class TestParameters(object):
     def depletion_potential(self, phi, depletant_radius, brush_length):
         return DepletionPotential(self, phi, depletant_radius, brush_length)
 
-
-    '''@pytest.fixture
-    def colloid_potentials_tabulated(self, radius_one, radius_two, surface_potential_one, surface_potential_two,
-                                     colloid_potentials_parameters):
-        return ColloidPotentialsTabulated(radius_one=radius_one, radius_two=radius_two,
-                                          surface_potential_one=surface_potential_one,
-                                          surface_potential_two=surface_potential_two,
-                                          colloid_potentials_parameters=colloid_potentials_parameters, use_log=False,
-                                          cutoff_factor=21.0, periodic_boundary_conditions=True)
-
-    @pytest.fixture(params=["algebraic", "tabulated"])
-    def colloid_potentials(self, colloid_potentials_algebraic, colloid_potentials_tabulated,  request):
-        if request.param == "algebraic":
-            return colloid_potentials_algebraic
-        else:
-            assert request.param == "tabulated"
-            return colloid_potentials_tabulated'''
-
-
     @pytest.fixture
     def openmm_platform(self):
         return Platform.getPlatformByName("Reference")
@@ -168,27 +149,6 @@ class TestDepletionPotentialExceptions(TestParameters):
             depletion_potential(phi = 0.5, depletant_radius=-5* (unit.nano * unit.meter), 
                                         brush_length=10* (unit.nano * unit.meter))
 
-
-    '''def test_exception_colloid_potentials_tabulated_add_wrong_particles(
-            self, colloid_potentials_tabulated, radius_one, radius_two, surface_potential_one, surface_potential_two):
-        with pytest.raises(ValueError):
-            colloid_potentials_tabulated.add_particle(radius=1000.0 * (unit.nano * unit.meter),
-                                                      surface_potential=surface_potential_one)
-        with pytest.raises(ValueError):
-            colloid_potentials_tabulated.add_particle(radius=1000.0 * (unit.nano * unit.meter),
-                                                      surface_potential=surface_potential_two)
-        with pytest.raises(ValueError):
-            colloid_potentials_tabulated.add_particle(radius=radius_one,
-                                                      surface_potential=1000.0 * (unit.milli * unit.volt))
-        with pytest.raises(ValueError):
-            colloid_potentials_tabulated.add_particle(radius=radius_two,
-                                                      surface_potential=1000.0 * (unit.milli * unit.volt))
-        with pytest.raises(ValueError):
-            colloid_potentials_tabulated.add_particle(radius=radius_one, surface_potential=surface_potential_two)
-        with pytest.raises(ValueError):
-            colloid_potentials_tabulated.add_particle(radius=radius_two, surface_potential=surface_potential_one)'''
-
-
 # noinspection DuplicatedCode
 class TestDepletionPotentialForTwoParticles(TestParameters):
     @pytest.fixture(autouse=True)
@@ -205,13 +165,6 @@ class TestDepletionPotentialForTwoParticles(TestParameters):
     @pytest.fixture
     def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
         return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
-
-
-    @pytest.mark.parametrize("surface_separation,expected_function",
-                             [((lambda pos, *args: np.array((pos* (unit.nano * unit.meter), 0.0, 0.0)),
-                             [0.0, 0.0, 0.0]),
-                             TestParameters.depletion_potential_expected)
-                      ])
 
     def test_depletion_potential(self, openmm_context, test_positions, radius_one, brush_length, phi, radius_depletant, 
         expected_function):

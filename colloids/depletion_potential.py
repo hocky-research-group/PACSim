@@ -2,10 +2,10 @@ import math
 from typing import Iterator
 from openmm import unit
 from openmm import CustomNonbondedForce
-from colloids.abstracts import ColloidPotentialsAbstract
+from colloids.abstracts import OpenMMPotentialAbstract
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
-class DepletionPotential(ColloidPotentialsAbstract):
+class DepletionPotential(OpenMMPotentialAbstract):
 
     """
     This class sets up the depletion potential between colloids in a solution with a nonadsorbing polymer background. 
@@ -47,7 +47,11 @@ class DepletionPotential(ColloidPotentialsAbstract):
                 periodic_boundary_conditions: bool = True):
         """Constructor of the DepletionPotential class."""
         
-        super().__init__(colloid_potentials_parameters, periodic_boundary_conditions)
+        #super().__init__(colloid_potentials_parameters, periodic_boundary_conditions)
+        
+        super().__init__()
+        self._parameters = colloid_potentials_parameters
+        self._periodic_boundary_conditions = periodic_boundary_conditions
 
         self._depletion_phi = depletion_phi
         self._depletant_radius = depletant_radius
@@ -56,18 +60,17 @@ class DepletionPotential(ColloidPotentialsAbstract):
 
 
     def _set_up_depletion_potential(self) -> CustomNonbondedForce:
-        """Set up the basic functional form of the Asakura-Oosawa depletion potential for a colloidal solution 
-        in a background of non-adsorbing polymers."""
+        """Set up the basic functional form of the Asakura-Oosawa depletion potential for a solution of binary colloidal 
+        particles in a background of non-adsorbing polymers."""
 
         depletion_potential = CustomNonbondedForce(
-            "step(sigma_colloid + sigma_depletant - r) * "
-            "(AO_prefactor * (1 - term1 + term2));"
-            "AO_prefactor =  -phi * (1+q)^3/q^3;"
-            "term1 = 3*r/ (2 * sigma_colloid * (1+q));"
-            "term2 = r^3 / (2 * sigma_colloid^3 *(1+q)^3);"
-            "q = sigma_depletant/sigma_colloid;"
-            "sigma_colloid = ((2 * radius1) + 2*brush_length);"
-            "sigma_depletant = ((2 * depletant_radius) + 2*brush_length);"
+            "step(rho_colloid1 + rho_colloid2 + 2*radius_depletant - r) * "
+            "-phi/16*(q1+q2+2-n)^2*(n+2*(q1+q2+2)-3/n*(q1^2+q2^2-2*q1*q2));"
+            "q1 = rho_colloid1/radius_depletant;"
+            "q2 = rho_colloid2/radius_depletant;"
+            "n = r/radius_depletant;"
+            "rho_colloid1 = (2 * radius1 + 2*brush_length)/2;"
+            "rho_colloid2 = (2 * radius2 + 2*brush_length)/2;"
         )
 
         depletion_potential.addGlobalParameter("phi", (self._depletion_phi))
@@ -82,9 +85,9 @@ class DepletionPotential(ColloidPotentialsAbstract):
 
         return depletion_potential
     
-    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:
+    def add_particle(self, radius: unit.Quantity) -> None:
         """
-        Add a colloid with a given radius and surface potential to the system.
+        Add a colloid with a given radius to the system.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -93,19 +96,14 @@ class DepletionPotential(ColloidPotentialsAbstract):
             The unit of the radius must be compatible with nanometers and the value must be greater than zero.
         :type radius: unit.Quantity
 
-
         :raises TypeError:
             If the radius is not a Quantity with a proper unit (via the abstract base class).
         :raises ValueError:
             If the radius is not greater than zero (via the abstract base class).
-        :param surface_potential:
-            The surface potential of the colloid.
-            The unit of the surface_potential must be compatible with millivolts.
-        :type surface_potential: unit.Quantity
         :raises RuntimeError:
             If the method yield_potentials was called before this method (via the abstract base class).
         """
-        super().add_particle(radius, surface_potential)
+        super().add_particle(radius)
 
         if radius.in_units_of(self._nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(self._nanometer)

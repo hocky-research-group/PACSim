@@ -343,14 +343,10 @@ class RunParameters(Parameters):
                 raise TypeError("Depletant radius must have a unit compatible with nanometers.")
             if self.depletant_radius <= 0.0 * (unit.nano * unit.meter):
                 raise ValueError("Depletant radius must be greater than zero.")
-            radius_list = [str(val) for t, val in self.radii.items()]
-            for r in radius_list:
-                if not r == radius_list[0]:
-                    raise ValueError("All colloidal particles must have the same radius if depletion is on.")
             for t in self.radii:
                 if self.depletant_radius/self.radii[t] > 0.1547:
                     warnings.warn("Size ratio of depletant to colloid particles is too large."
-                                    " Analytical computation of depletion potential will be invalid.")
+                                    " Analytical computation of depletion potential may be invalid.")
         else:
             if self.depletion_phi is not None:
                 raise ValueError("Phi must not be specified if depletion potential is not on.")

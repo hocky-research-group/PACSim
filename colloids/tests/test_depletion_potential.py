@@ -1,29 +1,11 @@
 from openmm import Context, LangevinIntegrator, Platform, System, unit, Vec3
 import pytest
 from colloids.depletion_potential import DepletionPotential
+from colloids import ColloidPotentialsParameters
 import numpy as np
 
 
 class TestParameters(object):
-
-    @staticmethod
-    def depletion_potential_expected(h, radius_colloid1, radius_colloid2, brush_length, phi, radius_depletant):
-
-        rho_colloid1 = (2 * radius_colloid1 + 2*brush_length)/2 #*unit.nanometer
-        rho_colloid2 = (2 * radius_colloid2 + 2*brush_length)/2 #*unit.nanometer
-        
-        # size ratio 
-        q1 = rho_colloid1/radius_depletant
-        q2 = rho_colloid2/radius_depletant 
-        
-        # center to center separation
-        rcc = h + rho_colloid1 + rho_colloid2  
-        
-        n = rcc/radius_depletant
-        
-        return np.where(rcc <= (rho_colloid1 + rho_colloid2 + 2*radius_depletant),
-                        -phi/16*(q1+q2+2-n)**2*(n+2*(q1+q2+2)-3/n*(q1**2+q2**2-2*q1*q2)),
-                        0.0) 
 
     @pytest.fixture
     def radius_one(self):
@@ -34,7 +16,7 @@ class TestParameters(object):
         return 85.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
-    def radius_depletant(self):
+    def depletant_radius(self):
         return 5.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
@@ -50,8 +32,23 @@ class TestParameters(object):
         return 0.5
 
     @pytest.fixture
+    def debye_length(self):
+        return 5.0 * (unit.nano * unit.meter)
+
+    @pytest.fixture
+    def dielectric_constant(self): 
+        return 80.0
+
+    @pytest.fixture
     def temperature(self):
         return 298.0 * unit.kelvin
+
+    @pytest.fixture
+    def colloid_potentials_parameters(self, brush_density, brush_length, debye_length, temperature,
+                                      dielectric_constant):
+        return ColloidPotentialsParameters(brush_density=brush_density, brush_length=brush_length,
+                                           debye_length=debye_length, temperature=temperature,
+                                           dielectric_constant=dielectric_constant)
 
     @pytest.fixture
     def test_positions(self):
@@ -77,8 +74,8 @@ class TestParameters(object):
         return system
 
     @pytest.fixture
-    def depletion_potential(self, phi, depletant_radius, brush_length):
-        return DepletionPotential(self, phi, depletant_radius, brush_length)
+    def depletion_potential(self, phi, depletant_radius, colloid_potentials_parameters):
+        return DepletionPotential(phi, depletant_radius, colloid_potentials_parameters)
 
     @pytest.fixture
     def openmm_platform(self):
@@ -115,28 +112,32 @@ class TestDepletionPotentialExceptions(TestParameters):
             depletion_potential.add_particle(radius=radius_one)
 
 
-    def test_exception_phi(self, depletion_potential):
+    def test_exception_phi(self, colloid_potentials_parameters):
         # Test exception on negative phi
         with pytest.raises(ValueError):
-            depletion_potential(phi = -0.5, depletant_radius=5* (unit.nano * unit.meter), 
-                                        brush_length=10* (unit.nano * unit.meter))
+            DepletionPotential(depletion_phi = -0.5, depletant_radius=5* (unit.nano * unit.meter), 
+                                colloid_potentials_parameters=colloid_potentials_parameters)
+                                        #brush_length=10* (unit.nano * unit.meter))
 
         # Test exception on phi > 1
         with pytest.raises(ValueError):
-            depletion_potential(phi = 2.0, depletant_radius=5* (unit.nano * unit.meter), 
-                                        brush_length=10* (unit.nano * unit.meter))
+            DepletionPotential(depletion_phi = 2.0, depletant_radius=5* (unit.nano * unit.meter),
+                                colloid_potentials_parameters=colloid_potentials_parameters)
+                                       # brush_length=10* (unit.nano * unit.meter))
 
 
-    def test_exception_depletant_radius(self, depletion_potential):
+    def test_exception_depletant_radius(self, colloid_potentials_parameters):
         # Test exception on wrong unit.
-        with pytest.raises(ValueError):
-            depletion_potential(phi = 0.5, depletant_radius=5/ ((unit.nano * unit.meter) ** 2), 
-                                        brush_length=10* (unit.nano * unit.meter))
+        with pytest.raises(TypeError):
+            DepletionPotential(depletion_phi = 0.5, depletant_radius=5 * unit.joule, 
+                                colloid_potentials_parameters=colloid_potentials_parameters)
+                                        #brush_length=10* (unit.nano * unit.meter))
 
         # Test exception on negative depletant radius
-        with pytest.raises(TypeError):
-            depletion_potential(phi = 0.5, depletant_radius=-5* (unit.nano * unit.meter), 
-                                        brush_length=10* (unit.nano * unit.meter))
+        with pytest.raises(ValueError):
+            DepletionPotential(depletion_phi = 0.5, depletant_radius=-5* (unit.nano * unit.meter), 
+                                colloid_potentials_parameters=colloid_potentials_parameters)
+                                      #  brush_length=10* (unit.nano * unit.meter))
 
 # noinspection DuplicatedCode
 class TestDepletionPotentialForTwoParticles(TestParameters):
@@ -155,12 +156,33 @@ class TestDepletionPotentialForTwoParticles(TestParameters):
     def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
         return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
 
-    @pytest.mark.parametrize("expected_function", TestParameters.depletion_potential_expected)
+   
+    @staticmethod
+    def depletion_potential_expected(h, radius_one, radius_two, brush_length, phi, depletant_radius):
 
-    def test_depletion_potential(self, openmm_context, test_positions, radius_one, radius_two, brush_length, phi, radius_depletant, 
+        rho_colloid1 = (2 * radius_one + 2*brush_length)/2 #*unit.nanometer
+        rho_colloid2 = (2 * radius_two + 2*brush_length)/2 #*unit.nanometer
+        
+        # size ratio 
+        q1 = rho_colloid1/depletant_radius
+        q2 = rho_colloid2/depletant_radius
+        
+        # center to center separation
+        rcc = h + rho_colloid1 + rho_colloid2  
+        
+        n = rcc/depletant_radius
+        
+        return np.where(rcc <= (rho_colloid1 + rho_colloid2 + 2*depletant_radius),
+                        -phi/16*(q1+q2+2-n)**2*(n+2*(q1+q2+2)-3/n*(q1**2+q2**2-2*q1*q2)),
+                        0.0) 
+    
+    @pytest.mark.parametrize("expected_function", [(depletion_potential_expected)])
+
+    def test_depletion_potential(self, openmm_context, test_positions, radius_one, radius_two, brush_length, phi, depletant_radius,
         expected_function):
 
         openmm_potentials = np.zeros(len(test_positions)) #use surface separation as test positions
+        #expected_potentials = np.zeros(len(test_positions))
         for index, pos in enumerate(test_positions):
             r_value = pos + radius_one + radius_two +2*brush_length #openmm function takes input of center-to-center distance
             openmm_context.setPositions([[r_value.value_in_unit(unit.nanometer), 0.0, 0.0], [0.0, 0.0, 0.0]])
@@ -168,8 +190,9 @@ class TestDepletionPotentialForTwoParticles(TestParameters):
             openmm_potentials[index] = (
                 state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole))
         
-        expected_potentials = expected_function(test_positions, radius_one, radius_two, brush_length, phi, radius_depletant)
-        assert openmm_potentials == pytest.approx(expected_potentials.value_in_unit(unit.kilojoule_per_mole), 
+        expected_potentials = expected_function(test_positions, radius_one, radius_two, brush_length, phi, depletant_radius)
+        
+        assert openmm_potentials == pytest.approx(expected_potentials, #.value_in_unit(unit.kilojoule_per_mole), 
             rel=1.0e-7, abs=1.0e-13)
        
                  

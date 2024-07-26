@@ -4,6 +4,7 @@ from openmm import unit
 from openmm import CustomNonbondedForce
 from colloids.abstracts import OpenMMPotentialAbstract
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
+import warnings
 
 class DepletionPotential(OpenMMPotentialAbstract):
 
@@ -43,13 +44,26 @@ class DepletionPotential(OpenMMPotentialAbstract):
     _nanometer = unit.nano * unit.meter
     
     def __init__(self, depletion_phi: float, depletant_radius: unit.Quantity, 
-                colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(), 
+                colloid_potentials_parameters: ColloidPotentialsParameters, 
                 periodic_boundary_conditions: bool = True):
         """Constructor of the DepletionPotential class."""
         
         #super().__init__(colloid_potentials_parameters, periodic_boundary_conditions)
         
         super().__init__()
+
+        if depletion_phi is None:
+                raise ValueError("Phi must be specified if depletion is on.")
+        if not 0.0 <= depletion_phi <= 1.0:
+            raise ValueError("Phi must be between zero and one.")
+        if depletant_radius is None:
+            raise ValueError("Depletant radius must be specified if depletion is on.")
+        if not depletant_radius.unit.is_compatible(unit.nano * unit.meter):
+            raise TypeError("Depletant radius must have a unit compatible with nanometers.")
+        if depletant_radius <= 0.0 * (unit.nano * unit.meter):
+            raise ValueError("Depletant radius must be greater than zero.")
+
+
         self._parameters = colloid_potentials_parameters
         self._periodic_boundary_conditions = periodic_boundary_conditions
 
@@ -64,16 +78,16 @@ class DepletionPotential(OpenMMPotentialAbstract):
         particles in a background of non-adsorbing polymers."""
 
         depletion_potential = CustomNonbondedForce(
-            "step(rho_colloid1 + rho_colloid2 + 2*radius_depletant - r) * "
+            "step(rho_colloid1 + rho_colloid2 + 2*depletant_radius - r) * "
             "-phi/16*(q1+q2+2-n)^2*(n+2*(q1+q2+2)-3/n*(q1^2+q2^2-2*q1*q2));"
-            "q1 = rho_colloid1/radius_depletant;"
-            "q2 = rho_colloid2/radius_depletant;"
-            "n = r/radius_depletant;"
+            "q1 = rho_colloid1/depletant_radius;"
+            "q2 = rho_colloid2/depletant_radius;"
+            "n = r/depletant_radius;"
             "rho_colloid1 = (2 * radius1 + 2*brush_length)/2;"
             "rho_colloid2 = (2 * radius2 + 2*brush_length)/2;"
         )
 
-        depletion_potential.addGlobalParameter("phi", (self._depletion_phi))
+        depletion_potential.addGlobalParameter("phi", self._depletion_phi)
         
         depletion_potential.addGlobalParameter("depletant_radius",
                                             self._depletant_radius.value_in_unit(self._nanometer))
@@ -97,9 +111,9 @@ class DepletionPotential(OpenMMPotentialAbstract):
         :type radius: unit.Quantity
 
         :raises TypeError:
-            If the radius is not a Quantity with a proper unit (via the abstract base class).
+            If the radius is not a Quantity with a proper unit.
         :raises ValueError:
-            If the radius is not greater than zero (via the abstract base class).
+            If the radius is not greater than zero.
         :raises RuntimeError:
             If the method yield_potentials was called before this method (via the abstract base class).
         """
@@ -107,6 +121,10 @@ class DepletionPotential(OpenMMPotentialAbstract):
 
         if radius.in_units_of(self._nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(self._nanometer)
+        if not radius.unit.is_compatible(self._nanometer):
+            raise TypeError("argument radius must have a unit that is compatible with nanometers")
+        if not radius.value_in_unit(self._nanometer) > 0.0:
+            raise ValueError("argument radius must have a value greater than zero")
         
         self._depletion_potential.addParticle([radius.value_in_unit(self._nanometer)])
 

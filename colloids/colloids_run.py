@@ -71,7 +71,6 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
 
-    add_depletion = parameters.use_depletion
 
     # Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
@@ -127,15 +126,14 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
 
-    if add_depletion:
+    if parameters.use_depletion:
         depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,
                                                  colloid_potentials_parameters=potentials_parameters,
                                                  periodic_boundary_conditions=not all_walls)
 
         for i, t in enumerate(types):
             # noinspection PyTypeChecker
-            depletion_potential.add_particle(radius=parameters.radii[t],
-                                             surface_potential=parameters.surface_potentials[t])
+            depletion_potential.add_particle(radius=parameters.radii[t])
         for force in depletion_potential.yield_potentials():
             system.addForce(force)
 

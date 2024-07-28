@@ -71,13 +71,11 @@ class DepletionPotential(OpenMMPotentialAbstract):
         """Set up the basic functional form of the Asakura-Oosawa depletion potential for a solution of binary colloidal 
         particles in a background of non-adsorbing polymers."""
         depletion_potential = CustomNonbondedForce(
-            "step(rho_colloid1 + rho_colloid2 + 2*depletant_radius - r) * "
-            "depletion_prefactor * (q1+q2+2-n)^2 * (n + 2*(q1+q2+2) - 3/n*(q1^2+q2^2-2*q1*q2));"
-            "q1 = rho_colloid1/depletant_radius;"
-            "q2 = rho_colloid2/depletant_radius;"
-            "n = r/depletant_radius;"
-            "rho_colloid1 = radius1 + brush_length;"
-            "rho_colloid2 = radius2 + brush_length;"
+            "step(depletion_q1 + depletion_q2 + 2 - n) * "
+            "depletion_prefactor * (depletion_q1 + depletion_q2 + 2 - n)^2 "
+            "* (n + 2 * (depletion_q1 + depletion_q2 + 2) "
+            "- 3.0 / n * (depletion_q1^2 + depletion_q2^2 - 2.0 * depletion_q1 * depletion_q2));"
+            "n = r / depletant_radius;"
         )
         depletion_potential.addGlobalParameter(
             "depletion_prefactor",
@@ -85,9 +83,7 @@ class DepletionPotential(OpenMMPotentialAbstract):
              * self._depletion_phi / 16.0).value_in_unit(unit.kilojoule_per_mole))
         depletion_potential.addGlobalParameter("depletant_radius",
                                                self._depletant_radius.value_in_unit(self._nanometer))
-        depletion_potential.addGlobalParameter("brush_length",
-                                               self._brush_length.value_in_unit(self._nanometer))
-        depletion_potential.addPerParticleParameter("radius")
+        depletion_potential.addPerParticleParameter("depletion_q")
         return depletion_potential
     
     def add_particle(self, radius: unit.Quantity) -> None:
@@ -108,14 +104,14 @@ class DepletionPotential(OpenMMPotentialAbstract):
         :raises RuntimeError:
             If the method yield_potentials was called before this method (via the abstract base class).
         """
-        super().add_particle(radius)
+        super().add_particle()
         if not radius.unit.is_compatible(self._nanometer):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
         if not radius.value_in_unit(self._nanometer) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
         if radius.in_units_of(self._nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(self._nanometer)
-        self._depletion_potential.addParticle([radius.value_in_unit(self._nanometer)])
+        self._depletion_potential.addParticle([(radius + self._brush_length) / self._depletant_radius])
 
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """

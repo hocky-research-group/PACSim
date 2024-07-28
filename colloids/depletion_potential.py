@@ -3,97 +3,83 @@ from typing import Iterator
 from openmm import unit
 from openmm import CustomNonbondedForce
 from colloids.abstracts import OpenMMPotentialAbstract
-from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
-import warnings
+
 
 class DepletionPotential(OpenMMPotentialAbstract):
-
     """
-    This class sets up the depletion potential between colloids in a solution with a nonadsorbing polymer background. 
-    Since the attractive force arises from the fact that the polymer molecules are depleted at the surface of the colloids, 
-    the force is called the depletion force. The depletion force is well-modeled by the Asakura-Oosawa potential. 
+    This class sets up the depletion potential between colloids in a solution with a non-adsorbing polymer background.
+    Since the attractive force arises from the fact that the polymer molecules are depleted at the surface of the
+    colloids, the force is called the depletion force. The depletion force is well-modeled by the Asakura-Oosawa
+    potential. To completely describe the pair potentials in a system of colloids within solution of non-adsorbing
+    polymers, this attractive depletion force can be paired with the steric and electrostatic forces between the ionic
+    colloids from the Alexander-de Gennes polymer brush model and DLVO theory.
 
-    The cutoff distance for the depletion potential is set to max(sigma_colloid) + sigma_depletant where sigma_colloid is the 
-    diameter of the largest particle in the system plus two lengths of the polymer brush, and sigma_depletant is the diameter
-    of the depletant plus two lengths of the polymer brush. A switching function is used to make the potential and forces go 
-    smoothly to 0 at the cutoff distance. The cutoff can be set to be periodic or non-periodic.
+    The cutoff distance for the depletion potential is set to max(sigma_colloid) + sigma_depletant where sigma_colloid
+    is the diameter of the largest particle in the system plus two lengths of the polymer brush, and sigma_depletant is
+    the diameter of the depletant. The cutoff can be set to be periodic or non-periodic.
 
     :param depletion_phi:
         The number density of polymers in the solution.
         The value must be between 0 and 1.
     :type depletion_phi: float
     :param depletant_radius:
-        The "radius" of the polymers, if treated as hard spheres.
+        The "radius" of the depletants, if treated as hard spheres.
         The unit of the depletant_radius must be compatible with nanometers and the value must be greater than zero.
     :type depletant_radius: unit.Quantity
     :param brush_length:
         The thickness of the polymer brush as described by the Alexander-de Gennes polymer brush model.
-        (See ColloidPotentialsParameters() for more information.)
+        (See ColloidPotentialsParameters class for more information.)
         The unit of the brush_length must be compatible with nanometers and the value must be greater than zero.
         Defaults to 10.0 nanometers.
     :type brush_length: unit.Quantity
     :param periodic_boundary_conditions:
         Whether this force should use periodic cutoffs for the depletion potential.
     :type periodic_boundary_conditions: bool
-
     """
     
     _nanometer = unit.nano * unit.meter
     
-    def __init__(self, depletion_phi: float, depletant_radius: unit.Quantity, 
-                colloid_potentials_parameters: ColloidPotentialsParameters, 
-                periodic_boundary_conditions: bool = True):
+    def __init__(self, depletion_phi: float, depletant_radius: unit.Quantity, brush_length: unit.Quantity,
+                 periodic_boundary_conditions: bool = True):
         """Constructor of the DepletionPotential class."""
-        
-        #super().__init__(colloid_potentials_parameters, periodic_boundary_conditions)
-        
         super().__init__()
 
-        if depletion_phi is None:
-                raise ValueError("Phi must be specified if depletion is on.")
         if not 0.0 <= depletion_phi <= 1.0:
-            raise ValueError("Phi must be between zero and one.")
-        if depletant_radius is None:
-            raise ValueError("Depletant radius must be specified if depletion is on.")
-        if not depletant_radius.unit.is_compatible(unit.nano * unit.meter):
-            raise TypeError("Depletant radius must have a unit compatible with nanometers.")
-        if depletant_radius <= 0.0 * (unit.nano * unit.meter):
-            raise ValueError("Depletant radius must be greater than zero.")
-
-
-        self._parameters = colloid_potentials_parameters
-        self._periodic_boundary_conditions = periodic_boundary_conditions
+            raise ValueError("phi must be between zero and one")
+        if not depletant_radius.unit.is_compatible(self._nanometer):
+            raise TypeError("depletant radius must have a unit compatible with nanometers")
+        if depletant_radius <= 0.0 * self._nanometer:
+            raise ValueError("depletant radius must be greater than zero")
+        if not brush_length.unit.is_compatible(self._nanometer):
+            raise TypeError("brush length must have a unit compatible with nanometers")
+        if brush_length <= 0.0 * self._nanometer:
+            raise ValueError("brush length must be greater than zero")
 
         self._depletion_phi = depletion_phi
         self._depletant_radius = depletant_radius
-        self._depletion_potential = self._set_up_depletion_potential()
+        self._brush_length = brush_length
+        self._periodic_boundary_conditions = periodic_boundary_conditions
         self._max_radius = -math.inf * self._nanometer
-
+        self._depletion_potential = self._set_up_depletion_potential()
 
     def _set_up_depletion_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the Asakura-Oosawa depletion potential for a solution of binary colloidal 
         particles in a background of non-adsorbing polymers."""
-
         depletion_potential = CustomNonbondedForce(
             "step(rho_colloid1 + rho_colloid2 + 2*depletant_radius - r) * "
-            "-phi/16*(q1+q2+2-n)^2*(n+2*(q1+q2+2)-3/n*(q1^2+q2^2-2*q1*q2));"
+            "-phi/16 * (q1+q2+2-n)^2 * (n + 2*(q1+q2+2) - 3/n*(q1^2+q2^2-2*q1*q2));"
             "q1 = rho_colloid1/depletant_radius;"
             "q2 = rho_colloid2/depletant_radius;"
             "n = r/depletant_radius;"
-            "rho_colloid1 = (2 * radius1 + 2*brush_length)/2;"
-            "rho_colloid2 = (2 * radius2 + 2*brush_length)/2;"
+            "rho_colloid1 = radius1 + brush_length;"
+            "rho_colloid2 = radius2 + brush_length;"
         )
-
         depletion_potential.addGlobalParameter("phi", self._depletion_phi)
-        
         depletion_potential.addGlobalParameter("depletant_radius",
-                                            self._depletant_radius.value_in_unit(self._nanometer))
-        
+                                               self._depletant_radius.value_in_unit(self._nanometer))
         depletion_potential.addGlobalParameter("brush_length",
-                                            self._parameters.brush_length.value_in_unit(self._nanometer))
-
+                                               self._brush_length.value_in_unit(self._nanometer))
         depletion_potential.addPerParticleParameter("radius")
-
         return depletion_potential
     
     def add_particle(self, radius: unit.Quantity) -> None:
@@ -115,14 +101,12 @@ class DepletionPotential(OpenMMPotentialAbstract):
             If the method yield_potentials was called before this method (via the abstract base class).
         """
         super().add_particle(radius)
-
-        if radius.in_units_of(self._nanometer) > self._max_radius:
-            self._max_radius = radius.in_units_of(self._nanometer)
         if not radius.unit.is_compatible(self._nanometer):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
         if not radius.value_in_unit(self._nanometer) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
-        
+        if radius.in_units_of(self._nanometer) > self._max_radius:
+            self._max_radius = radius.in_units_of(self._nanometer)
         self._depletion_potential.addParticle([radius.value_in_unit(self._nanometer)])
 
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
@@ -146,12 +130,9 @@ class DepletionPotential(OpenMMPotentialAbstract):
         else:
             self._depletion_potential.setNonbondedMethod(self._depletion_potential.CutoffNonPeriodic)
         self._depletion_potential.setCutoffDistance(
-            ((2.0 * self._max_radius + 2.0 * self._parameters.brush_length)
-            + (2.0 * self._depletant_radius + 2.0 * self._parameters.brush_length)).value_in_unit(self._nanometer))
+            (2.0 * self._max_radius + 2.0 * self._depletant_radius + 2.0 * self._brush_length).value_in_unit(
+             self._nanometer))
         self._depletion_potential.setUseLongRangeCorrection(False)
         self._depletion_potential.setUseSwitchingFunction(False)
 
         yield self._depletion_potential
-
-    
-    

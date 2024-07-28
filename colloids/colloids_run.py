@@ -128,9 +128,8 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
 
     if parameters.use_depletion:
         depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,
-                                                 colloid_potentials_parameters=potentials_parameters,
+                                                 brush_length=parameters.brush_length,
                                                  periodic_boundary_conditions=not all_walls)
-
         for i, t in enumerate(types):
             # noinspection PyTypeChecker
             depletion_potential.add_particle(radius=parameters.radii[t])

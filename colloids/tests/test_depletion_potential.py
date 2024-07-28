@@ -182,8 +182,7 @@ class TestDepletionPotentialForTwoParticles(TestParameters):
         expected_potentials = self.depletion_potential_expected(test_separations, radius_one, radius_two, brush_length,
                                                                 depletant_phi, depletant_radius, temperature)
 
-        assert openmm_potentials == pytest.approx(expected_potentials,  # .value_in_unit(unit.kilojoule_per_mole),
-                                                  rel=1.0e-7, abs=1.0e-13)
+        assert openmm_potentials == pytest.approx(expected_potentials, rel=1.0e-7, abs=1.0e-13)
 
 
 if __name__ == '__main__':

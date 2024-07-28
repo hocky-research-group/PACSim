@@ -108,10 +108,8 @@ class TestRunParameters(object):
         assert parameters.alpha == yaml_parameters.alpha
         assert parameters.epsilon == yaml_parameters.epsilon
         assert parameters.use_depletion == yaml_parameters.use_depletion
-        assert (parameters.depletant_radius.value_in_unit(parameters.depletant_radius.unit)
-                == pytest.approx(yaml_parameters.depletant_radius.value_in_unit(parameters.depletant_radius.unit),
-                                 rel=1e-12, abs=1e-12))
-        assert parameters.depletion_phi == pytest.approx(yaml_parameters.depletion_phi, rel=1e-12, abs=1e-12)
+        assert parameters.depletion_phi == yaml_parameters.depletion_phi
+        assert parameters.depletant_radius == yaml_parameters.depletant_radius
 
 
 if __name__ == '__main__':

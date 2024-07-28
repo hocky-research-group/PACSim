@@ -49,6 +49,11 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
                           box_vector_three[2] * (unit.nano * unit.meter) if parameters.wall_directions[2] else None)
         final_cell = cell.copy()
         if not all_walls:
+            if parameters.use_depletion:
+                if (parameters.depletant_radius
+                        > parameters.cutoff_factor * parameters.debye_length - 2.0 * parameters.brush_length):
+                    raise ValueError("the depletant radius is too large for the cutoff factor and brush length when "
+                                     "partial walls are included (r_d <= cutoff_factor * lambda_D - 2 * L)")
             for index, wall_direction in enumerate(parameters.wall_directions):
                 if wall_direction:
                     # The shifted Lennard Jones walls diverge at distance r = radius - 1 from the location of the wall,

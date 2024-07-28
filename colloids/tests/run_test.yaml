@@ -7,9 +7,6 @@ brush_length: !Quantity
   value: 10.6
 checkpoint_filename: test_run_and_resume/checkpoint.chk
 checkpoint_interval: 500
-collision_rate: !Quantity
-  unit: /picosecond
-  value: 0.01
 cutoff_factor: 21.0
 debye_length: !Quantity
   unit: nanometer
@@ -21,7 +18,16 @@ epsilon: null
 final_configuration_gsd_filename: test_run_and_resume/final_frame.gsd
 final_configuration_xyz_filename: test_run_and_resume/final_frame.xyz
 initial_configuration: first_frame.xyz
-integrator_seed: 3
+integrator: LangevinIntegrator
+integrator_parameters:
+  frictionCoeff: !Quantity
+    unit: /picosecond
+    value: 0.001574074286750681
+  randomNumberSeed: 3
+  stepSize: !Quantity
+    unit: picosecond
+    value: 0.00317647015905543
+  temperature: potential_temperature
 masses:
   N: !Quantity
     unit: dalton
@@ -48,12 +54,9 @@ surface_potentials:
   P: !Quantity
     unit: millivolt
     value: 44.0
-temperature: !Quantity
+potential_temperature: !Quantity
   unit: kelvin
   value: 298.0
-timestep: !Quantity
-  unit: picosecond
-  value: 0.05
 trajectory_filename: test_run_and_resume/trajectory.gsd
 trajectory_interval: 10
 use_depletion: false

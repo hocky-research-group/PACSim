@@ -1,70 +1,71 @@
-alpha: 1.0
+alpha: null
 brush_density: !Quantity
   unit: /(nanometer**2)
   value: 0.09
 brush_length: !Quantity
   unit: nanometer
-  value: 10.0
+  value: 10.6
 checkpoint_filename: checkpoint.chk
-checkpoint_interval: 1000000000
-collision_rate: !Quantity
-  unit: /picosecond
-  value: 0.001574074286750681
+checkpoint_interval: 50000
 cutoff_factor: 21.0
 debye_length: !Quantity
   unit: nanometer
-  value: 5.4
+  value: 5.726968
 depletant_radius: !Quantity
     unit: nanometer
     value: 5.0
 depletion_phi: 0.5
 dielectric_constant: 80.0
-epsilon: !Quantity
-    unit: kilojoule/mole
-    value: 2.477709860209665
+epsilon: null
 final_configuration_gsd_filename: final_frame.gsd
 final_configuration_xyz_filename: final_frame.xyz
-initial_configuration: initial.xyz
-integrator_seed: null
+initial_configuration: tests/first_frame.xyz
+integrator: LangevinIntegrator
+integrator_parameters:
+  frictionCoeff: !Quantity
+    unit: /picosecond
+    value: 0.001574074286750681
+  randomNumberSeed: null
+  stepSize: !Quantity
+    unit: picosecond
+    value: 0.00317647015905543
+  temperature: potential_temperature
 masses:
   N: !Quantity
     unit: dalton
-    value: 1.885
+    value: 0.7406327610409243
   P: !Quantity
     unit: dalton
     value: 1.0
 minimize_energy_initially: false
-platform_name: CUDA
+platform_name: CPU
+potential_temperature: !Quantity
+  unit: kelvin
+  value: 298.0
 radii:
   N: !Quantity
     unit: nanometer
-    value: 105.0
+    value: 95.0
   P: !Quantity
     unit: nanometer
     value: 105.0
-run_steps: 1000000000
+run_steps: 100000
 state_data_filename: state_data.csv
 state_data_interval: 1000
 surface_potentials:
   N: !Quantity
     unit: millivolt
-    value: 0.0
+    value: -54.0
   P: !Quantity
     unit: millivolt
-    value: 0.0
-temperature: !Quantity
-  unit: kelvin
-  value: 298.0
-timestep: !Quantity
-  unit: picosecond
-  value: 0.00317647015
+    value: 44.0
 trajectory_filename: trajectory.gsd
-trajectory_interval: 500000
+trajectory_interval: 1000
 use_depletion: true
 use_log: false
 use_tabulated: false
 velocity_seed: null
 wall_directions:
-  - true
-  - true
-  - true
+  - false
+  - false
+  - false

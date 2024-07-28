@@ -355,8 +355,8 @@ class RunParameters(Parameters):
                 raise ValueError("Depletant radius must be greater than zero.")
             for t in self.radii:
                 if self.depletant_radius/self.radii[t] > 0.1547:
-                    warnings.warn("Size ratio of depletant to colloid particles is too large."
-                                    " Analytical computation of depletion potential may be invalid.")
+                    warnings.warn("Size ratio of depletant to colloid particles is too large. "
+                                  "Analytical computation of depletion potential may be invalid.")
         else:
             if self.depletion_phi is not None:
                 raise ValueError("Phi must not be specified if depletion potential is not on.")

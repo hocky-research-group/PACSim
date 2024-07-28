@@ -1,7 +1,6 @@
 from openmm import Context, LangevinIntegrator, Platform, System, unit, Vec3
 import pytest
 from colloids.depletion_potential import DepletionPotential
-from colloids import ColloidPotentialsParameters
 import numpy as np
 
 
@@ -97,7 +96,8 @@ class TestDepletionPotentialExceptions(TestParameters):
     def test_exception_depletant_radius(self, depletant_phi, brush_length):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
-            DepletionPotential(depletion_phi=depletant_phi, depletant_radius=5.0 * unit.joule, brush_length=brush_length)
+            DepletionPotential(depletion_phi=depletant_phi, depletant_radius=5.0 * unit.joule,
+                               brush_length=brush_length)
 
         # Test exception on negative depletant radius
         with pytest.raises(ValueError):
@@ -107,7 +107,8 @@ class TestDepletionPotentialExceptions(TestParameters):
     def test_exception_brush_length(self, depletant_phi, depletant_radius):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
-            DepletionPotential(depletion_phi=depletant_phi, depletant_radius=depletant_radius, brush_length=5.0 * unit.joule)
+            DepletionPotential(depletion_phi=depletant_phi, depletant_radius=depletant_radius,
+                               brush_length=5.0 * unit.joule)
 
         # Test exception on negative brush length
         with pytest.raises(ValueError):
@@ -145,7 +146,8 @@ class TestDepletionPotentialForTwoParticles(TestParameters):
 
         return np.where(
             r <= (rho_colloid1 + rho_colloid2 + 2 * depletant_radius),
-            -depletant_phi / 16 * (q1 + q2 + 2 - n) ** 2 * (n + 2 * (q1 + q2 + 2) - 3 / n * (q1 ** 2 + q2 ** 2 - 2 * q1 * q2)),
+            -depletant_phi / 16 * (q1 + q2 + 2 - n) ** 2 * (n + 2 * (q1 + q2 + 2)
+                                                            - 3 / n * (q1 ** 2 + q2 ** 2 - 2 * q1 * q2)),
             0.0)
 
     def test_depletion_potential(self, openmm_context, test_separations, radius_one, radius_two, brush_length,

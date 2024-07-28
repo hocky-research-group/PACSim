@@ -213,13 +213,9 @@ def main():
 
     set_up_reporters(parameters, simulation, False, parameters.run_steps, cell)
 
-    #simulation.step(parameters.run_steps)
+    simulation.step(parameters.run_steps)
     # TODO: Automatically plot energies etc.
     # TODO: CHECK ALL SURFACE SEPARATIONS
-    
-    for _ in range(int(parameters.run_steps/100)):
-        simulation.step(100)
-        print(simulation.integrator.getStepSize())
 
     if parameters.final_configuration_gsd_filename is not None:
         write_gsd_file(parameters.final_configuration_gsd_filename, simulation, parameters.radii,

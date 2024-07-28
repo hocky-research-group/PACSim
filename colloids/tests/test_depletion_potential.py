@@ -22,6 +22,10 @@ class TestParameters(object):
         return 10.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
+    def temperature(self):
+        return 300.0 * unit.kelvin
+
+    @pytest.fixture
     def depletant_phi(self):
         return 0.5
 
@@ -50,8 +54,8 @@ class TestParameters(object):
         return system
 
     @pytest.fixture
-    def depletion_potential(self, depletant_phi, depletant_radius, brush_length):
-        return DepletionPotential(depletant_phi, depletant_radius, brush_length)
+    def depletion_potential(self, depletant_phi, depletant_radius, brush_length, temperature):
+        return DepletionPotential(depletant_phi, depletant_radius, brush_length, temperature)
 
     @pytest.fixture
     def openmm_platform(self):
@@ -84,36 +88,49 @@ class TestDepletionPotentialExceptions(TestParameters):
         with pytest.raises(RuntimeError):
             depletion_potential.add_particle(radius=radius_one)
 
-    def test_exception_phi(self, depletant_radius, brush_length):
+    def test_exception_phi(self, depletant_radius, brush_length, temperature):
         # Test exception on negative phi
         with pytest.raises(ValueError):
-            DepletionPotential(depletion_phi=-0.5, depletant_radius=depletant_radius, brush_length=brush_length)
+            DepletionPotential(depletion_phi=-0.5, depletant_radius=depletant_radius, brush_length=brush_length,
+                               temperature=temperature)
 
         # Test exception on phi > 1
         with pytest.raises(ValueError):
-            DepletionPotential(depletion_phi=2.0, depletant_radius=depletant_radius, brush_length=brush_length)
+            DepletionPotential(depletion_phi=2.0, depletant_radius=depletant_radius, brush_length=brush_length,
+                               temperature=temperature)
 
-    def test_exception_depletant_radius(self, depletant_phi, brush_length):
+    def test_exception_depletant_radius(self, depletant_phi, brush_length, temperature):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
             DepletionPotential(depletion_phi=depletant_phi, depletant_radius=5.0 * unit.joule,
-                               brush_length=brush_length)
+                               brush_length=brush_length, temperature=temperature)
 
         # Test exception on negative depletant radius
         with pytest.raises(ValueError):
             DepletionPotential(depletion_phi=depletant_phi, depletant_radius=-5.0 * (unit.nano * unit.meter),
-                               brush_length=brush_length)
+                               brush_length=brush_length, temperature=temperature)
 
-    def test_exception_brush_length(self, depletant_phi, depletant_radius):
+    def test_exception_brush_length(self, depletant_phi, depletant_radius, temperature):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
             DepletionPotential(depletion_phi=depletant_phi, depletant_radius=depletant_radius,
-                               brush_length=5.0 * unit.joule)
+                               brush_length=5.0 * unit.joule, temperature=temperature)
 
         # Test exception on negative brush length
         with pytest.raises(ValueError):
             DepletionPotential(depletion_phi=depletant_phi, depletant_radius=depletant_radius,
-                               brush_length=-5.0 * (unit.nano * unit.meter))
+                               brush_length=-5.0 * (unit.nano * unit.meter), temperature=temperature)
+
+    def test_exception_temperature(self, depletant_phi, depletant_radius, brush_length):
+        # Test exception on wrong unit.
+        with pytest.raises(TypeError):
+            DepletionPotential(depletion_phi=depletant_phi, depletant_radius=depletant_radius,
+                               brush_length=brush_length, temperature=5.0 * unit.joule)
+
+        # Test exception on negative temperature
+        with pytest.raises(ValueError):
+            DepletionPotential(depletion_phi=depletant_phi, depletant_radius=depletant_radius,
+                               brush_length=brush_length, temperature=-5.0 * unit.kelvin)
 
 
 # noinspection DuplicatedCode
@@ -134,7 +151,8 @@ class TestDepletionPotentialForTwoParticles(TestParameters):
         return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
 
     @staticmethod
-    def depletion_potential_expected(r, radius_one, radius_two, brush_length, depletant_phi, depletant_radius):
+    def depletion_potential_expected(r, radius_one, radius_two, brush_length, depletant_phi, depletant_radius,
+                                     temperature):
         rho_colloid1 = radius_one + brush_length
         rho_colloid2 = radius_two + brush_length
 
@@ -143,15 +161,17 @@ class TestDepletionPotentialForTwoParticles(TestParameters):
         q2 = rho_colloid2 / depletant_radius
 
         n = r / depletant_radius
+        kt = (unit.BOLTZMANN_CONSTANT_kB * temperature * unit.AVOGADRO_CONSTANT_NA).value_in_unit(
+            unit.kilojoules_per_mole)
 
         return np.where(
             r <= (rho_colloid1 + rho_colloid2 + 2 * depletant_radius),
-            -depletant_phi / 16 * (q1 + q2 + 2 - n) ** 2 * (n + 2 * (q1 + q2 + 2)
-                                                            - 3 / n * (q1 ** 2 + q2 ** 2 - 2 * q1 * q2)),
+            - kt * depletant_phi / 16 * (q1 + q2 + 2 - n) ** 2 * (n + 2 * (q1 + q2 + 2)
+                                                                  - 3 / n * (q1 ** 2 + q2 ** 2 - 2 * q1 * q2)),
             0.0)
 
     def test_depletion_potential(self, openmm_context, test_separations, radius_one, radius_two, brush_length,
-                                 depletant_phi, depletant_radius):
+                                 depletant_phi, depletant_radius, temperature):
 
         openmm_potentials = np.zeros(len(test_separations))  # use surface separation as test positions
         for index, sep in enumerate(test_separations):
@@ -160,7 +180,7 @@ class TestDepletionPotentialForTwoParticles(TestParameters):
             openmm_potentials[index] = (state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole))
 
         expected_potentials = self.depletion_potential_expected(test_separations, radius_one, radius_two, brush_length,
-                                                                depletant_phi, depletant_radius)
+                                                                depletant_phi, depletant_radius, temperature)
 
         assert openmm_potentials == pytest.approx(expected_potentials,  # .value_in_unit(unit.kilojoule_per_mole),
                                                   rel=1.0e-7, abs=1.0e-13)

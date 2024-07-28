@@ -40,7 +40,7 @@ class DepletionPotential(OpenMMPotentialAbstract):
     _nanometer = unit.nano * unit.meter
     
     def __init__(self, depletion_phi: float, depletant_radius: unit.Quantity, brush_length: unit.Quantity,
-                 periodic_boundary_conditions: bool = True):
+                 temperature: unit.Quantity, periodic_boundary_conditions: bool = True):
         """Constructor of the DepletionPotential class."""
         super().__init__()
 
@@ -54,10 +54,15 @@ class DepletionPotential(OpenMMPotentialAbstract):
             raise TypeError("brush length must have a unit compatible with nanometers")
         if brush_length <= 0.0 * self._nanometer:
             raise ValueError("brush length must be greater than zero")
+        if not temperature.unit.is_compatible(unit.kelvin):
+            raise TypeError("argument temperature must have a unit that is compatible with kelvin")
+        if not temperature.value_in_unit(unit.kelvin) > 0.0:
+            raise ValueError("argument temperature must have a value greater than zero")
 
         self._depletion_phi = depletion_phi
         self._depletant_radius = depletant_radius
         self._brush_length = brush_length
+        self._temperature = temperature
         self._periodic_boundary_conditions = periodic_boundary_conditions
         self._max_radius = -math.inf * self._nanometer
         self._depletion_potential = self._set_up_depletion_potential()
@@ -67,14 +72,17 @@ class DepletionPotential(OpenMMPotentialAbstract):
         particles in a background of non-adsorbing polymers."""
         depletion_potential = CustomNonbondedForce(
             "step(rho_colloid1 + rho_colloid2 + 2*depletant_radius - r) * "
-            "-phi/16 * (q1+q2+2-n)^2 * (n + 2*(q1+q2+2) - 3/n*(q1^2+q2^2-2*q1*q2));"
+            "depletion_prefactor * (q1+q2+2-n)^2 * (n + 2*(q1+q2+2) - 3/n*(q1^2+q2^2-2*q1*q2));"
             "q1 = rho_colloid1/depletant_radius;"
             "q2 = rho_colloid2/depletant_radius;"
             "n = r/depletant_radius;"
             "rho_colloid1 = radius1 + brush_length;"
             "rho_colloid2 = radius2 + brush_length;"
         )
-        depletion_potential.addGlobalParameter("phi", self._depletion_phi)
+        depletion_potential.addGlobalParameter(
+            "depletion_prefactor",
+            (-unit.BOLTZMANN_CONSTANT_kB * self._temperature * unit.AVOGADRO_CONSTANT_NA
+             * self._depletion_phi / 16.0).value_in_unit(unit.kilojoule_per_mole))
         depletion_potential.addGlobalParameter("depletant_radius",
                                                self._depletant_radius.value_in_unit(self._nanometer))
         depletion_potential.addGlobalParameter("brush_length",

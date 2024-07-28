@@ -77,7 +77,6 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
 
-
     # Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
@@ -130,6 +129,7 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     if parameters.use_depletion:
         depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,
                                                  brush_length=parameters.brush_length,
+                                                 temperature=parameters.potential_temperature,
                                                  periodic_boundary_conditions=not all_walls)
         for i, t in enumerate(types):
             # noinspection PyTypeChecker

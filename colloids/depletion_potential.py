@@ -12,9 +12,6 @@ class DepletionPotential(OpenMMPotentialAbstract):
     This class sets up the depletion potential between colloids in a solution with a nonadsorbing polymer background. 
     Since the attractive force arises from the fact that the polymer molecules are depleted at the surface of the colloids, 
     the force is called the depletion force. The depletion force is well-modeled by the Asakura-Oosawa potential. 
-    To completely describe the pair potentials in a system of colloids within solution of nonadsorbing polymers, this attractive
-    depletion force can be paired with the repulsive force as described by the Alexander-de Gennes polymer brush model 
-    between two colloids. (See ColloidPotentialsParameters() for more information.)
 
     The cutoff distance for the depletion potential is set to max(sigma_colloid) + sigma_depletant where sigma_colloid is the 
     diameter of the largest particle in the system plus two lengths of the polymer brush, and sigma_depletant is the diameter

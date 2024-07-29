@@ -209,7 +209,7 @@ class RunParameters(Parameters):
         default_factory=lambda: {"P": 105.0 * (unit.nano * unit.meter), "N": 95.0 * (unit.nano * unit.meter)})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
-    particle_densities = Optional[dict[str, unit.Quantity]] = None
+    particle_densities: Optional[dict[str, unit.Quantity]] = None
     platform_name: str = "Reference"
     temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
     collision_rate: unit.Quantity = field(default_factory=lambda: 0.001574074286750681 / (unit.pico * unit.second))

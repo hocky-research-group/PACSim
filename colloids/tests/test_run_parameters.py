@@ -111,6 +111,10 @@ class TestRunParameters(object):
         assert all(pw == yw for pw, yw in zip(parameters.wall_directions, yaml_parameters.wall_directions))
         assert parameters.alpha == yaml_parameters.alpha
         assert parameters.epsilon == yaml_parameters.epsilon
+        assert parameters.gravitational_constant == yaml_parameters.gravitational_constant
+        assert parameters.water_density == yaml_parameters.water_density
+        assert parameters.gravity_on == yaml_parameters.gravity_on
+        assert parameters.particle_densities == yaml_parameters.particle_densities
 
 
 if __name__ == '__main__':

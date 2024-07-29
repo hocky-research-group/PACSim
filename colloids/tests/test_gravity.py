@@ -56,7 +56,7 @@ class TestGravityParameters(object):
 
     @staticmethod
     def gravitational_force_exp(particle_density, water_density, particle_radius, z, g):
-        return ((np.absolute(water_density - particle_density))* 4/3 * np.pi * particle_radius**3) * z * g
+        return ((np.abs(water_density - particle_density))* 4/3 * np.pi * particle_radius**3) * z * g
 
     @pytest.fixture
     # Define a function that returns your Gravity function from gravity.py (openmm version)
@@ -146,19 +146,19 @@ class TestGravity(TestGravityParameters):
         return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
     
     def test_gravitational_potentials(self, openmm_context, particle_density, particle_radius,
-                                      test_z_positions, g, water_density):
+                                      test_z_positions, gravitational_constant, water_density):
         
         openmm_grav_potentials = np.zeros(len(test_z_positions))
         
         for dir_z_position in test_z_positions:
             position = [0.0, 0.0, dir_z_position]
-            openmm_context.setPositions(position)
+            openmm_context.setPositions([position])
             openmm_state = openmm_context.getState(getEnergy=True)
             openmm_grav_potentials = openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
 
         # get the gravitational potentials for each z position from the numpy function
         expected_numpy_grav_potentials = self.gravitational_force_exp(particle_density, water_density, particle_radius, 
-                        test_z_positions, g).value_in_unit(unit.kilojoule_per_mole)
+                        test_z_positions, gravitational_constant).value_in_unit(unit.kilojoule_per_mole)
         
         #use an assert statement to compare the two arrays of gravitational potentials and make sure they're the same
         assert openmm_grav_potentials == pytest.approx(expected_numpy_grav_potentials, rel=1.0e-7, abs=1.0e-13)

@@ -54,7 +54,7 @@ class Gravity(OpenMMPotentialAbstract):
 
         gravitational_potential.addGlobalParameter("gravitational_constant", self._gravitational_constant.value_in_unit(unit.meter/unit.second**2))
         gravitational_potential.addGlobalParameter("water_density", self._water_density.value_in_unit(unit.gram/unit.centimeter**3))
-        gravitational_potential.addGlobaalParameter("pi", math.pi)
+        gravitational_potential.addGlobalParameter("pi", math.pi)
         
         gravitational_potential.addPerParticleParameter("radius")
         gravitational_potential.addPerParticleParameter("particle_density")

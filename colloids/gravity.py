@@ -48,8 +48,7 @@ class Gravity(OpenMMPotentialAbstract):
 
         gravitational_potential = CustomExternalForce(
                 "(gravitational_constant * particle_mass * z);"
-                "density_difference = particle_density - water_density;"
-                "particle_mass = (particle_density - water_density) * 4/3 * pi * radius^3;"
+                "particle_mass = (abs(particle_density - water_density)) * 4/3 * pi * radius^3;"
             )
 
         gravitational_potential.addGlobalParameter("gravitational_constant", self._gravitational_constant.value_in_unit(unit.meter/unit.second**2))

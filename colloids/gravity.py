@@ -26,7 +26,7 @@ class Gravity(OpenMMPotentialAbstract):
 
     _nanometer = unit.nano * unit.meter
 
-    def __init__(self, gravitational_constant: unit.Quantity, water_density: unit.Quantity):
+    def __init__(self, gravitational_constant: unit.Quantity, water_density: unit.Quantity, particle_density: unit.Quantity):
 
         """Constructor of the Gravity class."""
         super().__init__()
@@ -37,9 +37,14 @@ class Gravity(OpenMMPotentialAbstract):
             raise TypeError("argument water_density must have a unit compatible with grams per centimeter cubed.")
         if not water_density.value_in_unit(unit.gram/unit.centimeter**3) > 0.0:
             raise ValueError("argument water_density must have a value greater than zero")
+        if not particle_density.unit.is_compatible(unit.gram/unit.centimeter**3):
+            raise TypeError("argument particle_density must have a unit compatible with grams per centimeter cubed.")
+        if not particle_density.value_in_unit(unit.gram/unit.centimeter**3) > 0.0:
+            raise ValueError("argument particle_density must have a value greater than zero")
 
         self._gravitational_constant = gravitational_constant
         self._water_density = water_density
+        self._particle_density = particle_density
       
         self._gravitational_potential = self._set_up_gravitational_potential()
 
@@ -51,16 +56,16 @@ class Gravity(OpenMMPotentialAbstract):
                 "particle_mass = (abs(particle_density - water_density)) * 4/3 * pi * radius^3;"
             )
 
-        gravitational_potential.addGlobalParameter("gravitational_constant", self._gravitational_constant.value_in_unit(unit.meter/unit.second**2))
-        gravitational_potential.addGlobalParameter("water_density", self._water_density.value_in_unit(unit.gram/unit.centimeter**3))
+        gravitational_potential.addGlobalParameter("gravitational_constant", self._gravitational_constant.value_in_unit(unit.nanometer/unit.picosecond**2))
+        gravitational_potential.addGlobalParameter("water_density", (self._water_density * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.amu/unit.nanometer**3))
         gravitational_potential.addGlobalParameter("pi", math.pi)
+        gravitational_potential.addGlobalParameter("particle_density", (self._particle_density * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.amu/unit.nanometer**3))
         
         gravitational_potential.addPerParticleParameter("radius")
-        gravitational_potential.addPerParticleParameter("particle_density")
     
         return gravitational_potential
 
-    def add_particle(self, index: int, radius: unit.Quantity, particle_density: unit.Quantity) -> None:
+    def add_particle(self, index: int, radius: unit.Quantity) -> None:
         """
         Add a colloid with a given radius and particle density to the system.
 
@@ -90,12 +95,8 @@ class Gravity(OpenMMPotentialAbstract):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
         if not radius.value_in_unit(self._nanometer) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
-        if not particle_density.unit.is_compatible(unit.gram/unit.centimeter**3):
-            raise TypeError("argument particle_density must have a unit compatible with grams per centimeter cubed.")
-        if not particle_density.value_in_unit(unit.gram/unit.centimeter**3) > 0.0:
-            raise ValueError("argument particle_density must have a value greater than zero")
 
-        self._gravitational_potential.addParticle(index, [radius.value_in_unit(self._nanometer), particle_density.value_in_unit(unit.gram/unit.centimeter**3)])
+        self._gravitational_potential.addParticle(index, [(radius.value_in_unit(self._nanometer))])
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """

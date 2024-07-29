@@ -125,11 +125,11 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
             system.addForce(force)
     
     if add_gravity:
-        gravitational_potential = Gravity(parameters.gravitational_constant, parameters.water_density)
+        gravitational_potential = Gravity(parameters.gravitational_constant, parameters.water_density, parameters.particle_density)
         
         for i, t in enumerate(types):
             # noinspection PyTypeChecker
-            gravitational_potential.add_particle(index=i, radius=parameters.radii[t], particle_density=parameters.particle_density[t])
+            gravitational_potential.add_particle(index=i, radius=parameters.radii[t])
         for force in gravitational_potential.yield_potentials():
             system.addForce(force)
 

@@ -163,10 +163,8 @@ class TestGravity(TestGravityParameters):
         # get the gravitational potentials for each z position from the numpy function
         expected_numpy_grav_potentials = (self.gravitational_force_exp(particle_density, water_density, particle_radius, 
                         test_z_positions, gravitational_constant) * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
-        
         #use an assert statement to compare the two arrays of gravitational potentials and make sure they're the same
-        print(expected_numpy_grav_potentials[0])
-        print(openmm_grav_potentials[0])
+   
         assert openmm_grav_potentials == pytest.approx(expected_numpy_grav_potentials, rel=1.0e-7, abs=1.0e-13)
 
 if __name__ == '__main__':

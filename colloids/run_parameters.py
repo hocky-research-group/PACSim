@@ -206,8 +206,7 @@ class RunParameters(Parameters):
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
     platform_name: str = "Reference"
-    potential_temperature: unit.Quantity = field(
-        default_factory=lambda: 298.0 * unit.kelvin)
+    potential_temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
     integrator: str = "LangevinIntegrator"
     integrator_parameters: dict[str, Any] = field(
         default_factory=lambda: {
@@ -216,12 +215,9 @@ class RunParameters(Parameters):
             "frictionCoeff": 0.001574074286750681 / (unit.pico * unit.second),
             "randomNumberSeed": None
         })
-    brush_density: unit.Quantity = field(
-        default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
-    brush_length: unit.Quantity = field(
-        default_factory=lambda: 10.6 * (unit.nano * unit.meter))
-    debye_length: unit.Quantity = field(
-        default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
+    brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
+    brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
+    debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
     use_depletion: bool = False
     dielectric_constant: float = 80.0
     cutoff_factor: float = 21.0
@@ -240,56 +236,42 @@ class RunParameters(Parameters):
     final_configuration_xyz_filename: Optional[str] = "final_frame.xyz"
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
-    wall_directions: list[bool] = field(
-        default_factory=lambda: [False, False, False])
+    wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
     depletion_phi: Optional[float] = None
     depletant_radius: Optional[unit.Quantity] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
         if not self.initial_configuration.endswith(".xyz"):
-            raise ValueError(
-                "The filename of the initial configuration must end with '.xyz'")
+            raise ValueError("The filename of the initial configuration must end with '.xyz'")
         for t in self.masses:
             if not self.masses[t].unit.is_compatible(unit.amu):
-                raise TypeError(
-                    f"Mass of type {t} must have a unit compatible with atomic mass units.")
+                raise TypeError(f"Mass of type {t} must have a unit compatible with atomic mass units.")
             if self.masses[t] <= 0.0 * unit.amu:
-                raise ValueError(
-                    f"Mass of type {t} must be greater than zero.")
+                raise ValueError(f"Mass of type {t} must be greater than zero.")
             if t not in self.radii:
-                raise ValueError(
-                    f"Type {t} of the masses dictionary is not in radii dictionary.")
+                raise ValueError(f"Type {t} of the masses dictionary is not in radii dictionary.")
             if t not in self.surface_potentials:
-                raise ValueError(
-                    f"Type {t} of the masses dictionary is not in surface potentials dictionary.")
+                raise ValueError(f"Type {t} of the masses dictionary is not in surface potentials dictionary.")
         for t in self.radii:
             if not self.radii[t].unit.is_compatible(unit.nano * unit.meter):
-                raise TypeError(
-                    f"Radius of type {t} must have a unit compatible with nanometers.")
+                raise TypeError(f"Radius of type {t} must have a unit compatible with nanometers.")
             if self.radii[t] <= 0.0 * (unit.nano * unit.meter):
-                raise ValueError(
-                    f"Radius of type {t} must be greater than zero.")
+                raise ValueError(f"Radius of type {t} must be greater than zero.")
             if t not in self.masses:
-                raise ValueError(
-                    f"Type {t} of the radii dictionary is not in masses dictionary.")
+                raise ValueError(f"Type {t} of the radii dictionary is not in masses dictionary.")
             if t not in self.surface_potentials:
-                raise ValueError(
-                    f"Type {t} of the initial configuration is not in surface potentials dictionary.")
+                raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
         for t in self.surface_potentials:
             if not self.surface_potentials[t].unit.is_compatible(
                     unit.milli * unit.volt):
-                raise TypeError(
-                    f"Surface potential of type {t} must have a unit compatible with millivolts.")
+                raise TypeError(f"Surface potential of type {t} must have a unit compatible with millivolts.")
             if t not in self.masses:
-                raise ValueError(
-                    f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
+                raise ValueError(f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
             if t not in self.radii:
-                raise ValueError(
-                    f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
+                raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
-            raise ValueError(
-                "The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
+            raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
         possible_integrators = [name for name, _ in inspect.getmembers(
             integrators, inspect.isfunction)]
         if self.integrator not in possible_integrators:
@@ -303,112 +285,89 @@ class RunParameters(Parameters):
                             f"{self.integrator_parameters}. The expected signature is "
                             f"{inspect.signature(integrator_getter)}")
         if not self.potential_temperature.unit.is_compatible(unit.kelvin):
-            raise TypeError(
-                "The temperature must have a unit compatible with kelvin.")
+            raise TypeError("The temperature must have a unit compatible with kelvin.")
         if self.potential_temperature <= 0.0 * unit.kelvin:
             raise ValueError("The temperature must be greater than zero.")
         if not self.brush_density.unit.is_compatible(
                 (unit.nano * unit.meter) ** (-2)):
-            raise TypeError(
-                "The brush density must have a unit compatible with 1/nanometer^2.")
+            raise TypeError("The brush density must have a unit compatible with 1/nanometer^2.")
         if self.brush_density <= 0.0 * ((unit.nano * unit.meter) ** (-2)):
             raise ValueError("The brush density must be greater than zero.")
         if not self.brush_length.unit.is_compatible(unit.nano * unit.meter):
-            raise TypeError(
-                "The brush length must have a unit compatible with nanometers.")
+            raise TypeError("The brush length must have a unit compatible with nanometers.")
         if self.brush_length <= 0.0 * (unit.nano * unit.meter):
             raise ValueError("The brush length must be greater than zero.")
         if not self.debye_length.unit.is_compatible(unit.nano * unit.meter):
-            raise TypeError(
-                "The Debye length must have a unit compatible with nanometers.")
+            raise TypeError("The Debye length must have a unit compatible with nanometers.")
         if self.debye_length <= 0.0 * (unit.nano * unit.meter):
             raise ValueError("The Debye length must be greater than zero.")
         if self.dielectric_constant <= 0.0:
-            raise ValueError(
-                "The dielectric constant must be greater than zero.")
+            raise ValueError("The dielectric constant must be greater than zero.")
         if self.run_steps <= 0:
-            raise ValueError(
-                "The number of time steps must be greater than zero.")
+            raise ValueError("The number of time steps must be greater than zero.")
         if self.state_data_interval <= 0:
-            raise ValueError(
-                "The state data interval must be greater than zero.")
+            raise ValueError("The state data interval must be greater than zero.")
         if not self.state_data_filename.endswith(".csv"):
-            raise ValueError(
-                "The filename of the state data must end with '.csv'.")
+            raise ValueError("The filename of the state data must end with '.csv'.")
         if self.trajectory_interval <= 0:
-            raise ValueError(
-                "The trajectory interval must be greater than zero.")
+            raise ValueError("The trajectory interval must be greater than zero.")
         if not self.trajectory_filename.endswith(".gsd"):
-            raise ValueError(
-                "The filename of the trajectory must end with '.gsd'.")
+            raise ValueError("The filename of the trajectory must end with '.gsd'.")
         if self.checkpoint_interval <= 0:
-            raise ValueError(
-                "The checkpoint interval must be greater than zero.")
+            raise ValueError("The checkpoint interval must be greater than zero.")
         if not self.checkpoint_filename.endswith(".chk"):
-            raise ValueError(
-                "The filename of the checkpoint must end with '.chk'.")
+            raise ValueError("The filename of the checkpoint must end with '.chk'.")
         if (self.final_configuration_gsd_filename is not None
                 and not self.final_configuration_gsd_filename.endswith(".gsd")):
-            raise ValueError(
-                "The filename of the final configuration must end with '.gsd'.")
+            raise ValueError("The filename of the final configuration must end with '.gsd'.")
         if (self.final_configuration_xyz_filename is not None
                 and not self.final_configuration_xyz_filename.endswith(".xyz")):
-            raise ValueError(
-                "The filename of the final configuration must end with '.xyz'.")
+            raise ValueError("The filename of the final configuration must end with '.xyz'.")
         if isinstance(self.wall_directions, str):
             raise ValueError("Wall directions was parsed as a string although it should be a list of bools. "
                              "Make sure that the yaml file is correctly formatted and that there is space after each "
                              "dash in the list of wall directions.")
         if len(self.wall_directions) != 3:
-            raise ValueError(
-                "Wall directions must be specified for three dimensions.")
+            raise ValueError("Wall directions must be specified for three dimensions.")
         if any(self.wall_directions):
             if self.epsilon is None:
-                raise ValueError(
-                    "Epsilon must be specified if walls are active.")
+                raise ValueError("Epsilon must be specified if walls are active.")
             if not self.epsilon.unit.is_compatible(unit.kilojoule_per_mole):
-                raise TypeError(
-                    "Epsilon must have a unit compatible with kilojoules per mole.")
+                raise TypeError("Epsilon must have a unit compatible with kilojoules per mole.")
             if self.epsilon <= 0.0 * unit.kilojoule_per_mole:
                 raise ValueError("epsilon must be greater than zero.")
             if self.alpha is None:
-                raise ValueError(
-                    "Alpha must be specified if walls are active.")
+                raise ValueError("Alpha must be specified if walls are active.")
             if not 0.0 <= self.alpha <= 1.0:
                 raise ValueError("Alpha must be between zero and one.")
         else:
             if self.epsilon is not None:
-                raise ValueError(
-                    "Epsilon must not be specified if walls are not active.")
+                raise ValueError("Epsilon must not be specified if walls are not active.")
             if self.alpha is not None:
-                raise ValueError(
-                    "Alpha must not be specified if walls are not active.")
+                raise ValueError("Alpha must not be specified if walls are not active.")
         if self.use_depletion:
             if self.depletion_phi is None:
                 raise ValueError("Phi must be specified if depletion is on.")
             if not 0.0 <= self.depletion_phi <= 1.0:
                 raise ValueError("Phi must be between zero and one.")
             if self.depletant_radius is None:
-                raise ValueError(
-                    "Depletant radius must be specified if depletion is on.")
+                raise ValueError("Depletant radius must be specified if depletion is on.")
             if not self.depletant_radius.unit.is_compatible(
                     unit.nano * unit.meter):
-                raise TypeError(
-                    "Depletant radius must have a unit compatible with nanometers.")
+                raise TypeError("Depletant radius must have a unit compatible with nanometers.")
             if self.depletant_radius <= 0.0 * (unit.nano * unit.meter):
                 raise ValueError("Depletant radius must be greater than zero.")
             for t in self.radii:
                 if self.depletant_radius / self.radii[t] > 0.1547:
                     warnings.warn("Size ratio of depletant to colloid particles is too large. "
                                   "Analytical computation of depletion potential may be invalid."
-                                  "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, pp 10079 - 10106.")
+                                  "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
+                                  "pp 10079 - 10106.")
         else:
             if self.depletion_phi is not None:
-                raise ValueError(
-                    "Phi must not be specified if depletion potential is not on.")
+                raise ValueError("Phi must not be specified if depletion potential is not on.")
             if self.depletant_radius is not None:
-                raise ValueError(
-                    "Depletant radius must not be specified if depletion potential is not on.")
+                raise ValueError("Depletant radius must not be specified if depletion potential is not on.")
 
     def check_types_of_initial_configuration(self):
         """
@@ -423,30 +382,23 @@ class RunParameters(Parameters):
         types = list(dict.fromkeys(types_from_file))
         for t in types:
             if t not in self.masses:
-                raise ValueError(
-                    f"Type {t} of the initial configuration is not in masses dictionary.")
+                raise ValueError(f"Type {t} of the initial configuration is not in masses dictionary.")
             if t not in self.radii:
-                raise ValueError(
-                    f"Type {t} of the initial configuration is not in radii dictionary.")
+                raise ValueError(f"Type {t} of the initial configuration is not in radii dictionary.")
             if t not in self.surface_potentials:
-                raise ValueError(
-                    f"Type {t} of the initial configuration is not in surface potentials dictionary.")
+                raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
         for t in self.masses:
             if t not in types:
-                raise ValueError(
-                    f"Type {t} of the masses dictionary is not in the initial configuration.")
+                raise ValueError(f"Type {t} of the masses dictionary is not in the initial configuration.")
         for t in self.radii:
             if t not in types:
-                raise ValueError(
-                    f"Type {t} of the radii dictionary is not in the initial configuration.")
+                raise ValueError(f"Type {t} of the radii dictionary is not in the initial configuration.")
         for t in self.surface_potentials:
             if t not in types:
-                raise ValueError(
-                    f"Type {t} of the surface potentials dictionary is not in the initial configuration.")
+                raise ValueError(f"Type {t} of the surface potentials dictionary is not in the initial configuration.")
 
 
 if __name__ == '__main__':
-    RunParameters(
-        initial_configuration="tests/first_frame.xyz").to_yaml("example.yaml")
+    RunParameters(initial_configuration="tests/first_frame.xyz").to_yaml("example.yaml")
     parameters = RunParameters.from_yaml("example.yaml")
     print(parameters)

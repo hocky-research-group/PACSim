@@ -10,23 +10,27 @@ from initial_particle_positions import subrandom_particle_positions, lattice_par
 
 def main():
     number_particles = 500
-    reduced_density = 0.5
-    mass = 39.9 * unit.amu  # argon
+    reduced_density = 0.05
+    mass = 39.9 * unit.amu / 50.0  # argon
     sigma = 3.4 * unit.angstrom  # argon
     epsilon = 0.238 * unit.kilocalories_per_mole  # argon
     cutoff = 4.0 * sigma
     switch_width = 3.4 * unit.angstrom  # argon
-    temperature = epsilon / unit.BOLTZMANN_CONSTANT_kB / unit.AVOGADRO_CONSTANT_NA  # kT/epsilon = 1
+    temperature = 1.0 / 3.0 * epsilon / unit.BOLTZMANN_CONSTANT_kB / unit.AVOGADRO_CONSTANT_NA  # kT/epsilon = 1
     reduced_time_step = 0.001
     number_equilibration_steps = 0
-    number_production_steps = 10
-    platform = "CPU"  # "Reference", "CPU", "CUDA", or "OpenCL"
+    number_production_steps = 1000000
+    platform = "CUDA"  # "Reference", "CPU", "CUDA", or "OpenCL"
     trajectory_filename = "trajectory.gsd"
     trajectory_interval = 1000
     state_data_filename = "state_data.csv"
     state_data_interval = 100
     initial = "lattice"  # "lattice" or "random"
     use_plumed = True
+    distance_threshold_first_coordination_sphere = 0.55  # Only relevant if use_plumed is True.
+    lq6_threshold = 0.19
+    contact_distance_threshold = 1.5 * sigma.value_in_unit(unit.nano * unit.meter)
+    switch_width_plumed = 0.01  # Only relevant if use_plumed is True.
 
     # Create topology with Argon atoms.
     topology = app.Topology()
@@ -70,26 +74,38 @@ def main():
 
     if use_plumed:
         # See https://www.plumed-nest.org/eggs/19/049/data/plumed_GeTe.dat.html
-        distance_threshold_first_coordination_sphere = 0.4  # TODO: SET ACCORDING TO SIMULATIONS!
-        switch_width = 0.01
         script = f"""
         # Calculate the Steinhardt Q6 vector for each of the atoms in the system
         q6: Q6 ...
             SPECIES=1-{number_particles} 
-            SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width} D_MAX={distance_threshold_first_coordination_sphere + switch_width}}} 
+            SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width_plumed} D_MAX={distance_threshold_first_coordination_sphere + switch_width_plumed}}} 
             MEAN 
             HISTOGRAM={{GAUSSIAN LOWER=0.0 UPPER=1.0 NBINS=20 SMEAR=0.1}}
         ...
-        PRINT ARG=q6.* FILE=q6
+        PRINT ARG=q6.* FILE=q6 STRIDE={state_data_interval}
         # Calculate the local Steinhardt parameter for each of the atoms in the system 
         # in the manner described by ten Wolde and Frenkel.
         lq6: LOCAL_Q6 ...
             SPECIES=q6 
-            SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width} D_MAX={distance_threshold_first_coordination_sphere + switch_width}}} 
+            SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width_plumed} D_MAX={distance_threshold_first_coordination_sphere + switch_width_plumed}}} 
             MEAN 
             HISTOGRAM={{GAUSSIAN LOWER=0.0 UPPER=1.0 NBINS=20 SMEAR=0.1}} 
         ...
         PRINT ARG=lq6.* FILE=lq6
+        # Now select only those atoms that have a local q6 parameter that is larger than a certain threshold
+        flq6: MFILTER_MORE DATA=lq6 SWITCH={{GAUSSIAN D_0={lq6_threshold} R_0={switch_width_plumed} D_MAX={lq6_threshold + switch_width_plumed}}}
+        # Calculate the coordination number for those atoms that have a local q6 parameter that is larger than a certain threshold
+        cc_cmat: CONTACT_MATRIX ATOMS=flq6 SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
+        # Use depth first clustering to identify the sizes of the clusters
+        dfs: DFSCLUSTERING MATRIX=cc_cmat
+        # Compute the sum of the coordination numbers for the atoms in the largest cluster                                                         
+        clust1: CLUSTER_PROPERTIES CLUSTERS=dfs CLUSTER=1 SUM  
+        PRINT ARG=clust1.* FILE=clust1 STRIDE={state_data_interval}
+        # Do the same but without the filter on lq6.
+        cc_cmat_all: CONTACT_MATRIX ATOMS=q6 SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
+        dfs_all: DFSCLUSTERING MATRIX=cc_cmat_all
+        clust1_all: CLUSTER_PROPERTIES CLUSTERS=dfs_all CLUSTER=1 SUM
+        PRINT ARG=clust1_all.* FILE=clust1_all STRIDE={state_data_interval}
         """
         system.addForce(PlumedForce(script))
 

@@ -46,6 +46,8 @@ class Gravity(OpenMMPotentialAbstract):
         if not gravitational_acceleration.unit.is_compatible(unit.meter / unit.second ** 2):
             raise TypeError(
                 "argument gravitational constant must have a unit that is compatible with meters per second squared")
+        if not gravitational_acceleration.value_in_unit(unit.meter / unit.second ** 2) > 0.0:
+            raise ValueError("argument gravitational constant must have a value greater than zero")
         if not water_density.unit.is_compatible(unit.gram / self._centimeter ** 3):
             raise TypeError("argument water_density must have a unit compatible with grams per centimeter cubed.")
         if not water_density.value_in_unit(unit.gram / self._centimeter ** 3) > 0.0:
@@ -63,10 +65,7 @@ class Gravity(OpenMMPotentialAbstract):
     def _set_up_gravitational_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the gravitational potential."""
 
-        gravitational_potential = CustomExternalForce(
-            "(gravitational_acceleration * particle_mass * z);"
-            "particle_mass = (abs(particle_density - water_density)) * 4/3 * pi * radius^3;"
-        )
+        gravitational_potential = CustomExternalForce("(gravitational_acceleration * particle_mass * z)")
 
         gravitational_potential.addGlobalParameter(
             "gravitational_acceleration",
@@ -103,8 +102,8 @@ class Gravity(OpenMMPotentialAbstract):
             raise ValueError("argument radius must have a value greater than zero")
         self._gravitational_potential.addParticle(
             index,
-            [(self._particle_density - self._water_density)
-             * 4.0 / 3.0 * math.pi * radius.value_in_unit(self._nanometer) ** 3])
+            [((self._particle_density - self._water_density)
+              * 4.0 / 3.0 * math.pi * (radius ** 3) * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.amu)])
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """

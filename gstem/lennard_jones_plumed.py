@@ -1,3 +1,4 @@
+import gsd.hoomd
 import numpy as np
 import openmm
 from openmm import app
@@ -160,7 +161,20 @@ def main():
     print("Production...")
     simulation.step(number_production_steps)
 
+    if use_plumed:
+        with (gsd.hoomd.open("trajectory.gsd", "r") as file_read,
+              gsd.hoomd.open("trajectory_lq6.gsd", "w") as file_write):
+            for i, frame in enumerate(file_read):
+                if i == 0:
+                    frame.particles.charge = np.zeros(frame.particles.N)
+                else:
+                    lq6 = np.loadtxt("LQ6MULTICOLVAR.xyz", skiprows=i * 2 + (i - 1) * number_particles,
+                                     max_rows=number_particles, usecols=(4,))
+                    assert len(lq6) > 0
+                    frame.particles.charge = lq6
+                file_write.append(frame)
+                file_write.flush()
+
 
 if __name__ == '__main__':
     main()
-

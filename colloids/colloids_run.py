@@ -123,17 +123,17 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         for force in slj_walls.yield_potentials():
             system.addForce(force)
 
-    if parameters.gravity_on:
-        gravitational_potential = Gravity(parameters.gravitational_constant, parameters.water_density, parameters.particle_density)
+    for force in colloid_potentials.yield_potentials():
+        system.addForce(force)
 
+    if parameters.use_gravity:
+        gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density,
+                                          parameters.particle_density)
         for i, t in enumerate(types):
             # noinspection PyTypeChecker
             gravitational_potential.add_particle(index=i, radius=parameters.radii[t])
         for force in gravitational_potential.yield_potentials():
             system.addForce(force)
-
-    for force in colloid_potentials.yield_potentials():
-        system.addForce(force)
 
     if parameters.use_depletion:
         depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,

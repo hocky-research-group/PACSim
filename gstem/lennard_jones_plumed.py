@@ -89,7 +89,7 @@ def main():
         SPECIES=q6 
         SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width_plumed} D_MAX={distance_threshold_first_coordination_sphere + switch_width_plumed}}} 
         MEAN 
-        HISTOGRAM={{GAUSSIAN LOWER=0.0 UPPER=1.0 NBINS=20 SMEAR=0.1}} 
+        HISTOGRAM={{GAUSSIAN LOWER=-1.0 UPPER=1.0 NBINS=40 SMEAR=0.1}} 
     ...
     PRINT ARG=lq6.* FILE=lq6 STRIDE={state_data_interval}
     DUMPMULTICOLVAR DATA=lq6 FILE=LQ6MULTICOLVAR.xyz STRIDE={trajectory_interval}

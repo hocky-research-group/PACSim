@@ -110,10 +110,10 @@ class TestRunParameters(object):
         assert parameters.use_depletion == yaml_parameters.use_depletion
         assert parameters.depletion_phi == yaml_parameters.depletion_phi
         assert parameters.depletant_radius == yaml_parameters.depletant_radius
-        assert parameters.gravitational_constant == yaml_parameters.gravitational_constant
+        assert parameters.use_gravity == yaml_parameters.use_gravity
+        assert parameters.gravitational_acceleration == yaml_parameters.gravitational_acceleration
         assert parameters.water_density == yaml_parameters.water_density
-        assert parameters.gravity_on == yaml_parameters.gravity_on
-        assert parameters.particle_densities == yaml_parameters.particle_densities
+        assert parameters.particle_density == yaml_parameters.particle_density
 
 
 if __name__ == '__main__':

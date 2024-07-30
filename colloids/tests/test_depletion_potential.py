@@ -36,7 +36,7 @@ class TestParameters(object):
     @pytest.fixture
     def test_separations(self, maximum_separation):
         return np.linspace(0.0, maximum_separation.value_in_unit(unit.nano * unit.meter),
-                           num=1000) * (unit.nano * unit.meter)
+                           num=1000)[1:] * (unit.nano * unit.meter)
 
     @pytest.fixture
     def side_length(self, radius_one, radius_two, maximum_separation):

@@ -4,7 +4,7 @@ import openmm
 from openmm import app
 from openmm import unit
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
-                      ShiftedLennardJonesWalls, DepletionPotential)
+                      ShiftedLennardJonesWalls, DepletionPotential, Gravity)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
 import colloids.integrators as integrators
@@ -125,6 +125,15 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
 
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
+
+    if parameters.use_gravity:
+        gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density,
+                                          parameters.particle_density)
+        for i, t in enumerate(types):
+            # noinspection PyTypeChecker
+            gravitational_potential.add_particle(index=i, radius=parameters.radii[t])
+        for force in gravitational_potential.yield_potentials():
+            system.addForce(force)
 
     if parameters.use_depletion:
         depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,

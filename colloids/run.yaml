@@ -19,6 +19,7 @@ dielectric_constant: 80.0
 epsilon: null
 final_configuration_gsd_filename: final_frame.gsd
 final_configuration_xyz_filename: final_frame.xyz
+gravitational_acceleration: null
 initial_configuration: tests/first_frame.xyz
 integrator: LangevinIntegrator
 integrator_parameters:
@@ -38,6 +39,7 @@ masses:
     unit: dalton
     value: 1.0
 minimize_energy_initially: false
+particle_density: null
 platform_name: CPU
 potential_temperature: !Quantity
   unit: kelvin
@@ -62,6 +64,7 @@ surface_potentials:
 trajectory_filename: trajectory.gsd
 trajectory_interval: 1000
 use_depletion: true
+use_gravity: false
 use_log: false
 use_tabulated: false
 velocity_seed: null
@@ -69,3 +72,4 @@ wall_directions:
   - false
   - false
   - false
+water_density: null

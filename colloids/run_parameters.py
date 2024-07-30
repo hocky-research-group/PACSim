@@ -178,12 +178,12 @@ class RunParameters(Parameters):
     :type alpha: Optional[float]
     :param use_depletion:
         A boolean indicating whether to turn on the depletion attraction for the simulation.
-        If depletion attraction is on, phi and depletant radius must be specified.
+        If depletion attraction is on, depletion_phi and depletant_radius must be specified.
         Defaults to False.
     :type use_depletion: bool
     :param depletion_phi:
         The number density of polymers in the solution.
-        If depletion attraction is on, the value of depletion_phi must not be None and 0<= depletion_phi <=1.
+        If depletion attraction is on, the value of depletion_phi must not be None and 0 <= depletion_phi <=1.
         Defaults to None.
     :type depletion_phi: Optional[float]
     :param depletant_radius:
@@ -263,8 +263,7 @@ class RunParameters(Parameters):
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
         for t in self.surface_potentials:
-            if not self.surface_potentials[t].unit.is_compatible(
-                    unit.milli * unit.volt):
+            if not self.surface_potentials[t].unit.is_compatible(unit.milli * unit.volt):
                 raise TypeError(f"Surface potential of type {t} must have a unit compatible with millivolts.")
             if t not in self.masses:
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
@@ -272,8 +271,7 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
-        possible_integrators = [name for name, _ in inspect.getmembers(
-            integrators, inspect.isfunction)]
+        possible_integrators = [name for name, _ in inspect.getmembers(integrators, inspect.isfunction)]
         if self.integrator not in possible_integrators:
             raise ValueError(f"Integrator {self.integrator} not available, the integrator must be one of the "
                              f"following: {', '.join(possible_integrators)}.")
@@ -288,8 +286,7 @@ class RunParameters(Parameters):
             raise TypeError("The temperature must have a unit compatible with kelvin.")
         if self.potential_temperature <= 0.0 * unit.kelvin:
             raise ValueError("The temperature must be greater than zero.")
-        if not self.brush_density.unit.is_compatible(
-                (unit.nano * unit.meter) ** (-2)):
+        if not self.brush_density.unit.is_compatible((unit.nano * unit.meter) ** (-2)):
             raise TypeError("The brush density must have a unit compatible with 1/nanometer^2.")
         if self.brush_density <= 0.0 * ((unit.nano * unit.meter) ** (-2)):
             raise ValueError("The brush density must be greater than zero.")
@@ -347,9 +344,9 @@ class RunParameters(Parameters):
                 raise ValueError("Alpha must not be specified if walls are not active.")
         if self.use_depletion:
             if self.depletion_phi is None:
-                raise ValueError("Phi must be specified if depletion is on.")
+                raise ValueError("Depletion phi must be specified if depletion is on.")
             if not 0.0 <= self.depletion_phi <= 1.0:
-                raise ValueError("Phi must be between zero and one.")
+                raise ValueError("Depletion phi must be between zero and one.")
             if self.depletant_radius is None:
                 raise ValueError("Depletant radius must be specified if depletion is on.")
             if not self.depletant_radius.unit.is_compatible(
@@ -365,7 +362,7 @@ class RunParameters(Parameters):
                                   "pp 10079 - 10106.")
         else:
             if self.depletion_phi is not None:
-                raise ValueError("Phi must not be specified if depletion potential is not on.")
+                raise ValueError("Depletion phi must not be specified if depletion potential is not on.")
             if self.depletant_radius is not None:
                 raise ValueError("Depletant radius must not be specified if depletion potential is not on.")
 

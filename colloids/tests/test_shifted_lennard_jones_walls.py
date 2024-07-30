@@ -4,6 +4,8 @@ from colloids import ShiftedLennardJonesWalls
 import numpy as np
 
 
+@pytest.mark.filterwarnings(
+    "ignore:The force of the shifted Lennard-Jones potential as a wall is only continuous if alpha = 1.")
 class TestShiftedLennardJonesWallsParameters(object):
     @staticmethod
     def slj_walls_potential_active(pos, wall_distance, rcut, delta, epsilon, sigma, alpha):

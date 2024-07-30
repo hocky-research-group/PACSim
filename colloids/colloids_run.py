@@ -4,9 +4,10 @@ import openmm
 from openmm import app
 from openmm import unit
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
-                      ShiftedLennardJonesWalls, Gravity)
+                      ShiftedLennardJonesWalls, DepletionPotential, Gravity)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
+import colloids.integrators as integrators
 from colloids.run_parameters import RunParameters
 from colloids.status_reporter import StatusReporter
 
@@ -45,10 +46,15 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
                 box_vector_three[0] == 0.0 and box_vector_three[1] == 0.0):
             raise ValueError("If any wall is included, the box vectors must be parallel to the coordinate axes.")
         wall_distances = (box_vector_one[0] * (unit.nano * unit.meter) if parameters.wall_directions[0] else None,
-                          box_vector_two[1] * (unit.nano * unit.meter)if parameters.wall_directions[1] else None,
+                          box_vector_two[1] * (unit.nano * unit.meter) if parameters.wall_directions[1] else None,
                           box_vector_three[2] * (unit.nano * unit.meter) if parameters.wall_directions[2] else None)
         final_cell = cell.copy()
         if not all_walls:
+            if parameters.use_depletion:
+                if (parameters.depletant_radius
+                        > (parameters.cutoff_factor * parameters.debye_length - 2.0 * parameters.brush_length) / 2.0):
+                    raise ValueError("the depletant radius is too large for the cutoff factor and brush length when "
+                                     "partial walls are included (r_d <= (cutoff_factor * lambda_D - 2 * L) / 2)")
             for index, wall_direction in enumerate(parameters.wall_directions):
                 if wall_direction:
                     # The shifted Lennard Jones walls diverge at distance r = radius - 1 from the location of the wall,
@@ -71,21 +77,14 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
 
-    add_gravity = parameters.gravity_on
-    
     # Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
-    # TODO: ALLOW FOR DIFFERENT INTEGRATORS?
-    integrator = openmm.LangevinIntegrator(parameters.temperature,
-                                           parameters.collision_rate,
-                                           parameters.timestep)
-    if parameters.integrator_seed is not None:
-        integrator.setRandomNumberSeed(parameters.integrator_seed)
+    integrator = getattr(integrators, parameters.integrator)(**parameters.integrator_parameters)
 
     potentials_parameters = ColloidPotentialsParameters(
         brush_density=parameters.brush_density, brush_length=parameters.brush_length,
-        debye_length=parameters.debye_length, temperature=parameters.temperature,
+        debye_length=parameters.debye_length, temperature=parameters.potential_temperature,
         dielectric_constant=parameters.dielectric_constant
     )
 
@@ -123,10 +122,10 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
             slj_walls.add_particle(index=i, radius=parameters.radii[t])
         for force in slj_walls.yield_potentials():
             system.addForce(force)
-    
-    if add_gravity:
+
+    if parameters.gravity_on:
         gravitational_potential = Gravity(parameters.gravitational_constant, parameters.water_density, parameters.particle_density)
-        
+
         for i, t in enumerate(types):
             # noinspection PyTypeChecker
             gravitational_potential.add_particle(index=i, radius=parameters.radii[t])
@@ -136,7 +135,39 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
 
+    if parameters.use_depletion:
+        depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,
+                                                 brush_length=parameters.brush_length,
+                                                 temperature=parameters.potential_temperature,
+                                                 periodic_boundary_conditions=not all_walls)
+        for i, t in enumerate(types):
+            # noinspection PyTypeChecker
+            depletion_potential.add_particle(radius=parameters.radii[t])
+        for force in depletion_potential.yield_potentials():
+            system.addForce(force)
+
     if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":
+        # Set different force groups for the nonbonded potentials to allow for different cutoffs on the OpenCL and CUDA
+        # platforms.
+        cutoffs = []
+        for force in system.getForces():
+            if isinstance(force, (openmm.NonbondedForce, openmm.CustomNonbondedForce)):
+                assert (force.getNonbondedMethod() == openmm.NonbondedForce.CutoffPeriodic
+                        or force.getNonbondedMethod() == openmm.NonbondedForce.CutoffNonPeriodic)
+                cutoff_distance = force.getCutoffDistance()
+                cutoff_distance_index = -1
+                for other_cutoff_index in range(len(cutoffs)):
+                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(
+                            unit.nano * unit.meter)) < 1.0e-6:
+                        cutoff_distance_index = other_cutoff_index
+                if cutoff_distance_index == -1:
+                    cutoffs.append(cutoff_distance)
+                    cutoff_distance_index = len(cutoffs) - 1
+                else:
+                    force.setCutoffDistance(cutoffs[cutoff_distance_index])
+                force.setForceGroup(cutoff_distance_index)
+
+    if parameters.platform_name == "CUDA":
         simulation = app.Simulation(topology, system, integrator, platform,
                                     platformProperties={"Precision": "mixed"})
     else:
@@ -178,10 +209,10 @@ def main():
 
     simulation.context.setPositions(positions)
     if parameters.velocity_seed is not None:
-        simulation.context.setVelocitiesToTemperature(parameters.temperature,
+        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
                                                       parameters.velocity_seed)
     else:
-        simulation.context.setVelocitiesToTemperature(parameters.temperature)
+        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature)
 
     if parameters.minimize_energy_initially:
         # TODO: Do we want this?

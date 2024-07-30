@@ -150,8 +150,46 @@ class Parameters(object):
     Base dataclass providing methods to store the data in a yaml file and to read the data from a yaml file.
 
     All standard data types (int, float, str) or standard containers (list, tuple, dict) of them can be stored in an
-    inheriting data class. In addition, this dataclass provides methods to store OpenMM quantities in a yaml file by
-    wrapping them in a custom class.
+    inheriting data class.
+
+    In addition, this dataclass provides methods to store OpenMM quantities in a yaml file by wrapping them in a custom
+    class. In the yaml file, OpenMM quantities are stored with the tag !Quantity and two key-value pairs with the keys
+    "value" and "unit".
+
+    In the yaml file, every value of a given key may be a reference to another value with another key in the top level
+    of the yaml file. For example, the following excerpt from a yaml file contains a reference to the value of the key
+    "potential_temperature" in the top level of the yaml file in the value of the key "temperature" in the dictionary
+    "integrator_parameters":
+
+    potential_temperature: !Quantity
+        unit: kelvin
+        value: 298.0
+    integrator: LangevinIntegrator
+    integrator_parameters:
+        frictionCoeffs: !Quantity
+            unit: /picosecond
+            value: 0.001574074286750681
+        stepSize: !Quantity
+            unit: picosecond
+            value: 0.00317647015905543
+        temperature: potential_temperature
+
+    This reference is resolved when the data is read from the yaml file and effectively becomes:
+
+    potential_temperature: !Quantity
+        unit: kelvin
+        value: 298.0
+    integrator: LangevinIntegrator
+    integrator_parameters:
+        frictionCoeffs: !Quantity
+            unit: /picosecond
+            value: 0.001574074286750681
+        stepSize: !Quantity
+            unit: picosecond
+            value: 0.00317647015905543
+        temperature: !Quantity
+            unit: kelvin
+            value: 298.0
     """
 
     class _Quantity(yaml.YAMLObject):
@@ -283,9 +321,24 @@ class Parameters(object):
         with open(filename, "r") as f:
             params = yaml.load(f, Loader=yaml.FullLoader)
         for key, value in params.items():
+            params[key] = cls._resolve_reference_values(params, value)
+        for key, value in params.items():
             params[key] = cls._convert_to_openmm_quantity(value)
         # noinspection PyArgumentList
         return cls(**params)
+
+    @staticmethod
+    def _resolve_reference_values(base_params: dict[str, Any], value: Any) -> Any:
+        """Recursively resolve references to other parameters in the base_params dictionary."""
+        if isinstance(value, str) and value in base_params:
+            return base_params[value]
+        elif isinstance(value, dict):
+            return_dict = value
+            for key, sub_value in value.items():
+                return_dict[key] = Parameters._resolve_reference_values(base_params, sub_value)
+            return return_dict
+        else:
+            return value
 
     def to_yaml(self, filename: str) -> None:
         """

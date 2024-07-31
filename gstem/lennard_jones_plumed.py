@@ -134,7 +134,6 @@ def main():
     cc_cmat: CONTACT_MATRIX ...
         ATOMS=flq6 
         SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
-        LOWMEM
         NOPBC
     ...
     # Use depth first clustering to identify the sizes of the clusters
@@ -146,7 +145,6 @@ def main():
     cc_cmat_all: CONTACT_MATRIX ...
         ATOMS=q6 
         SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
-        LOWMEM
         NOPBC
     ...
     dfs_all: DFSCLUSTERING MATRIX=cc_cmat_all LOWMEM NOPBC

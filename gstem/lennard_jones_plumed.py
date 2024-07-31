@@ -5,6 +5,7 @@ from openmm import app
 from openmm import unit
 from openmmplumed import PlumedForce
 from colloids.gsd_reporter import GSDReporter
+from colloids.shifted_lennard_jones_walls import ShiftedLennardJonesWalls
 from colloids.status_reporter import StatusReporter
 from initial_particle_positions import subrandom_particle_positions, lattice_particle_positions
 
@@ -21,14 +22,15 @@ def main():
     reduced_time_step = 0.001
     number_equilibration_steps = 0
     number_production_steps = 1000000
-    platform = "CUDA"  # "Reference", "CPU", "CUDA", or "OpenCL"
+    platform = "CPU"  # "Reference", "CPU", "CUDA", or "OpenCL"
     trajectory_filename = "trajectory.gsd"
     trajectory_interval = 1000
     state_data_filename = "state_data.csv"
     state_data_interval = 100
     initial = "lattice"  # "lattice" or "random"
     use_plumed = True
-    distance_threshold_first_coordination_sphere = 0.6  # Only relevant if use_plumed is True.
+    # Only relevant if use_plumed is True.
+    distance_threshold_first_coordination_sphere = 1.5 * sigma.value_in_unit(unit.nano * unit.meter)
     lq6_threshold = 0.5
     contact_distance_threshold = 1.5 * sigma.value_in_unit(unit.nano * unit.meter)
     switch_width_plumed = 0.01  # Only relevant if use_plumed is True.
@@ -50,20 +52,25 @@ def main():
     number_density = reduced_density / sigma ** 3
     volume = number_particles * (number_density ** -1)
     box_edge = volume ** (1.0 / 3.0)
-    system.setDefaultPeriodicBoxVectors(
-        openmm.Vec3(box_edge, 0.0 * unit.angstrom, 0.0 * unit.angstrom),
-        openmm.Vec3(0.0 * unit.angstrom, box_edge, 0.0 * unit.angstrom),
-        openmm.Vec3(0.0 * unit.angstrom, 0.0 * unit.angstrom, box_edge)
-    )
+    box_vectors = np.array([
+        [box_edge, 0.0 * unit.angstrom, 0.0 * unit.angstrom],
+        [0.0 * unit.angstrom, box_edge, 0.0 * unit.angstrom],
+        [0.0 * unit.angstrom, 0.0 * unit.angstrom, box_edge]])
+
+    # On my MAC, PLUMED throws a segmentation fault if one switches off periodic boundaries by not setting these
+    # box vectors and by choosing CutoffNonPeriodic for the Lennard-Jones force. Therefore, we simply choose a very
+    # large periodic box here so that periodic boundary conditions should not matter with the walls.
+    enlarged_box_vectors = 10.0 * box_vectors
+    system.setDefaultPeriodicBoxVectors(*enlarged_box_vectors)
 
     # Create Lennard-Jones force with periodic boundary conditions.
     lennard_jones_force = openmm.CustomNonbondedForce(
-        "4.0 * epsilon / (alpha * alpha) "
-        "* (1.0 / (r * r / (sigma * sigma) - 1.0 )^6 - alpha / (r * r / (sigma * sigma) - 1.0)^3 )")
+        "4.0 * epsilon_lj / (alpha_lj * alpha_lj) "
+        "* (1.0 / (r * r / (sigma * sigma) - 1.0 )^6 - alpha_lj / (r * r / (sigma * sigma) - 1.0)^3 )")
     lennard_jones_force.addGlobalParameter("sigma", sigma)
-    lennard_jones_force.addGlobalParameter("epsilon", epsilon)
-    lennard_jones_force.addGlobalParameter("alpha", 50)
-    lennard_jones_force.setNonbondedMethod(openmm.NonbondedForce.CutoffPeriodic)
+    lennard_jones_force.addGlobalParameter("epsilon_lj", epsilon)
+    lennard_jones_force.addGlobalParameter("alpha_lj", 50)
+    lennard_jones_force.setNonbondedMethod(openmm.CustomNonbondedForce.CutoffPeriodic)
     lennard_jones_force.setCutoffDistance(cutoff)
     lennard_jones_force.setUseSwitchingFunction(True)
     lennard_jones_force.setSwitchingDistance(cutoff - switch_width)
@@ -71,11 +78,26 @@ def main():
     # Add particles to the system and the Lennard-Jones force.
     for particle_index in range(number_particles):
         system.addParticle(mass)
-        # Set charge to zero to switch off electrostatics.
         lennard_jones_force.addParticle()
 
     # Add the Lennard-Jones force to the system.
     system.addForce(lennard_jones_force)
+
+    # Add walls to the system.
+    # The shifted Lennard-Jones walls have a divergence at a distance of sigma / 2.0 - 1.0 nm to the walls.
+    # Here, sigma is the parameter of the generalized LJ potential, that is, the hard-core diameter of the particles.
+    # Since sigma / 2.0 is smaller than 1 nm, this means that the divergence is actually outside the expected walls.
+    # We choose the wall_distances so that the shifted Lennard-Jones walls diverge at a distance of sigma / 2.0 - 0.2 nm
+    # to the walls which looks reasonable in the movies.
+    walls = ShiftedLennardJonesWalls(wall_distances=[box_edge - 2.0 * (unit.nano * unit.meter) * (1.0 - 0.2),
+                                                     box_edge - 2.0 * (unit.nano * unit.meter) * (1.0 - 0.2),
+                                                     box_edge - 2.0 * (unit.nano * unit.meter) * (1.0 - 0.2)],
+                                     epsilon=temperature * unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA,
+                                     alpha=1.0, wall_directions=[True, True, True])
+    for particle_index in range(number_particles):
+        walls.add_particle(particle_index, radius=sigma / 2.0)
+    for potential in walls.yield_potentials():
+        system.addForce(potential)
 
     # See https://www.plumed-nest.org/eggs/19/049/data/plumed_GeTe.dat.html
     script = f"""
@@ -86,6 +108,7 @@ def main():
         MEAN 
         HISTOGRAM={{GAUSSIAN LOWER=0.0 UPPER=1.0 NBINS=20 SMEAR=0.1}}
         LOWMEM
+        NOPBC
     ...
     PRINT ARG=q6.* FILE=q6 STRIDE={state_data_interval}
     # Calculate the local Steinhardt parameter for each of the atoms in the system 
@@ -94,27 +117,43 @@ def main():
         SPECIES=q6 
         SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width_plumed} D_MAX={distance_threshold_first_coordination_sphere + switch_width_plumed}}} 
         MEAN 
-        HISTOGRAM={{GAUSSIAN LOWER=-1.0 UPPER=1.0 NBINS=40 SMEAR=0.1}} 
+        HISTOGRAM={{GAUSSIAN LOWER=-1.0 UPPER=1.0 NBINS=40 SMEAR=0.1}}
         LOWMEM
+        NOPBC
     ...
     PRINT ARG=lq6.* FILE=lq6 STRIDE={state_data_interval}
     DUMPMULTICOLVAR DATA=lq6 FILE=LQ6MULTICOLVAR.xyz STRIDE={trajectory_interval}
     # Now select only those atoms that have a local q6 parameter that is larger than a certain threshold
-    flq6: MFILTER_MORE DATA=lq6 SWITCH={{GAUSSIAN D_0={lq6_threshold} R_0={switch_width_plumed} D_MAX={lq6_threshold + switch_width_plumed}}} LOWMEM
+    flq6: MFILTER_MORE ...
+        DATA=lq6 
+        SWITCH={{GAUSSIAN D_0={lq6_threshold} R_0={switch_width_plumed} D_MAX={lq6_threshold + switch_width_plumed}}}
+        LOWMEM
+        NOPBC
+    ...
     # Calculate the coordination number for those atoms that have a local q6 parameter that is larger than a certain threshold
-    cc_cmat: CONTACT_MATRIX ATOMS=flq6 SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
+    cc_cmat: CONTACT_MATRIX ...
+        ATOMS=flq6 
+        SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
+        LOWMEM
+        NOPBC
+    ...
     # Use depth first clustering to identify the sizes of the clusters
-    dfs: DFSCLUSTERING MATRIX=cc_cmat LOWMEM
+    dfs: DFSCLUSTERING MATRIX=cc_cmat LOWMEM NOPBC
     # Compute the sum of the coordination numbers for the atoms in the largest cluster                                                         
-    clust1: CLUSTER_PROPERTIES CLUSTERS=dfs CLUSTER=1 SUM  
+    clust1: CLUSTER_PROPERTIES CLUSTERS=dfs CLUSTER=1 SUM LOWMEM NOPBC
     PRINT ARG=clust1.* FILE=clust1 STRIDE={state_data_interval}
     # Do the same but without the filter on lq6.
-    cc_cmat_all: CONTACT_MATRIX ATOMS=q6 SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
-    dfs_all: DFSCLUSTERING MATRIX=cc_cmat_all LOWMEM
-    clust1_all: CLUSTER_PROPERTIES CLUSTERS=dfs_all CLUSTER=1 SUM
+    cc_cmat_all: CONTACT_MATRIX ...
+        ATOMS=q6 
+        SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
+        LOWMEM
+        NOPBC
+    ...
+    dfs_all: DFSCLUSTERING MATRIX=cc_cmat_all LOWMEM NOPBC
+    clust1_all: CLUSTER_PROPERTIES CLUSTERS=dfs_all CLUSTER=1 SUM LOWMEM NOPBC
     PRINT ARG=clust1_all.* FILE=clust1_all STRIDE={state_data_interval}
-    res: RESTRAINT ARG=clust1_all.sum,clust1.sum AT={restraint_clust1_all},{restraint_clust1} KAPPA={spring_constant_clust1_all},{spring_constant_clust1}
-    PRINT ARG=res.bias FILE=bias STRIDE={state_data_interval}
+    #res: RESTRAINT ARG=clust1_all.sum,clust1.sum AT={restraint_clust1_all},{restraint_clust1} KAPPA={spring_constant_clust1_all},{spring_constant_clust1}
+    #PRINT ARG=res.bias FILE=bias STRIDE={state_data_interval}
     """
     with open("plumed.dat", "w") as file:
         print(script, file=file)
@@ -132,9 +171,9 @@ def main():
 
     # Set initial positions and velocities, and minimize energy of initial configuration.
     if initial == "random":
-        positions = subrandom_particle_positions(number_particles, system.getDefaultPeriodicBoxVectors())
+        positions = subrandom_particle_positions(number_particles, box_vectors)
     else:
-        positions = lattice_particle_positions(number_particles, system.getDefaultPeriodicBoxVectors())
+        positions = lattice_particle_positions(number_particles, box_vectors)
 
     min_distance = float("inf")
     for index_one in range(len(positions)):
@@ -154,7 +193,8 @@ def main():
 
     if number_equilibration_steps > 0:
         # Equilibration run.
-        simulation.reporters.append(StatusReporter(max(1, number_equilibration_steps // 100), number_equilibration_steps))
+        simulation.reporters.append(StatusReporter(max(1, number_equilibration_steps // 100),
+                                                   number_equilibration_steps))
         print("Equilibrating...")
         simulation.step(number_equilibration_steps)
         simulation.reporters = []
@@ -162,7 +202,7 @@ def main():
     simulation.reporters.append(StatusReporter(max(1, number_production_steps // 100), number_production_steps))
     simulation.reporters.append(GSDReporter(trajectory_filename, trajectory_interval,
                                             {"Ar": sigma / 2.0}, {"Ar": 0.0 * unit.volt},
-                                            simulation))
+                                            simulation, cell=box_vectors))
     simulation.reporters.append(app.StateDataReporter(state_data_filename, state_data_interval, step=True,
                                                       time=True, kineticEnergy=True, potentialEnergy=True,
                                                       temperature=True, speed=True))

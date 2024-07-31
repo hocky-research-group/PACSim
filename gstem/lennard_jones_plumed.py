@@ -58,10 +58,12 @@ def main():
         [0.0 * unit.angstrom, 0.0 * unit.angstrom, box_edge]])
 
     # On my MAC, PLUMED throws a segmentation fault if one switches off periodic boundaries by not setting these
-    # box vectors and by choosing CutoffNonPeriodic for the Lennard-Jones force. Therefore, we simply choose a very
-    # large periodic box here so that periodic boundary conditions should not matter with the walls.
-    enlarged_box_vectors = 10.0 * box_vectors
-    system.setDefaultPeriodicBoxVectors(*enlarged_box_vectors)
+    # box vectors and by choosing CutoffNonPeriodic for the Lennard-Jones force. Therefore, we simply choose a big
+    # enough periodic box here so that periodic boundary conditions should not matter with the walls.
+    enlarged_box_edge = box_edge + cutoff / 2.0
+    system.setDefaultPeriodicBoxVectors(openmm.Vec3(enlarged_box_edge, 0.0 * unit.angstrom, 0.0 * unit.angstrom),
+                                        openmm.Vec3(0.0 * unit.angstrom, enlarged_box_edge, 0.0 * unit.angstrom),
+                                        openmm.Vec3(0.0 * unit.angstrom, 0.0 * unit.angstrom, enlarged_box_edge))
 
     # Create Lennard-Jones force with periodic boundary conditions.
     lennard_jones_force = openmm.CustomNonbondedForce(

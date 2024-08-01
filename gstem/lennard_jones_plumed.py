@@ -34,10 +34,6 @@ def main():
     lq6_threshold = 0.5
     contact_distance_threshold = 1.5 * sigma.value_in_unit(unit.nano * unit.meter)
     switch_width_plumed = 0.01  # Only relevant if use_plumed is True.
-    restraint_clust1_all = 50.0
-    restraint_clust1 = 100.0
-    spring_constant_clust1_all = 200.0
-    spring_constant_clust1 = 200.0
 
     # Create topology with Argon atoms.
     topology = app.Topology()
@@ -103,19 +99,9 @@ def main():
 
     # See https://www.plumed-nest.org/eggs/19/049/data/plumed_GeTe.dat.html
     script = f"""
-    # Calculate the Steinhardt Q6 vector for each of the atoms in the system
-    q6: Q6 ...
-        SPECIES=1-{number_particles} 
-        SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width_plumed} D_MAX={distance_threshold_first_coordination_sphere + switch_width_plumed}}} 
-        MEAN 
-        HISTOGRAM={{GAUSSIAN LOWER=0.0 UPPER=1.0 NBINS=20 SMEAR=0.1}}
-        NOPBC
-    ...
-    PRINT ARG=q6.* FILE=q6 STRIDE={state_data_interval}
-    # Calculate the local Steinhardt parameter for each of the atoms in the system 
-    # in the manner described by ten Wolde and Frenkel.
+    # Calculate the local Steinhardt parameter for each of the atoms in the system
     lq6: LOCAL_Q6 ...
-        SPECIES=q6 
+        SPECIES=1-{number_particles}
         SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width_plumed} D_MAX={distance_threshold_first_coordination_sphere + switch_width_plumed}}} 
         MEAN 
         HISTOGRAM={{GAUSSIAN LOWER=-1.0 UPPER=1.0 NBINS=40 SMEAR=0.1}}
@@ -131,7 +117,7 @@ def main():
         LOWMEM
         NOPBC
     ...
-    # Calculate the coordination number for those atoms that have a local q6 parameter that is larger than a certain threshold
+    # Calculate the contact matrix for those atoms that have a local q6 parameter that is larger than a threshold
     cc_cmat: CONTACT_MATRIX ...
         ATOMS=flq6 
         SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
@@ -141,7 +127,7 @@ def main():
     dfs: DFSCLUSTERING MATRIX=cc_cmat LOWMEM NOPBC
     # Compute the sum of the coordination numbers for the atoms in the largest cluster                                                         
     clust1: CLUSTER_PROPERTIES CLUSTERS=dfs CLUSTER=1 SUM LOWMEM NOPBC
-    PRINT ARG=clust1.* FILE=clust1 STRIDE={state_data_interval}
+    PRINT ARG=clust1.sum FILE=clust1 STRIDE={state_data_interval}
     # Do the same but without the filter on lq6.
     cc_cmat_all: CONTACT_MATRIX ...
         ATOMS=1-{number_particles} 
@@ -150,9 +136,7 @@ def main():
     ...
     dfs_all: DFSCLUSTERING MATRIX=cc_cmat_all LOWMEM NOPBC
     clust1_all: CLUSTER_PROPERTIES CLUSTERS=dfs_all CLUSTER=1 SUM LOWMEM NOPBC
-    PRINT ARG=clust1_all.* FILE=clust1_all STRIDE={state_data_interval}
-    # res: RESTRAINT ARG=clust1_all.sum,clust1.sum AT={restraint_clust1_all},{restraint_clust1} KAPPA={spring_constant_clust1_all},{spring_constant_clust1}
-    # PRINT ARG=res.bias FILE=bias STRIDE={state_data_interval}
+    PRINT ARG=clust1_all.sum FILE=clust1_all STRIDE={state_data_interval}
     """
     with open("plumed.dat", "w") as file:
         print(script, file=file)

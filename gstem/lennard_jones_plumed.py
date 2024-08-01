@@ -99,9 +99,15 @@ def main():
 
     # See https://www.plumed-nest.org/eggs/19/049/data/plumed_GeTe.dat.html
     script = f"""
+    # Calculate the Steinhardt Q6 vector for each of the atoms in the system
+    q6: Q6 ...
+        SPECIES=1-{number_particles} 
+        SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width_plumed} D_MAX={distance_threshold_first_coordination_sphere + switch_width_plumed}}} 
+        NOPBC
+    ...
     # Calculate the local Steinhardt parameter for each of the atoms in the system
     lq6: LOCAL_Q6 ...
-        SPECIES=1-{number_particles}
+        SPECIES=q6
         SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width_plumed} D_MAX={distance_threshold_first_coordination_sphere + switch_width_plumed}}} 
         MEAN 
         HISTOGRAM={{GAUSSIAN LOWER=-1.0 UPPER=1.0 NBINS=40 SMEAR=0.1}}

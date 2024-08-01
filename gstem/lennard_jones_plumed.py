@@ -140,8 +140,14 @@ def main():
     # Use depth first clustering to identify the sizes of the clusters
     dfs: DFSCLUSTERING MATRIX=cc_cmat LOWMEM NOPBC
     # Output the number of atoms in the largest cluster
-    nat: CLUSTER_NATOMS CLUSTERS=dfs CLUSTER=1 LOWMEM NOPBC
-    PRINT ARG=nat FILE=clust1 STRIDE={state_data_interval}
+    nat: CLUSTER_PROPERTIES ...
+        CLUSTERS=dfs
+        CLUSTER=1
+        MORE_THAN={{GAUSSIAN D_0=0.0 R_0={switch_width_plumed} D_MAX={switch_width_plumed}}}
+        LOWMEM
+        NOPBC
+    ...
+    PRINT ARG=nat.morethan FILE=clust1 STRIDE={state_data_interval}
     # Do the same but without the filter on lq6.
     cc_cmat_all: CONTACT_MATRIX ...
         ATOMS=1-{number_particles} 
@@ -149,8 +155,14 @@ def main():
         NOPBC
     ...
     dfs_all: DFSCLUSTERING MATRIX=cc_cmat_all LOWMEM NOPBC
-    nat_all: CLUSTER_NATOMS CLUSTERS=dfs_all CLUSTER=1 LOWMEM NOPBC
-    PRINT ARG=nat_all FILE=clust1_all STRIDE={state_data_interval}
+    nat_all: CLUSTER_PROPERTIES ...
+        CLUSTERS=dfs_all 
+        CLUSTER=1 
+        MORE_THAN={{GAUSSIAN D_0=0.0 R_0={switch_width_plumed} D_MAX={switch_width_plumed}}}
+        LOWMEM
+        NOPBC
+    ...
+    PRINT ARG=nat_all.morethan FILE=clust1_all STRIDE={state_data_interval}
     # res: RESTRAINT ARG=clust1_all.sum,clust1.sum AT={restraint_clust1_all},{restraint_clust1} KAPPA={spring_constant_clust1_all},{spring_constant_clust1}
     # PRINT ARG=res.bias FILE=bias STRIDE={state_data_interval}
     """

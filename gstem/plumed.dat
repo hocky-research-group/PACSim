@@ -1,0 +1,48 @@
+# Calculate the Steinhardt Q6 vector for each of the atoms in the system
+q6: Q6 ...
+    SPECIES=1-500
+    SWITCH={GAUSSIAN D_0=0.51 R_0=0.01 D_MAX=0.52}
+    MEAN
+    HISTOGRAM={GAUSSIAN LOWER=0.0 UPPER=1.0 NBINS=20 SMEAR=0.1}
+    NOPBC
+...
+PRINT ARG=q6.* FILE=q6 STRIDE=100
+# Calculate the local Steinhardt parameter for each of the atoms in the system
+# in the manner described by ten Wolde and Frenkel.
+lq6: LOCAL_Q6 ...
+    SPECIES=q6
+    SWITCH={GAUSSIAN D_0=0.51 R_0=0.01 D_MAX=0.52}
+    MEAN
+    HISTOGRAM={GAUSSIAN LOWER=-1.0 UPPER=1.0 NBINS=40 SMEAR=0.1}
+    LOWMEM
+    NOPBC
+...
+PRINT ARG=lq6.* FILE=lq6 STRIDE=100
+DUMPMULTICOLVAR DATA=lq6 FILE=LQ6MULTICOLVAR.xyz STRIDE=1000
+# Now select only those atoms that have a local q6 parameter that is larger than a certain threshold
+flq6: MFILTER_MORE ...
+    DATA=lq6
+    SWITCH={GAUSSIAN D_0=0.5 R_0=0.01 D_MAX=0.51}
+    LOWMEM
+    NOPBC
+...
+# Calculate the coordination number for those atoms that have a local q6 parameter that is larger than a certain threshold
+cc_cmat: CONTACT_MATRIX ...
+    ATOMS=flq6
+    SWITCH={GAUSSIAN D_0=0.51 R_0=0.01 D_MAX=0.52}
+    NOPBC
+...
+# Use depth first clustering to identify the sizes of the clusters
+dfs: DFSCLUSTERING MATRIX=cc_cmat LOWMEM NOPBC
+# Output the number of atoms in the largest cluster
+nat: CLUSTER_NATOMS CLUSTERS=dfs CLUSTER=1 LOWMEM NOPBC
+PRINT ARG=nat FILE=clust1 STRIDE=100
+# Do the same but without the filter on lq6.
+cc_cmat_all: CONTACT_MATRIX ...
+    ATOMS=1-500
+    SWITCH={GAUSSIAN D_0=0.51 R_0=0.01 D_MAX=0.52}
+    NOPBC
+...
+dfs_all: DFSCLUSTERING MATRIX=cc_cmat_all LOWMEM NOPBC
+nat_all: CLUSTER_NATOMS CLUSTERS=dfs_all CLUSTER=1 LOWMEM NOPBC
+PRINT ARG=nat_all FILE=clust1_all STRIDE=100

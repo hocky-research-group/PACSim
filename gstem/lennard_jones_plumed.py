@@ -109,7 +109,6 @@ def main():
         SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width_plumed} D_MAX={distance_threshold_first_coordination_sphere + switch_width_plumed}}} 
         MEAN 
         HISTOGRAM={{GAUSSIAN LOWER=0.0 UPPER=1.0 NBINS=20 SMEAR=0.1}}
-        LOWMEM
         NOPBC
     ...
     PRINT ARG=q6.* FILE=q6 STRIDE={state_data_interval}
@@ -140,20 +139,20 @@ def main():
     ...
     # Use depth first clustering to identify the sizes of the clusters
     dfs: DFSCLUSTERING MATRIX=cc_cmat LOWMEM NOPBC
-    # Compute the sum of the coordination numbers for the atoms in the largest cluster                                                         
-    clust1: CLUSTER_PROPERTIES CLUSTERS=dfs CLUSTER=1 SUM LOWMEM NOPBC
-    PRINT ARG=clust1.* FILE=clust1 STRIDE={state_data_interval}
+    # Output the number of atoms in the largest cluster
+    nat: CLUSTER_NATOMS CLUSTERS=dfs CLUSTER=1 LOWMEM NOPBC
+    PRINT ARG=nat FILE=clust1 STRIDE={state_data_interval}
     # Do the same but without the filter on lq6.
     cc_cmat_all: CONTACT_MATRIX ...
-        ATOMS=q6 
+        ATOMS=1-{number_particles} 
         SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
         NOPBC
     ...
     dfs_all: DFSCLUSTERING MATRIX=cc_cmat_all LOWMEM NOPBC
-    clust1_all: CLUSTER_PROPERTIES CLUSTERS=dfs_all CLUSTER=1 SUM LOWMEM NOPBC
-    PRINT ARG=clust1_all.* FILE=clust1_all STRIDE={state_data_interval}
-    #res: RESTRAINT ARG=clust1_all.sum,clust1.sum AT={restraint_clust1_all},{restraint_clust1} KAPPA={spring_constant_clust1_all},{spring_constant_clust1}
-    #PRINT ARG=res.bias FILE=bias STRIDE={state_data_interval}
+    nat_all: CLUSTER_NATOMS CLUSTERS=dfs_all CLUSTER=1 LOWMEM NOPBC
+    PRINT ARG=nat_all FILE=clust1_all STRIDE={state_data_interval}
+    # res: RESTRAINT ARG=clust1_all.sum,clust1.sum AT={restraint_clust1_all},{restraint_clust1} KAPPA={spring_constant_clust1_all},{spring_constant_clust1}
+    # PRINT ARG=res.bias FILE=bias STRIDE={state_data_interval}
     """
     with open("plumed.dat", "w") as file:
         print(script, file=file)

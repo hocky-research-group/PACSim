@@ -30,7 +30,7 @@ def main():
     initial = "lattice"  # "lattice" or "random"
     use_plumed = True
     # Only relevant if use_plumed is True.
-    distance_threshold_first_coordination_sphere = 0.61 * (unit.nano * unit.meter)
+    distance_threshold_first_coordination_sphere = 0.61
     lq6_threshold = 0.4
     contact_distance_threshold = 1.5 * sigma.value_in_unit(unit.nano * unit.meter)
     switch_width_plumed = 0.01  # Only relevant if use_plumed is True.

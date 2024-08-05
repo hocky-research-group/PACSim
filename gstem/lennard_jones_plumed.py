@@ -21,7 +21,7 @@ def main():
     temperature = 1.0 / 3.0 * epsilon / unit.BOLTZMANN_CONSTANT_kB / unit.AVOGADRO_CONSTANT_NA  # kT/epsilon = 1
     reduced_time_step = 0.001
     number_equilibration_steps = 0
-    number_production_steps = 1000000
+    number_production_steps = 200000
     platform = "CPU"  # "Reference", "CPU", "CUDA", or "OpenCL"
     trajectory_filename = "trajectory.gsd"
     trajectory_interval = 1000

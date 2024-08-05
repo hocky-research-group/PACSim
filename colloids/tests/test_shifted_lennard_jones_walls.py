@@ -1,4 +1,4 @@
-from openmm import Context, LangevinIntegrator, Platform, System, unit, Vec3
+from openmm import Context, LangevinIntegrator, NonbondedForce, OpenMMException, Platform, System, unit, Vec3
 import pytest
 from colloids import ShiftedLennardJonesWalls
 import numpy as np
@@ -66,10 +66,6 @@ class TestShiftedLennardJonesWallsParameters(object):
                                             Vec3(0.0, wall_distances[1], 0.0),
                                             Vec3(0.0, 0.0, wall_distances[2]))
         return system
-
-    @pytest.fixture
-    def openmm_platform(self):
-        return Platform.getPlatformByName("Reference")
 
     @pytest.fixture
     def openmm_dummy_integrator(self):
@@ -216,9 +212,13 @@ class TestShiftedLennardJonesWallPotentialsAll(TestShiftedLennardJonesWallsParam
 
     # This function cannot be moved to TestParameters class because add_particle fixture should be called before
     # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
-    @pytest.fixture
-    def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
-        return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
+    @pytest.fixture(params=[("Reference", 1.0e-7), ("CPU", 1.0e-7), ("CUDA", 1.0e-3), ("OpenCL", 1.0e-3)])
+    def openmm_context_rel(self, openmm_system, openmm_dummy_integrator, request):
+        try:
+            platform = Platform.getPlatformByName(request.param[0])
+        except OpenMMException:
+            pytest.skip("Platform {} not available.".format(request.param[0]))
+        return Context(openmm_system, openmm_dummy_integrator, platform), request.param[1]
 
     @pytest.mark.parametrize("direction,expected_function",
                              [
@@ -226,8 +226,9 @@ class TestShiftedLennardJonesWallPotentialsAll(TestShiftedLennardJonesWallsParam
                                  (1, TestShiftedLennardJonesWallsParameters.slj_walls_potential_active),
                                  (2, TestShiftedLennardJonesWallsParameters.slj_walls_potential_active)
                              ])
-    def test_slj_walls_potential(self, openmm_context, test_positions, wall_distances, epsilon, alpha_all, radius,
+    def test_slj_walls_potential(self, openmm_context_rel, test_positions, wall_distances, epsilon, alpha_all, radius,
                                  all_wall_directions, direction, expected_function):
+        openmm_context, rel = openmm_context_rel
         openmm_potentials = np.empty(len(test_positions[direction]))
         for index, dir_position in enumerate(test_positions[direction]):
             position = [0.0, 0.0, 0.0]
@@ -245,7 +246,7 @@ class TestShiftedLennardJonesWallPotentialsAll(TestShiftedLennardJonesWallsParam
                                                 radius.value_in_unit(unit.nano * unit.meter), alpha_all)
         assert np.any(expected_potentials > 0.0)
         assert np.all(expected_potentials >= 0.0)
-        assert openmm_potentials == pytest.approx(expected_potentials, rel=1.0e-7, abs=1.0e-13)
+        assert openmm_potentials == pytest.approx(expected_potentials, rel=rel, abs=1.0e-13)
 
 
 class TestShiftedLennardJonesWallPotentialsSome(TestShiftedLennardJonesWallsParameters):
@@ -255,12 +256,23 @@ class TestShiftedLennardJonesWallPotentialsSome(TestShiftedLennardJonesWallsPara
         slj_potential_some.add_particle(index=0, radius=radius)
         for potential in slj_potential_some.yield_potentials():
             openmm_system.addForce(potential)
+        # Add a nonbonded force with a periodic cutoff to the system so that it uses periodic boundary conditions.
+        # This tests a potential issue on the CUDA/OpenCL platforms: https://github.com/openmm/openmm/issues/4611
+        nonbonded_force = NonbondedForce()
+        nonbonded_force.addParticle(0.0, 1.0, 0.0)
+        nonbonded_force.setNonbondedMethod(NonbondedForce.CutoffPeriodic)
+        nonbonded_force.setCutoffDistance(5.0)
+        openmm_system.addForce(nonbonded_force)
 
     # This function cannot be moved to TestParameters class because add_particle fixture should be called before
     # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
-    @pytest.fixture
-    def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
-        return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
+    @pytest.fixture(params=[("Reference", 1.0e-7), ("CPU", 1.0e-7), ("CUDA", 1.0e-3), ("OpenCL", 1.0e-3)])
+    def openmm_context_rel(self, openmm_system, openmm_dummy_integrator, request):
+        try:
+            platform = Platform.getPlatformByName(request.param[0])
+        except OpenMMException:
+            pytest.skip("Platform {} not available.".format(request.param[0]))
+        return Context(openmm_system, openmm_dummy_integrator, platform), request.param[1]
 
     @pytest.mark.parametrize("direction,expected_function",
                              [
@@ -268,8 +280,9 @@ class TestShiftedLennardJonesWallPotentialsSome(TestShiftedLennardJonesWallsPara
                                  (1, TestShiftedLennardJonesWallsParameters.slj_walls_potential_active),
                                  (2, lambda pos, *args: np.zeros_like(pos))
                              ])
-    def test_slj_walls_potential(self, openmm_context, test_positions, wall_distances, epsilon, alpha_some, radius,
+    def test_slj_walls_potential(self, openmm_context_rel, test_positions, wall_distances, epsilon, alpha_some, radius,
                                  some_wall_directions, direction, expected_function):
+        openmm_context, rel = openmm_context_rel
         openmm_potentials = np.empty(len(test_positions[direction]))
         for index, dir_position in enumerate(test_positions[direction]):
             position = [0.0, 0.0, 0.0]
@@ -289,7 +302,7 @@ class TestShiftedLennardJonesWallPotentialsSome(TestShiftedLennardJonesWallsPara
             assert np.all(expected_potentials >= 0.0)
         else:
             assert np.all(expected_potentials == 0.0)
-        assert openmm_potentials == pytest.approx(expected_potentials, rel=1.0e-7, abs=1.0e-13)
+        assert openmm_potentials == pytest.approx(expected_potentials, rel=rel, abs=1.0e-13)
 
 
 if __name__ == '__main__':

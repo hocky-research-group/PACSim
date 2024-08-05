@@ -228,9 +228,9 @@ def main():
         simulation.step(runsteps)
         debye = parameters.debye_length
         print("Step:", i*1000, "Debye:", debye)
-        simulation.context.setParameter("debye_length", debye + 0.1)
+        simulation.context.setParameter("debye_length", debye + 0.1*unit.nanometer)
         # TODO: add a way to track time
-        
+
     # TODO: Automatically plot energies etc.
     # TODO: CHECK ALL SURFACE SEPARATIONS
 

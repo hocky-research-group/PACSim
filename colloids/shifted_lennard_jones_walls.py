@@ -102,43 +102,47 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     def _set_up_slj_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the shifted Lennard Jones potential."""
 
-        slj_x = ("step(abs(x) - (wall_distance_x / 2.0 - r_cut - delta)) * ("
-                 "4.0 * epsilon * "
-                 "((sigma / (wall_distance_x / 2.0 - abs(x) - delta))^12 "
-                 " - alpha * (sigma / (wall_distance_x / 2.0 - abs(x) - delta))^6)"
-                 "- 4.0 * epsilon * "
-                 "((sigma / r_cut)^12 "
-                 " - alpha * (sigma / r_cut)^6))")
-        slj_y = ("step(abs(y) - (wall_distance_y / 2.0 - r_cut - delta)) * ("
-                 "4.0 * epsilon * "
-                 "((sigma / (wall_distance_y / 2.0 - abs(y) - delta))^12 "
-                 " - alpha * (sigma / (wall_distance_y / 2.0 - abs(y) - delta))^6)"
-                 "- 4.0 * epsilon * "
-                 "((sigma / r_cut)^12 "
-                 " - alpha * (sigma / r_cut)^6))")
-        slj_z = ("step(abs(z) - (wall_distance_z / 2.0 - r_cut - delta)) * ("
-                 "4.0 * epsilon * "
-                 "((sigma / (wall_distance_z / 2.0 - abs(z) - delta))^12 "
-                 " - alpha * (sigma / (wall_distance_z / 2.0 - abs(z) - delta))^6)"
-                 "- 4.0 * epsilon * "
-                 "((sigma / r_cut)^12 "
-                 " - alpha * (sigma / r_cut)^6))")
+        slj_x = ("step(periodicdistance(x, 0, 0, 0, 0, 0) - cutoff_x) * ("
+                 "four_epsilon * "
+                 "((radius / (wall_distance_x_over_two_minus_delta - periodicdistance(x, 0, 0, 0, 0, 0)))^12 "
+                 "- alpha * (radius / (wall_distance_x_over_two_minus_delta - periodicdistance(x, 0, 0, 0, 0, 0)))^6)"
+                 "+ shift)")
+        slj_y = ("step(periodicdistance(0, y, 0, 0, 0, 0) - cutoff_y) * ("
+                 "four_epsilon * "
+                 "((radius / (wall_distance_y_over_two_minus_delta - periodicdistance(0, y, 0, 0, 0, 0)))^12 "
+                 "- alpha * (radius / (wall_distance_y_over_two_minus_delta - periodicdistance(0, y, 0, 0, 0, 0)))^6)"
+                 "+ shift)")
+        slj_z = ("step(periodicdistance(0, 0, z, 0, 0, 0) - cutoff_z) * ("
+                 "four_epsilon * "
+                 "((radius / (wall_distance_z_over_two_minus_delta - periodicdistance(0, 0, z, 0, 0, 0)))^12 "
+                 "- alpha * (radius / (wall_distance_z_over_two_minus_delta - periodicdistance(0, 0, z, 0, 0, 0)))^6)"
+                 "+ shift)")
+        # Using periodicdistance switches on periodic boundary conditions in the OpenMM system.
+        # If there are walls in all directions, we don't want periodic boundary conditions though.
+        if all(self._wall_directions):
+            slj_x = slj_x.replace("periodicdistance(x, 0, 0, 0, 0, 0)", "abs(x)")
+            slj_y = slj_y.replace("periodicdistance(0, y, 0, 0, 0, 0)", "abs(y)")
+            slj_z = slj_z.replace("periodicdistance(0, 0, z, 0, 0, 0)", "abs(z)")
 
         slj_string = "+".join(slj for slj, wdir in zip([slj_x, slj_y, slj_z], self._wall_directions) if wdir)
         assert slj_string
-        # 2^(1/6) = 1.122462048309373.
-        slj_string += "; sigma = radius; delta = radius - 1.0; r_cut = radius * 1.122462048309373"
 
         slj_potential = CustomExternalForce(slj_string)
-        slj_potential.addGlobalParameter("epsilon", self._epsilon.value_in_unit(unit.kilojoule_per_mole))
+        slj_potential.addGlobalParameter("four_epsilon",
+                                         4.0 * self._epsilon.value_in_unit(unit.kilojoule_per_mole))
         slj_potential.addGlobalParameter("alpha", self._alpha)
         slj_potential.addPerParticleParameter("radius")
+        slj_potential.addPerParticleParameter("shift")
+
         if self._wall_directions[0]:
-            slj_potential.addGlobalParameter("wall_distance_x", self._wall_distances[0].value_in_unit(self._nanometer))
+            slj_potential.addPerParticleParameter("wall_distance_x_over_two_minus_delta")
+            slj_potential.addPerParticleParameter("cutoff_x")
         if self._wall_directions[1]:
-            slj_potential.addGlobalParameter("wall_distance_y", self._wall_distances[1].value_in_unit(self._nanometer))
+            slj_potential.addPerParticleParameter("wall_distance_y_over_two_minus_delta")
+            slj_potential.addPerParticleParameter("cutoff_y")
         if self._wall_directions[2]:
-            slj_potential.addGlobalParameter("wall_distance_z", self._wall_distances[2].value_in_unit(self._nanometer))
+            slj_potential.addPerParticleParameter("wall_distance_z_over_two_minus_delta")
+            slj_potential.addPerParticleParameter("cutoff_z")
 
         return slj_potential
 
@@ -170,10 +174,44 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             raise ValueError("argument radius must have a value greater than zero")
         for wall_distance in self._wall_distances:
             if wall_distance is not None:
-                if not wall_distance / 2.0 > radius * 2**(1/6) + radius - 1.0 * self._nanometer:
+                if not wall_distance / 2.0 > radius * 2 ** (1 / 6) + radius - 1.0 * self._nanometer:
                     raise ValueError("The colloid radius leads to a cutoff radius * 2^(1/6) + radius - 1 in the "
                                      "shifted Lennard-Jones wall that exceeds half of the wall distance.")
-        self._slj_potential.addParticle(index, [radius.value_in_unit(self._nanometer)])
+        rcut = (2.0 ** (1.0 / 6.0)) * radius
+        per_particle_parameters = [
+            radius.value_in_unit(self._nanometer),  # radius
+            (-4.0 * self._epsilon * ((radius / rcut) ** 12 - self._alpha * (radius / rcut) ** 6)).value_in_unit(
+                unit.kilojoule_per_mole)  # shift
+        ]
+        if self._wall_directions[0]:
+            per_particle_parameters.append(
+                (self._wall_distances[0] / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
+                    self._nanometer)  # wall_distance_x_over_two_minus_delta
+            )
+            per_particle_parameters.append(
+                (self._wall_distances[0] / 2.0 - rcut - radius + 1.0 * self._nanometer).value_in_unit(
+                    self._nanometer)  # cutoff_x
+            )
+        if self._wall_directions[1]:
+            per_particle_parameters.append(
+                (self._wall_distances[1] / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
+                    self._nanometer)  # wall_distance_y_over_two_minus_delta
+            )
+            per_particle_parameters.append(
+                (self._wall_distances[1] / 2.0 - rcut - radius + 1.0 * self._nanometer).value_in_unit(
+                    self._nanometer)  # cutoff_y
+            )
+        if self._wall_directions[2]:
+            per_particle_parameters.append(
+                (self._wall_distances[2] / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
+                    self._nanometer)  # wall_distance_z_over_two_minus_delta
+            )
+            per_particle_parameters.append(
+                (self._wall_distances[2] / 2.0 - rcut - radius + 1.0 * self._nanometer).value_in_unit(
+                    self._nanometer)  # cutoff_z
+            )
+
+        self._slj_potential.addParticle(index, per_particle_parameters)
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """

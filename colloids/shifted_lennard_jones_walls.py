@@ -119,10 +119,10 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
                  "+ shift)")
         # Using periodicdistance switches on periodic boundary conditions in the OpenMM system.
         # If there are walls in all directions, we don't want periodic boundary conditions though.
-        if all(self._wall_directions):
-            slj_x = slj_x.replace("periodicdistance(x, 0, 0, 0, 0, 0)", "abs(x)")
-            slj_y = slj_y.replace("periodicdistance(0, y, 0, 0, 0, 0)", "abs(y)")
-            slj_z = slj_z.replace("periodicdistance(0, 0, z, 0, 0, 0)", "abs(z)")
+        # if all(self._wall_directions):
+        #     slj_x = slj_x.replace("periodicdistance(x, 0, 0, 0, 0, 0)", "abs(x)")
+        #     slj_y = slj_y.replace("periodicdistance(0, y, 0, 0, 0, 0)", "abs(y)")
+        #     slj_z = slj_z.replace("periodicdistance(0, 0, z, 0, 0, 0)", "abs(z)")
 
         slj_string = "+".join(slj for slj, wdir in zip([slj_x, slj_y, slj_z], self._wall_directions) if wdir)
         assert slj_string

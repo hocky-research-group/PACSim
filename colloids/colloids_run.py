@@ -222,15 +222,13 @@ def main():
 
     set_up_reporters(parameters, simulation, False, parameters.run_steps, cell)
 
-    
+    debye = simulation.context.getParameter("debye_length")
     for i in range(1000):
         runsteps = int(parameters.run_steps/1000)
         simulation.step(runsteps)
-        debye = parameters.debye_length
-        print("Step:", i*1000, "Debye:", debye)
-        debye+=0.1*unit.nanometer
+        print("Debye:", debye)
+        debye+=0.01 #*unit.nanometer
         simulation.context.setParameter("debye_length", debye)
-        # TODO: add a way to track time
 
     # TODO: Automatically plot energies etc.
     # TODO: CHECK ALL SURFACE SEPARATIONS

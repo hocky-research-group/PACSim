@@ -28,12 +28,18 @@ def main():
     state_data_filename = "state_data.csv"
     state_data_interval = 100
     initial = "lattice"  # "lattice" or "random"
+    use_walls = False
     use_plumed = True
     # Only relevant if use_plumed is True.
     distance_threshold_first_coordination_sphere = 0.61
-    lq6_threshold = 0.4
+    lq6_threshold = 0.36
     contact_distance_threshold = 1.5 * sigma.value_in_unit(unit.nano * unit.meter)
-    switch_width_plumed = 0.01  # Only relevant if use_plumed is True.
+    switch_width_plumed = 0.01
+    restraint_clust1_all = 2000.0
+    fluctuations_clust1_all = 100.0
+    # Use 1/2 * kappa * cv_fluct^2 = k_B T
+    restraint_kappa = (2.0 * temperature * unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA
+                       / (fluctuations_clust1_all ** 2))
 
     # Create topology with Argon atoms.
     topology = app.Topology()
@@ -53,10 +59,14 @@ def main():
         [0.0 * unit.angstrom, box_edge, 0.0 * unit.angstrom],
         [0.0 * unit.angstrom, 0.0 * unit.angstrom, box_edge]])
 
-    # On my MAC, PLUMED throws a segmentation fault if one switches off periodic boundaries by not setting these
-    # box vectors and by choosing CutoffNonPeriodic for the Lennard-Jones force. Therefore, we simply choose a big
-    # enough periodic box here so that periodic boundary conditions should not matter with the walls.
-    enlarged_box_edge = box_edge + cutoff / 2.0
+    if use_walls:
+        # On my MAC, PLUMED throws a segmentation fault if one switches off periodic boundaries by not setting these
+        # box vectors and by choosing CutoffNonPeriodic for the Lennard-Jones force. Therefore, we simply choose a big
+        # enough periodic box here so that periodic boundary conditions should not matter with the walls.
+        enlarged_box_edge = box_edge + cutoff / 2.0
+    else:
+        enlarged_box_edge = box_edge
+
     system.setDefaultPeriodicBoxVectors(openmm.Vec3(enlarged_box_edge, 0.0 * unit.angstrom, 0.0 * unit.angstrom),
                                         openmm.Vec3(0.0 * unit.angstrom, enlarged_box_edge, 0.0 * unit.angstrom),
                                         openmm.Vec3(0.0 * unit.angstrom, 0.0 * unit.angstrom, enlarged_box_edge))
@@ -81,21 +91,22 @@ def main():
     # Add the Lennard-Jones force to the system.
     system.addForce(lennard_jones_force)
 
-    # Add walls to the system.
-    # The shifted Lennard-Jones walls have a divergence at a distance of sigma / 2.0 - 1.0 nm to the walls.
-    # Here, sigma is the parameter of the generalized LJ potential, that is, the hard-core diameter of the particles.
-    # Since sigma / 2.0 is smaller than 1 nm, this means that the divergence is actually outside the expected walls.
-    # We choose the wall_distances so that the shifted Lennard-Jones walls diverge at a distance of sigma / 2.0 - 0.2 nm
-    # to the walls which looks reasonable in the movies.
-    walls = ShiftedLennardJonesWalls(wall_distances=[box_edge - 2.0 * (unit.nano * unit.meter) * (1.0 - 0.2),
-                                                     box_edge - 2.0 * (unit.nano * unit.meter) * (1.0 - 0.2),
-                                                     box_edge - 2.0 * (unit.nano * unit.meter) * (1.0 - 0.2)],
-                                     epsilon=temperature * unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA,
-                                     alpha=1.0, wall_directions=[True, True, True])
-    for particle_index in range(number_particles):
-        walls.add_particle(particle_index, radius=sigma / 2.0)
-    for potential in walls.yield_potentials():
-        system.addForce(potential)
+    if use_walls:
+        # Add walls to the system.
+        # The shifted Lennard-Jones walls have a divergence at a distance of sigma / 2.0 - 1.0 nm to the walls.
+        # Here, sigma is the parameter of the generalized LJ potential, that is, the hard-core diameter of the
+        # particles. Since sigma / 2.0 is smaller than 1 nm, this means that the divergence is actually outside the
+        # expected walls. We choose the wall_distances so that the shifted Lennard-Jones walls diverge at a distance of
+        # sigma / 2.0 - 0.2 nm to the walls which looks reasonable in the movies.
+        walls = ShiftedLennardJonesWalls(wall_distances=[box_edge - 2.0 * (unit.nano * unit.meter) * (1.0 - 0.2),
+                                                         box_edge - 2.0 * (unit.nano * unit.meter) * (1.0 - 0.2),
+                                                         box_edge - 2.0 * (unit.nano * unit.meter) * (1.0 - 0.2)],
+                                         epsilon=temperature * unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA,
+                                         alpha=1.0, wall_directions=[True, True, True])
+        for particle_index in range(number_particles):
+            walls.add_particle(particle_index, radius=sigma / 2.0)
+        for potential in walls.yield_potentials():
+            system.addForce(potential)
 
     # See https://www.plumed-nest.org/eggs/19/049/data/plumed_GeTe.dat.html
     script = f"""
@@ -143,6 +154,12 @@ def main():
     dfs_all: DFSCLUSTERING MATRIX=cc_cmat_all LOWMEM NOPBC
     clust1_all: CLUSTER_PROPERTIES CLUSTERS=dfs_all CLUSTER=1 SUM LOWMEM NOPBC
     PRINT ARG=clust1_all.sum FILE=clust1_all STRIDE={state_data_interval}
+    res: RESTRAINT ...
+        ARG=clust1_all.sum
+        AT={restraint_clust1_all}
+        KAPPA={restraint_kappa.value_in_unit(unit.kilojoule_per_mole)}
+    ...
+    PRINT ARG=clust1_all.sum,clust1.sum,res.bias FILE=bias STRIDE={state_data_interval}
     """
     with open("plumed.dat", "w") as file:
         print(script, file=file)

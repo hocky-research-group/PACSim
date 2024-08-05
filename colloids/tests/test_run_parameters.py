@@ -51,7 +51,7 @@ class TestRunParameters(object):
     def test_run_parameters(self, parameters, yaml_parameters):
         # Because we cannot compare openmm quantities directly (see above), we have to compare all fields explicitly.
         # When new fields are added to the RunParameters dataclass, this test must be updated accordingly.
-        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 30
+        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 36
         assert parameters.initial_configuration == yaml_parameters.initial_configuration
         assert len(parameters.masses) == len(yaml_parameters.masses)
         assert len(parameters.radii) == len(yaml_parameters.radii)
@@ -74,15 +74,10 @@ class TestRunParameters(object):
                         rel=1e-12, abs=1e-12))
 
         assert parameters.platform_name == yaml_parameters.platform_name
-        assert (parameters.temperature.value_in_unit(parameters.temperature.unit)
-                == pytest.approx(yaml_parameters.temperature.value_in_unit(parameters.temperature.unit), rel=1e-12,
-                                 abs=1e-12))
-        assert (parameters.collision_rate.value_in_unit(parameters.collision_rate.unit)
-                == pytest.approx(yaml_parameters.collision_rate.value_in_unit(parameters.collision_rate.unit),
-                                 rel=1e-12, abs=1e-12))
-        assert (parameters.timestep.value_in_unit(parameters.timestep.unit)
-                == pytest.approx(yaml_parameters.timestep.value_in_unit(parameters.timestep.unit), rel=1e-12,
-                                 abs=1e-12))
+        assert (parameters.potential_temperature.value_in_unit(parameters.potential_temperature.unit)
+                == pytest.approx(
+                    yaml_parameters.potential_temperature.value_in_unit(parameters.potential_temperature.unit),
+                    rel=1e-12, abs=1e-12))
         assert (parameters.brush_density.value_in_unit(parameters.brush_density.unit)
                 == pytest.approx(yaml_parameters.brush_density.value_in_unit(parameters.brush_density.unit), rel=1e-12,
                                  abs=1e-12))
@@ -95,7 +90,8 @@ class TestRunParameters(object):
         assert parameters.dielectric_constant == yaml_parameters.dielectric_constant
         assert parameters.use_log == yaml_parameters.use_log
         assert parameters.use_tabulated == yaml_parameters.use_tabulated
-        assert parameters.integrator_seed == yaml_parameters.integrator_seed
+        assert parameters.integrator == yaml_parameters.integrator
+        assert parameters.integrator_parameters == yaml_parameters.integrator_parameters
         assert parameters.velocity_seed == yaml_parameters.velocity_seed
         assert parameters.run_steps == yaml_parameters.run_steps
         assert parameters.state_data_interval == yaml_parameters.state_data_interval
@@ -111,6 +107,13 @@ class TestRunParameters(object):
         assert all(pw == yw for pw, yw in zip(parameters.wall_directions, yaml_parameters.wall_directions))
         assert parameters.alpha == yaml_parameters.alpha
         assert parameters.epsilon == yaml_parameters.epsilon
+        assert parameters.use_depletion == yaml_parameters.use_depletion
+        assert parameters.depletion_phi == yaml_parameters.depletion_phi
+        assert parameters.depletant_radius == yaml_parameters.depletant_radius
+        assert parameters.use_gravity == yaml_parameters.use_gravity
+        assert parameters.gravitational_acceleration == yaml_parameters.gravitational_acceleration
+        assert parameters.water_density == yaml_parameters.water_density
+        assert parameters.particle_density == yaml_parameters.particle_density
 
 
 if __name__ == '__main__':

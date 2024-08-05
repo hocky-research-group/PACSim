@@ -160,7 +160,8 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             If the radius is not a Quantity with a proper unit (via the abstract base class).
         :raises ValueError:
             If the radius is not greater than zero (via the abstract base class).
-
+        :raises RuntimeError:
+            If this method is called after the yield_potentials method (via the abstract base class).
         """
         super().add_particle()
         if not radius.unit.is_compatible(self._nanometer):

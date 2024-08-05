@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Optional
+import inspect
+from typing import Any, Optional
 from openmm import unit
 from colloids.abstracts import Parameters
+import colloids.integrators as integrators
 from colloids.helper_functions import read_xyz_file
+import warnings
 
 
 @dataclass(order=True, frozen=True)
@@ -46,21 +49,26 @@ class RunParameters(Parameters):
         The name of the platform to use for the simulation.
         Defaults to "Reference". Other possible choices are "CPU", "CUDA", or "OpenCL".
     :type platform_name: str
-    :param temperature:
-        The temperature of the system.
+    :param potential_temperature:
+        The temperature that is used for the colloid potentials.
         The unit of the temperature must be compatible with kelvin and the value must be greater than zero.
         Defaults to 298.0 * unit.kelvin.
-    :type temperature: unit.Quantity
-    :param collision_rate:
-        The collision rate of the Langevin integrator.
-        The unit of the collision_rate must be compatible with 1/picoseconds and the value must be greater than zero.
-        Defaults to 0.01 / (unit.pico * unit.second).
-    :type collision_rate: unit.Quantity
-    :param timestep:
-        The timestep of the simulation.
-        The unit of the timestep must be compatible with picoseconds and the value must be greater than zero.
-        Defaults to 0.05 * (unit.pico * unit.second).
-    :type timestep: unit.Quantity
+    :type potential_temperature: unit.Quantity
+    :param integrator:
+        The name of the OpenMM integrator to use for the molecular-dynamics simulations.
+        Possible choices are "BrownianIntegrator", "LangevinIntegrator", LangevinMiddleIntegrator",
+        "NoseHooverIntegrator", "VariableLangevinIntegrator", "VariableVerletIntegrator", and "VerletIntegrator".
+        Defaults to "LangevinIntegrator".
+    :type integrator: str
+    :param integrator_parameters:
+        The parameters that are forwarded to initialize the OpenMM integrator.
+        Each integrator has specific parameters, and the parameters passed in here must be compatible with the chosen
+        integrator. See the corresponding integrator in the OpenMM documentation
+        http://docs.openmm.org/latest/api-python/library.html#integrators for the possible arguments (or, alternatively,
+        the colloids.integrators module).
+        Defaults to sensible values for the LangevinIntegrator (temperature of 298 K, frictionCoeff of
+        0.001574074286750681 / ps, stepSize of 0.00317647015905543 ps, and no specified random number seed).
+    :type integrator_parameters: dict[str, Any]
     :param brush_density:
         The polymer surface density in the Alexander-de Gennes polymer brush model [i.e., sigma in eq. (1)].
         The unit of the brush_density must be compatible with 1/nanometer^2 and the value must be greater than zero.
@@ -93,11 +101,6 @@ class RunParameters(Parameters):
         If False, the steric and electrostatic forces are computed based on algebraic expressions.
         Defaults to False.
     :type use_tabulated: bool
-    :param integrator_seed:
-        The seed for the random number generator of the integrator.
-        If None, a random seed is used.
-        Defaults to None.
-    :type integrator_seed: Optional[int]
     :param velocity_seed:
         The seed for the random number generator that is used to sample the initial velocities.
         If None, a random seed is used.
@@ -168,11 +171,50 @@ class RunParameters(Parameters):
         Defaults to None.
     :type epsilon: Optional[unit.Quantity]
     :param alpha:
-        Factor determining the strength of the attractive part of the Lennard-Jones potential for closed-wall 
+        Factor determining the strength of the attractive part of the Lennard-Jones potential for closed-wall
         simulations with shifted Lennard-Jones potential walls.
         If any wall direction is True, alpha must be not None and 0 <= alpha <= 1.
         Note that the force of this potential is only continuous if alpha = 1.
     :type alpha: Optional[float]
+    :param use_depletion:
+        A boolean indicating whether to turn on the depletion attraction for the simulation.
+        If depletion attraction is on, depletion_phi and depletant_radius must be specified.
+        Defaults to False.
+    :type use_depletion: bool
+    :param depletion_phi:
+        The number density of polymers in the solution.
+        If depletion attraction is on, the value of depletion_phi must not be None and 0 <= depletion_phi <=1.
+        Defaults to None.
+    :type depletion_phi: Optional[float]
+    :param depletant_radius:
+        The radius of the polymers in solution for a system with depletion attraction.
+        If depletion attraction is on, depletant_radius must not be None, its unit must be compatible with nanometers,
+        and the value must be greater than zero.
+    :type depletant_radius: Optional[unit.Quantity]
+    :param use_gravity: bool
+        A boolean indicating whether the gravitational force is turned on for the simulation.
+        If true, the gravitational acceleration, particle density, and water density parameters must be specified.
+        Defaults to False.
+    :param gravitational_acceleration:
+        The acceleration due to gravity.
+        If gravity is on, the value of the gravitational constant must be specified.
+        The unit must be compatible with meters per second squared.
+        Defaults to None.
+    :type gravitational_acceleration: Optional[unit.Quantity]
+    :param water_density:
+        The density of water. This is used to compute the effective particle density when calculating the gravitational
+        force.
+        If gravity is on, the density of water must be specified, its unit must be compatible with grams per centimeter
+        cubed, and the value must be greater than zero.
+        Defaults to None.
+    :type water_density: Optional[unit.Quantity]
+    :param particle_density:
+        The density of the colloidal particles. This is used to compute the effective particle density when calculating
+        the gravitational force.
+        If gravity is on, the particle density must be specified, its unit must be compatible with grams per centimeter
+        cubed, and the value must be greater than zero.
+        Defaults to None.
+    :type particle_density: Optional[unit.Quantity]
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -188,9 +230,15 @@ class RunParameters(Parameters):
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
     platform_name: str = "Reference"
-    temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
-    collision_rate: unit.Quantity = field(default_factory=lambda: 0.001574074286750681 / (unit.pico * unit.second))
-    timestep: unit.Quantity = field(default_factory=lambda: 0.03176470159055431 * (unit.pico * unit.second))
+    potential_temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
+    integrator: str = "LangevinIntegrator"
+    integrator_parameters: dict[str, Any] = field(
+        default_factory=lambda: {
+            "temperature": 298.0 * unit.kelvin,
+            "stepSize": 0.00317647015905543 * (unit.pico * unit.second),
+            "frictionCoeff": 0.001574074286750681 / (unit.pico * unit.second),
+            "randomNumberSeed": None
+        })
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
     debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
@@ -198,7 +246,6 @@ class RunParameters(Parameters):
     cutoff_factor: float = 21.0
     use_log: bool = False
     use_tabulated: bool = False
-    integrator_seed: Optional[int] = None
     velocity_seed: Optional[int] = None
     run_steps: int = 100
     state_data_interval: int = 100
@@ -213,6 +260,13 @@ class RunParameters(Parameters):
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
+    use_depletion: bool = False
+    depletion_phi: Optional[float] = None
+    depletant_radius: Optional[unit.Quantity] = None
+    use_gravity: bool = False
+    gravitational_acceleration: Optional[unit.Quantity] = None
+    water_density: Optional[unit.Quantity] = None
+    particle_density: Optional[unit.Quantity] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -245,18 +299,21 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
-        if not self.temperature.unit.is_compatible(unit.kelvin):
+        possible_integrators = [name for name, _ in inspect.getmembers(integrators, inspect.isfunction)]
+        if self.integrator not in possible_integrators:
+            raise ValueError(f"Integrator {self.integrator} not available, the integrator must be one of the "
+                             f"following: {', '.join(possible_integrators)}.")
+        integrator_getter = getattr(integrators, self.integrator)
+        try:
+            integrator_getter(**self.integrator_parameters)
+        except TypeError:
+            raise TypeError(f"Integrator {self.integrator} does not accept the given arguments "
+                            f"{self.integrator_parameters}. The expected signature is "
+                            f"{inspect.signature(integrator_getter)}")
+        if not self.potential_temperature.unit.is_compatible(unit.kelvin):
             raise TypeError("The temperature must have a unit compatible with kelvin.")
-        if self.temperature <= 0.0 * unit.kelvin:
+        if self.potential_temperature <= 0.0 * unit.kelvin:
             raise ValueError("The temperature must be greater than zero.")
-        if not self.collision_rate.unit.is_compatible((unit.pico * unit.second) ** (-1)):
-            raise TypeError("The collision rate must have a unit compatible with 1/picoseconds.")
-        if self.collision_rate <= 0.0 * ((unit.pico * unit.second) ** (-1)):
-            raise ValueError("The collision rate must be greater than zero.")
-        if not self.timestep.unit.is_compatible(unit.pico * unit.second):
-            raise TypeError("The timestep must have a unit compatible with picoseconds.")
-        if self.timestep <= 0.0 * (unit.pico * unit.second):
-            raise ValueError("The timestep must be greater than zero.")
         if not self.brush_density.unit.is_compatible((unit.nano * unit.meter) ** (-2)):
             raise TypeError("The brush density must have a unit compatible with 1/nanometer^2.")
         if self.brush_density <= 0.0 * ((unit.nano * unit.meter) ** (-2)):
@@ -313,6 +370,56 @@ class RunParameters(Parameters):
                 raise ValueError("Epsilon must not be specified if walls are not active.")
             if self.alpha is not None:
                 raise ValueError("Alpha must not be specified if walls are not active.")
+        if self.use_depletion:
+            if self.depletion_phi is None:
+                raise ValueError("Depletion phi must be specified if depletion is on.")
+            if not 0.0 <= self.depletion_phi <= 1.0:
+                raise ValueError("Depletion phi must be between zero and one.")
+            if self.depletant_radius is None:
+                raise ValueError("Depletant radius must be specified if depletion is on.")
+            if not self.depletant_radius.unit.is_compatible(
+                    unit.nano * unit.meter):
+                raise TypeError("Depletant radius must have a unit compatible with nanometers.")
+            if self.depletant_radius <= 0.0 * (unit.nano * unit.meter):
+                raise ValueError("Depletant radius must be greater than zero.")
+            for t in self.radii:
+                if self.depletant_radius / self.radii[t] > 0.1547:
+                    warnings.warn("Size ratio of depletant to colloid particles is too large. "
+                                  "Analytical computation of depletion potential may be invalid."
+                                  "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
+                                  "pp 10079 - 10106.")
+        else:
+            if self.depletion_phi is not None:
+                raise ValueError("Depletion phi must not be specified if depletion potential is not on.")
+            if self.depletant_radius is not None:
+                raise ValueError("Depletant radius must not be specified if depletion potential is not on.")
+        if self.use_gravity:
+            if self.gravitational_acceleration is None:
+                raise ValueError("Gravitational acceleration must be specified if gravity is on.")
+            if not self.gravitational_acceleration.unit.is_compatible(unit.meter / unit.second ** 2):
+                raise TypeError(
+                    "The gravitational acceleration must have a unit compatible with meters per second squared.")
+            if self.gravitational_acceleration <= 0.0 * (unit.meter / unit.second ** 2):
+                raise ValueError("The gravitational acceleration must be greater than zero.")
+            if self.water_density is None:
+                raise ValueError("Density of water must be specified if gravity is on.")
+            if not self.water_density.unit.is_compatible(unit.gram / (unit.centi * unit.meter)**3):
+                raise TypeError("The water density must have a unit compatible with grams per centimeter cubed.")
+            if self.water_density <= 0.0 * (unit.gram / (unit.centi * unit.meter)**3):
+                raise ValueError("The water density must be greater than zero.")
+            if self.particle_density is None:
+                raise ValueError("Density of particle must be specified if gravity is on.")
+            if not self.particle_density.unit.is_compatible(unit.gram / (unit.centi * unit.meter)**3):
+                raise TypeError("The particle density must have a unit compatible with grams per centimeter cubed.")
+            if self.particle_density <= 0.0 * (unit.gram / (unit.centi * unit.meter)**3):
+                raise ValueError("The particle density must be greater than zero.")
+        else:
+            if self.gravitational_acceleration is not None:
+                raise ValueError("Gravitational acceleration must not be specified if gravity is not on.")
+            if self.water_density is not None:
+                raise ValueError("Density of water must not be specified if gravity is not on.")
+            if self.particle_density is not None:
+                raise ValueError("Density of particle must not be specified if gravity is not on.")
 
     def check_types_of_initial_configuration(self):
         """

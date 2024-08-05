@@ -119,7 +119,7 @@ class TestParameters(object):
         return LangevinIntegrator(0.0, 0.0, 0.0)
 
 
-class TestColloidPotentialsAlgebraicExceptions(TestParameters):
+class TestColloidPotentialsExceptions(TestParameters):
     def test_exception_radius(self, colloid_potentials, radius_one, surface_potential_one):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
@@ -148,6 +148,15 @@ class TestColloidPotentialsAlgebraicExceptions(TestParameters):
             pass
         with pytest.raises(RuntimeError):
             colloid_potentials.add_particle(radius=radius_one, surface_potential=surface_potential_one)
+
+    def test_exception_colloid_potentials_tabulated_same_surface_potential(
+            self, radius_one, radius_two, surface_potential_one, colloid_potentials_parameters):
+        with pytest.raises(ValueError):
+            ColloidPotentialsTabulated(radius_one=radius_one, radius_two=radius_two,
+                                       surface_potential_one=surface_potential_one,
+                                       surface_potential_two=surface_potential_one,
+                                       colloid_potentials_parameters=colloid_potentials_parameters, use_log=False,
+                                       cutoff_factor=21.0, periodic_boundary_conditions=True)
 
     def test_exception_colloid_potentials_tabulated_add_wrong_particles(
             self, colloid_potentials_tabulated, radius_one, radius_two, surface_potential_one, surface_potential_two):

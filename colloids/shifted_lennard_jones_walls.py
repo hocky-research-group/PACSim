@@ -102,21 +102,27 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     def _set_up_slj_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the shifted Lennard Jones potential."""
 
-        slj_x = ("step(abs(x) - cutoff_x) * ("
+        slj_x = ("step(periodicdistance(x, 0, 0, 0, 0, 0) - cutoff_x) * ("
                  "four_epsilon * "
-                 "((radius / (wall_distance_x_over_two_minus_delta - abs(x)))^12 "
-                 "- alpha * (radius / (wall_distance_x_over_two_minus_delta - abs(x)))^6)"
+                 "((radius / (wall_distance_x_over_two_minus_delta - periodicdistance(x, 0, 0, 0, 0, 0)))^12 "
+                 "- alpha * (radius / (wall_distance_x_over_two_minus_delta - periodicdistance(x, 0, 0, 0, 0, 0)))^6)"
                  "+ shift)")
-        slj_y = ("step(abs(y) - cutoff_y) * ("
+        slj_y = ("step(periodicdistance(0, y, 0, 0, 0, 0) - cutoff_y) * ("
                  "four_epsilon * "
-                 "((radius / (wall_distance_y_over_two_minus_delta - abs(y)))^12 "
-                 "- alpha * (radius / (wall_distance_y_over_two_minus_delta - abs(y)))^6)"
+                 "((radius / (wall_distance_y_over_two_minus_delta - periodicdistance(0, y, 0, 0, 0, 0)))^12 "
+                 "- alpha * (radius / (wall_distance_y_over_two_minus_delta - periodicdistance(0, y, 0, 0, 0, 0)))^6)"
                  "+ shift)")
-        slj_z = ("step(abs(z) - cutoff_z) * ("
+        slj_z = ("step(periodicdistance(0, 0, z, 0, 0, 0) - cutoff_z) * ("
                  "four_epsilon * "
-                 "((radius / (wall_distance_z_over_two_minus_delta - abs(z)))^12 "
-                 "- alpha * (radius / (wall_distance_z_over_two_minus_delta - abs(z)))^6)"
+                 "((radius / (wall_distance_z_over_two_minus_delta - periodicdistance(0, 0, z, 0, 0, 0)))^12 "
+                 "- alpha * (radius / (wall_distance_z_over_two_minus_delta - periodicdistance(0, 0, z, 0, 0, 0)))^6)"
                  "+ shift)")
+        # Using periodicdistance switches on periodic boundary conditions in the OpenMM system.
+        # If there are walls in all directions, we don't want periodic boundary conditions though.
+        if all(self._wall_directions):
+            slj_x = slj_x.replace("periodicdistance(x, 0, 0, 0, 0, 0)", "abs(x)")
+            slj_y = slj_y.replace("periodicdistance(0, y, 0, 0, 0, 0)", "abs(y)")
+            slj_z = slj_z.replace("periodicdistance(0, 0, z, 0, 0, 0)", "abs(z)")
 
         slj_string = "+".join(slj for slj, wdir in zip([slj_x, slj_y, slj_z], self._wall_directions) if wdir)
         assert slj_string

@@ -28,7 +28,7 @@ def main():
     state_data_filename = "state_data.csv"
     state_data_interval = 100
     initial = "lattice"  # "lattice" or "random"
-    use_walls = True
+    use_walls = False
     use_plumed = True
     # Only relevant if use_plumed is True.
     distance_threshold_first_coordination_sphere = 0.61
@@ -114,7 +114,6 @@ def main():
     q6: Q6 ...
         SPECIES=1-{number_particles} 
         SWITCH={{GAUSSIAN D_0={distance_threshold_first_coordination_sphere} R_0={switch_width_plumed} D_MAX={distance_threshold_first_coordination_sphere + switch_width_plumed}}} 
-        NOPBC
     ...
     # Calculate the local Steinhardt parameter for each of the atoms in the system
     lq6: LOCAL_Q6 ...
@@ -123,7 +122,6 @@ def main():
         MEAN 
         HISTOGRAM={{GAUSSIAN LOWER=-1.0 UPPER=1.0 NBINS=40 SMEAR=0.1}}
         LOWMEM
-        NOPBC
     ...
     PRINT ARG=lq6.* FILE=lq6 STRIDE={state_data_interval}
     DUMPMULTICOLVAR DATA=lq6 FILE=LQ6MULTICOLVAR.xyz STRIDE={trajectory_interval}
@@ -132,27 +130,24 @@ def main():
         DATA=lq6 
         SWITCH={{GAUSSIAN D_0={lq6_threshold} R_0={switch_width_plumed} D_MAX={lq6_threshold + switch_width_plumed}}}
         LOWMEM
-        NOPBC
     ...
     # Calculate the contact matrix for those atoms that have a local q6 parameter that is larger than a threshold
     cc_cmat: CONTACT_MATRIX ...
         ATOMS=flq6 
         SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
-        NOPBC
     ...
     # Use depth first clustering to identify the sizes of the clusters
-    dfs: DFSCLUSTERING MATRIX=cc_cmat LOWMEM NOPBC
+    dfs: DFSCLUSTERING MATRIX=cc_cmat LOWMEM
     # Compute the sum of the coordination numbers for the atoms in the largest cluster                                                         
-    clust1: CLUSTER_PROPERTIES CLUSTERS=dfs CLUSTER=1 SUM LOWMEM NOPBC
+    clust1: CLUSTER_PROPERTIES CLUSTERS=dfs CLUSTER=1 SUM LOWMEM
     PRINT ARG=clust1.sum FILE=clust1 STRIDE={state_data_interval}
     # Do the same but without the filter on lq6.
     cc_cmat_all: CONTACT_MATRIX ...
         ATOMS=1-{number_particles} 
         SWITCH={{GAUSSIAN D_0={contact_distance_threshold} R_0={switch_width_plumed} D_MAX={contact_distance_threshold + switch_width_plumed}}}
-        NOPBC
     ...
-    dfs_all: DFSCLUSTERING MATRIX=cc_cmat_all LOWMEM NOPBC
-    clust1_all: CLUSTER_PROPERTIES CLUSTERS=dfs_all CLUSTER=1 SUM LOWMEM NOPBC
+    dfs_all: DFSCLUSTERING MATRIX=cc_cmat_all LOWMEM
+    clust1_all: CLUSTER_PROPERTIES CLUSTERS=dfs_all CLUSTER=1 SUM LOWMEM
     PRINT ARG=clust1_all.sum FILE=clust1_all STRIDE={state_data_interval}
     res: RESTRAINT ...
         ARG=clust1_all.sum

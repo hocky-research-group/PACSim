@@ -235,7 +235,7 @@ def main():
 
     if parameters.final_configuration_gsd_filename is not None:
         write_gsd_file(parameters.final_configuration_gsd_filename, simulation, parameters.radii,
-                       parameters.surface_potentials)
+                       parameters.surface_potentials, cell)
 
     if parameters.final_configuration_xyz_filename is not None:
         write_xyz_file(parameters.final_configuration_xyz_filename, simulation)

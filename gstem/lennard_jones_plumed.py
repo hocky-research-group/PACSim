@@ -28,7 +28,7 @@ def main():
     state_data_filename = "state_data.csv"
     state_data_interval = 100
     initial = "lattice"  # "lattice" or "random"
-    use_walls = False
+    use_walls = True
     use_plumed = True
     # Only relevant if use_plumed is True.
     distance_threshold_first_coordination_sphere = 0.61
@@ -36,7 +36,7 @@ def main():
     contact_distance_threshold = 1.5 * sigma.value_in_unit(unit.nano * unit.meter)
     switch_width_plumed = 0.01
     restraint_clust1_all = 2000.0
-    fluctuations_clust1_all = 100.0
+    fluctuations_clust1_all = 10.0
     # Use 1/2 * kappa * cv_fluct^2 = k_B T
     restraint_kappa = (2.0 * temperature * unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA
                        / (fluctuations_clust1_all ** 2))

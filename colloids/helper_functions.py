@@ -31,7 +31,7 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict
         periodic_box_vectors = openmm_simulation.system.getDefaultPeriodicBoxVectors()
     else:
        periodic_box_vectors = (openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
-                                            openmm.Vec3(*final_cell[2]))
+                                            openmm.Vec3(*final_cell[2]))*unit.nanometer
     assert len(periodic_box_vectors) == 3
     assert periodic_box_vectors[0][1].value_in_unit(nanometer) == 0.0
     assert periodic_box_vectors[0][2].value_in_unit(nanometer) == 0.0

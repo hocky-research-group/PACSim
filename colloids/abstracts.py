@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, fields
 from typing import Any, Iterator, Optional
-from openmm import CustomNonbondedForce, unit
+from openmm import CustomNonbondedForce, unit, app
 import yaml
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 

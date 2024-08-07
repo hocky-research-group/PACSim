@@ -215,6 +215,19 @@ class RunParameters(Parameters):
         cubed, and the value must be greater than zero.
         Defaults to None.
     :type particle_density: Optional[unit.Quantity]
+    :param use_update_reporter:
+        A boolean indicating whether the to use the update reporter to vary the value of a force-related parameter
+        over time in a simulation.
+        If true, the update reporter parameters must be specified.
+        Defaults to False.
+    :type use_update_reporter: bool
+    :param update_reporter_parameters:
+        The parameters that are forwarded to the UpdateReporter, if enabled for a simulation.
+        Defaults to update_reporter_filename of "debye_values.csv", variant "-debye_length", 
+        start_value of 5.726968 * (unit.nano * unit.meter), end_value of 6.726968 * (unit.nano * unit.meter),
+        report_interval of 1000, and continous = False.
+    :type update_reporter_parameters: Optional[dict]
+
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -268,7 +281,7 @@ class RunParameters(Parameters):
     water_density: Optional[unit.Quantity] = None
     particle_density: Optional[unit.Quantity] = None
     use_update_reporter: bool = False
-    update_reporter_parameters: dict[str, Any] = field(
+    update_reporter_parameters: Optional[dict[str, Any]] = field(
         default_factory=lambda: {
             "update_reporter_filename": "debye_values.csv",
             "variant": "-debye_length",

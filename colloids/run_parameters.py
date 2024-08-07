@@ -267,6 +267,18 @@ class RunParameters(Parameters):
     gravitational_acceleration: Optional[unit.Quantity] = None
     water_density: Optional[unit.Quantity] = None
     particle_density: Optional[unit.Quantity] = None
+    use_update_reporter: bool = False
+    update_reporter_parameters: dict[str, Any] = field(
+        default_factory=lambda: {
+            "update_reporter_filename": "debye_values.csv",
+            "variant": "debye_length",
+            "start_value": 5.726968 * (unit.nano * unit.meter),
+            "end_value": 6.726968 * (unit.nano * unit.meter)
+            "report_interval": 1000
+            "continous": False
+
+        }
+    )
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""

@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, fields
-from typing import Any, Iterator, Optional
-from openmm import CustomNonbondedForce, unit, app
+from typing import Any, Iterator
+from openmm import CustomNonbondedForce, unit
 import yaml
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
@@ -387,27 +387,3 @@ class Parameters(object):
             return obj.to_openmm_quantity()
         else:
             return deepcopy(obj)
-
-class UpdateParameters():
-    
-    def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters):
-        self._parameters = colloid_potentials_parameters
-    
-    def update_global_parameter(self, openmm_simulation: app.Simulation, parameter: str, modifier_function, continuous=False, frequency=Optional[int]):
-        current_value = openmm_simulation.context.getParameter(parameter)
-        if continuous==False:
-        
-            for i in range(frequency):
-                runsteps = int(self._parameters.run_steps/frequency)
-                openmm_simulation.step(runsteps)
-                print(f"{parameter} current value:", current_value)
-                current_value = modifier_function(current_value)
-                openmm_simulation.context.setParameter(parameter, current_value)
-        else: 
-            #continuous: update every step
-            for i in range(self._parameters.run_steps):
-                openmm_simulation.step(1)
-                print(f"{parameter} current value:", current_value)
-                current_value = modifier_function(current_value)
-                openmm_simulation.context.setParameter(parameter, current_value)
-

@@ -1,6 +1,4 @@
-from typing import Optional
 import numpy as np
-import numpy.typing as npt
 import openmm.app
 from openmm import unit
 
@@ -8,38 +6,90 @@ from openmm import unit
 class UpdateReporter(object):
     
     def __init__(self, filename: str, report_interval: int, simulation: openmm.app.Simulation, variant: str, 
-                 start_value: unit.Quantity, end_value: unit.Quantity, continous=False):
+                 start_value: unit.Quantity, end_value: unit.Quantity, total_number_steps: int, 
+                 append_file: bool = False, continous=False):
         """Constructor of the UpdateReporter class."""
         
+        if not filename.endswith(".csv"):
+            raise ValueError("The file must have the .csv extension.")
         if not report_interval > 0:
             raise ValueError("The report interval must be greater than zero.")
         assert simulation.topology.getNumChains() == 1
         assert simulation.topology.getNumResidues() == 1
         assert simulation.topology.getNumAtoms() == simulation.system.getNumParticles()
    
-        self._filename = filename
-        self._report_interval = report_interval
+        self._append_file = append_file
+        self._out = open(filename, 'a' if self._append_file else 'w')
+        self._ramp = continous
+        if self._ramp:
+            self._report_interval = 1
+        else: 
+            self._report_interval = report_interval
         self._variant = variant
         self._start_value = start_value
         self._end_value = end_value
-
-        #self._file = gsd.hoomd.open(name=filename, mode="r+" if self._append_file else "w")
+        self._total_number_steps = total_number_steps
     
-    def update_global_parameter(self, openmm_simulation: app.Simulation, parameter: str, modifier_function, continuous=False, frequency=Optional[int]):
-        current_value = openmm_simulation.context.getParameter(parameter)
-        if continuous==False:
-        
-            for i in range(frequency):
-                runsteps = int(self._parameters.run_steps/frequency)
-                openmm_simulation.step(runsteps)
-                print(f"{parameter} current value:", current_value)
-                current_value = modifier_function(current_value)
-                openmm_simulation.context.setParameter(parameter, current_value)
-        else: 
-            #continuous: update every step
-            for i in range(self._parameters.run_steps):
-                openmm_simulation.step(1)
-                print(f"{parameter} current value:", current_value)
-                current_value = modifier_function(current_value)
-                openmm_simulation.context.setParameter(parameter, current_value)
+    def describeNextReport(self, simulation: openmm.app.Simulation) -> tuple[int, bool, bool, bool, bool, bool]:
+        """Get information about the next report this reporter will generate.
 
+        This method is called by OpenMM once this reporter is added to the list of reporters of a simulation.
+
+        :param simulation:
+            The simulation to generate a report for.
+        :type simulation: openmm.app.Simulation
+
+        :returns:
+            (Number of steps until next report,
+            Whether the next report requires positions (False),
+            Whether the next report requires velocities (False),
+            Whether the next report requires forces (False),
+            Whether the next report requires energies (False),
+            Whether positions should be wrapped to lie in a single periodic box (False))
+        :rtype: tuple[int, bool, bool, bool, bool, bool]
+        """
+        steps = self._report_interval - simulation.currentStep % self._report_interval
+        return steps, False, False, False, False, False
+
+    def update(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
+        
+        assert state.getStepCount() == simulation.currentStep
+
+        current_value = self._start_value + ((self._end_value - self._start_value) * self.report_interval/self._total_number_steps) * simulation.currentStep
+        
+        simulation.context.setParameter(self._variant, current_value)
+
+        # print to stdout to test - remove this when reporter is fully implemented
+        print("Step", simulation.currentStep, f" - value of {self._variant}:", simulation.context.getParameter(self._variant))
+
+        assert current_value == simulation.context.getParameter(self._variant)
+    
+    def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
+        """
+        Generate a report by storing information about the updated variant parameter in a .csv file.
+
+        :param simulation:
+            The OpenMM simulation to generate a report for.
+        :type simulation: openmm.app.Simulation
+        :param state:
+            The current state of the OpenMM simulation.
+        :type state: openmm.State
+        """
+        step = simulation.currentStep
+        time = state.getTime().value_in_unit(unit.picosecond)
+        current_value = simulation.context.getParameter(self._variant)
+
+
+        print([step, time, current_value], file=self._out)
+
+    def __del__(self) -> None:
+        """Destructor of the UpdateReporter class."""
+        try:
+            self._out.close()
+        except AttributeError:
+            # If another error occured, the '_out' attribute might not exist.
+            pass
+
+    
+    
+    

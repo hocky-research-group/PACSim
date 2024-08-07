@@ -10,6 +10,7 @@ from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_f
 import colloids.integrators as integrators
 from colloids.run_parameters import RunParameters
 from colloids.status_reporter import StatusReporter
+from colloids.update_reporter import UpdateReporter
 
 
 class ExampleAction(argparse.Action):
@@ -178,6 +179,9 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
 
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
                      total_number_steps: int, cell: npt.NDArray[float]) -> None:
+    
+    update_reporter_parameters = getattr(integrators, parameters.use_update_reporter)(**parameters.update_reporter_parameters)
+    
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
                                             parameters.radii, parameters.surface_potentials, simulation,
                                             append_file=append_file,
@@ -189,7 +193,14 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                                                       speed=True, append=append_file))
     simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
                                                        parameters.checkpoint_interval))
-
+    simulation.reporters.append(UpdateReporter(parameters.update_reporter_parameters.filename, 
+                                               parameters.update_reporter_parameters.report_interval,
+                                               simulation, parameters.update_reporter_parameters.variant, 
+                                               parameters.update_reporter_parameters.start_value, 
+                                               parameters.update_reporter_parameters.end_value,
+                                               total_number_steps, append_file=append_file, 
+                                               continous=parameters.update_reporter_parameters.continuous))
+    
 
 def main():
     parser = argparse.ArgumentParser(description="Run OpenMM for a colloids system.")
@@ -222,13 +233,7 @@ def main():
 
     set_up_reporters(parameters, simulation, False, parameters.run_steps, cell)
 
-    debye = simulation.context.getParameter("debye_length")
-    for i in range(1000):
-        runsteps = int(parameters.run_steps/1000)
-        simulation.step(runsteps)
-        print("Debye:", debye)
-        debye+=0.01 #*unit.nanometer
-        simulation.context.setParameter("debye_length", debye)
+    simulation.step(parameters.run_steps)
 
     # TODO: Automatically plot energies etc.
     # TODO: CHECK ALL SURFACE SEPARATIONS

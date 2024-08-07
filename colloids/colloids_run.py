@@ -180,8 +180,6 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
                      total_number_steps: int, cell: npt.NDArray[float]) -> None:
     
-    update_reporter_parameters = getattr(integrators, parameters.use_update_reporter)(**parameters.update_reporter_parameters)
-    
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
                                             parameters.radii, parameters.surface_potentials, simulation,
                                             append_file=append_file,
@@ -193,13 +191,16 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                                                       speed=True, append=append_file))
     simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
                                                        parameters.checkpoint_interval))
-    simulation.reporters.append(UpdateReporter(parameters.update_reporter_parameters.filename, 
-                                               parameters.update_reporter_parameters.report_interval,
-                                               simulation, parameters.update_reporter_parameters.variant, 
-                                               parameters.update_reporter_parameters.start_value, 
-                                               parameters.update_reporter_parameters.end_value,
-                                               total_number_steps, append_file=append_file, 
-                                               continous=parameters.update_reporter_parameters.continuous))
+    
+    print(parameters.update_reporter_parameters["variant"])
+    
+    simulation.reporters.append(UpdateReporter(parameters.update_reporter_parameters["update_reporter_filename"], 
+                                               parameters.update_reporter_parameters["report_interval"],
+                                               simulation, parameters.update_reporter_parameters["variant"], 
+                                               parameters.update_reporter_parameters["start_value"], 
+                                               parameters.update_reporter_parameters["end_value"],
+                                               total_number_steps, append_file,
+                                               parameters.update_reporter_parameters["continuous"]))
     
 
 def main():

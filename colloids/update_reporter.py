@@ -25,7 +25,7 @@ class UpdateReporter(object):
             self._report_interval = 1
         else: 
             self._report_interval = report_interval
-        self._variant = variant
+        self._variant = variant.split("-")[1]
         self._start_value = start_value
         self._end_value = end_value
         self._total_number_steps = total_number_steps
@@ -50,19 +50,6 @@ class UpdateReporter(object):
         """
         steps = self._report_interval - simulation.currentStep % self._report_interval
         return steps, False, False, False, False, False
-
-    def update(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
-        
-        assert state.getStepCount() == simulation.currentStep
-
-        current_value = self._start_value + ((self._end_value - self._start_value) * self.report_interval/self._total_number_steps) * simulation.currentStep
-        
-        simulation.context.setParameter(self._variant, current_value)
-
-        # print to stdout to test - remove this when reporter is fully implemented
-        print("Step", simulation.currentStep, f" - value of {self._variant}:", simulation.context.getParameter(self._variant))
-
-        assert current_value == simulation.context.getParameter(self._variant)
     
     def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
         """
@@ -76,11 +63,17 @@ class UpdateReporter(object):
         :type state: openmm.State
         """
         step = simulation.currentStep
-        time = state.getTime().value_in_unit(unit.picosecond)
+        
         current_value = simulation.context.getParameter(self._variant)
+        current_value += (self._end_value - self._start_value) * self._report_interval/self._total_number_steps
+        
+        simulation.context.setParameter(self._variant, current_value)
+        
+        #this is just to check that parameter update is happening properly
+        ## remove when fully implemented
+        current_value1 = simulation.context.getParameter(self._variant)
 
-
-        print([step, time, current_value], file=self._out)
+        print(step, current_value, current_value1, file=self._out)
 
     def __del__(self) -> None:
         """Destructor of the UpdateReporter class."""

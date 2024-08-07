@@ -63,20 +63,12 @@ surface_potentials:
     value: 44.0
 trajectory_filename: trajectory.gsd
 trajectory_interval: 1000
-update_reporter_parameters:
-  update_reporter_filename: debye_values.csv
-  variant: "debye_length"
-  start_value: debye_length
-  end_value: !Quantity
-    unit: nanometer
-    value: 6.726968
-  report_interval: 1000
-  continuous: false 
+update_reporter_parameters: null
 use_depletion: true
 use_gravity: false
 use_log: false
 use_tabulated: false
-use_update_reporter: true
+use_update_reporter: false
 velocity_seed: null
 wall_directions:
   - false

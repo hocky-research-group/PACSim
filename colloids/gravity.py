@@ -39,7 +39,7 @@ class Gravity(OpenMMPotentialAbstract):
     _nanometer = unit.nano * unit.meter
 
     def __init__(self, gravitational_acceleration: unit.Quantity, water_density: unit.Quantity,
-                 particle_density: unit.Quantity):
+                 particle_density: unit.Quantity) -> None:
         """Constructor of the Gravity class."""
         super().__init__()
 

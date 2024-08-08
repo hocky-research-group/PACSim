@@ -16,8 +16,10 @@ def read_xyz_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[
     return atoms.get_chemical_symbols(), atoms.get_positions(), cell
 
 
+# noinspection PyUnresolvedReferences
 def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict: dict[str, unit.Quantity],
-                   surface_potentials_dict: dict[str, unit.Quantity], final_cell: Optional[npt.NDArray[float]]) -> None:
+                   surface_potentials_dict: dict[str, unit.Quantity],
+                   cell: Optional[npt.NDArray[unit.Quantity]]) -> None:
     nanometer = unit.nano * unit.meter
     millivolt = unit.milli * unit.volt
 
@@ -27,11 +29,7 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict
     assert topology.getNumChains() == 1
     assert topology.getNumResidues() == 1
     assert topology.getNumAtoms() == openmm_simulation.system.getNumParticles() == len(positions)
-    if openmm_simulation.system.usesPeriodicBoundaryConditions ==True:
-        periodic_box_vectors = openmm_simulation.system.getDefaultPeriodicBoxVectors()
-    else:
-       periodic_box_vectors = (openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
-                                            openmm.Vec3(*final_cell[2]))*unit.nanometer
+    periodic_box_vectors = cell if cell is not None else openmm_simulation.context.getState().getPeriodicBoxVectors()
     assert len(periodic_box_vectors) == 3
     assert periodic_box_vectors[0][1].value_in_unit(nanometer) == 0.0
     assert periodic_box_vectors[0][2].value_in_unit(nanometer) == 0.0

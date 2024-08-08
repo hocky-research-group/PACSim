@@ -18,11 +18,11 @@ class UpdateReporter(object):
         The filename must end with the .csv extension.
     :type filename: str
     :param update_interval:
-        The interval (in time steps) at which to update the value of the variant parameter in the OpenMM simulation.
+        The interval (in time steps) at which to update the value of the global parameter in the OpenMM simulation.
         The value must be greater than zero.
     :type update_interval: int
     :param final_update_step:
-        The final step at which the value of the variant parameter will be updated.
+        The final step at which the value of the global parameter will be updated.
         The value must be greater than or equal to the update_interval.
     :type final_update_step: int
     :param global_parameter_name:
@@ -30,9 +30,9 @@ class UpdateReporter(object):
         This must be one of the global parameters passed into any of the OpenMM Force objects.
     :type global_parameter_name: str
     :param end_value:
-        The end value of the variant parameter.
-        The value and unit must agree with those of the parameter being updated. For instance, if the variant parameter
-        is debye_length, the value must be greater than 0 and the unit must be compatible with nanometers.
+        The end value of the global parameter.
+        OpenMM does not store the units of global parameters, so the user must be sure to pass in a quantity with a
+        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
     :type end_value: unit.Quantity
     :param simulation:
         The OpenMM simulation that this reporter will be added to.
@@ -49,7 +49,6 @@ class UpdateReporter(object):
         If the update_interval is not greater than zero.
         If the final_update_step is not greater than or equal to the update_interval.
         If the global_parameter_name is not in the simulation context.
-        If the unit of the end_value is not compatible with the unit of the global parameter.
     """
     
     def __init__(self, filename: str, update_interval: int, final_update_step, global_parameter_name: str,
@@ -65,13 +64,11 @@ class UpdateReporter(object):
         self._final_update_step = final_update_step
         self._global_parameter_name = global_parameter_name
         if self._global_parameter_name not in simulation.context.getParameters():
-            raise ValueError("The variant parameter is not in the simulation context.")
+            raise ValueError(f"The global parameter {self._global_parameter_name} is not in the simulation context.")
         self._start_value = simulation.context.getParameters()[self._global_parameter_name]
-        if not end_value.unit.is_compatible(self._start_value.unit):
-            raise ValueError("The unit of the end value must be compatible with the unit of the global parameter.")
-        self._end_value = end_value
+        self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
         self._file = open(filename, "a" if append_file else "x")
-        print(f"Timestep,{self._global_parameter_name}", file=self._file)
+        print(f"timestep,{self._global_parameter_name}", file=self._file)
 
     # noinspection PyPep8Naming
     def describeNextReport(self, simulation: openmm.app.Simulation) -> tuple[int, bool, bool, bool, bool, bool]:

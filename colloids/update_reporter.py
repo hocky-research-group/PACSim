@@ -67,7 +67,7 @@ class UpdateReporter(object):
             raise ValueError(f"The global parameter {self._global_parameter_name} is not in the simulation context.")
         self._start_value = simulation.context.getParameters()[self._global_parameter_name]
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
-        self._file = open(filename, "a" if append_file else "x")
+        self._file = open(filename, "a" if append_file else "w")
         print(f"timestep,{self._global_parameter_name}", file=self._file)
 
     # noinspection PyPep8Naming

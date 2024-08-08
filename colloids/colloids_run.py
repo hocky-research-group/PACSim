@@ -1,4 +1,5 @@
 import argparse
+import inspect
 import numpy.typing as npt
 import openmm
 from openmm import app
@@ -192,14 +193,13 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
     simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
                                                        parameters.checkpoint_interval))
     if parameters.use_update_reporter:
-        simulation.reporters.append(UpdateReporter(parameters.update_reporter_parameters["update_reporter_filename"],
-                                                   parameters.update_reporter_parameters["report_interval"],
-                                                   simulation, parameters.update_reporter_parameters["variant"],
-                                                   parameters.update_reporter_parameters["start_value"],
-                                                   parameters.update_reporter_parameters["end_value"],
-                                                   total_number_steps, append_file,
-                                                   parameters.update_reporter_parameters["continuous"]))
-    
+        try:
+            simulation.reporters.append(UpdateReporter(simulation=simulation, **parameters.update_reporter_parameters))
+        except TypeError:
+            raise TypeError(
+                f"UpdateReporter does not accept the given arguments {parameters.update_reporter_parameters}. "
+                f"The expected signature is {inspect.signature(UpdateReporter.__init__)}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Run OpenMM for a colloids system.")

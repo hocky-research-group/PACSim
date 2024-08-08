@@ -1,4 +1,4 @@
-alpha: null
+alpha: 1.0
 brush_density: !Quantity
   unit: /(nanometer**2)
   value: 0.09
@@ -16,7 +16,9 @@ depletant_radius: !Quantity
     value: 5.0
 depletion_phi: 0.5
 dielectric_constant: 80.0
-epsilon: null
+epsilon: !Quantity
+    unit: kilojoule/mole
+    value: 2.477709860209665
 final_configuration_gsd_filename: test_run_and_resume/final_frame_resume.gsd
 final_configuration_xyz_filename: test_run_and_resume/final_frame_resume.xyz
 gravitational_acceleration: !Quantity
@@ -85,9 +87,9 @@ use_update_reporter: true
 use_tabulated: false
 velocity_seed: 2
 wall_directions:
-  - false
-  - false
-  - false
+  - true
+  - true
+  - true
 water_density: !Quantity
   unit: gram/(centimeter**3)
   value: 0.998

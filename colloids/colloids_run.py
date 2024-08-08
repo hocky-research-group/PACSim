@@ -191,16 +191,14 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                                                       speed=True, append=append_file))
     simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
                                                        parameters.checkpoint_interval))
-    
-    print(parameters.update_reporter_parameters["variant"])
-    
-    simulation.reporters.append(UpdateReporter(parameters.update_reporter_parameters["update_reporter_filename"], 
-                                               parameters.update_reporter_parameters["report_interval"],
-                                               simulation, parameters.update_reporter_parameters["variant"], 
-                                               parameters.update_reporter_parameters["start_value"], 
-                                               parameters.update_reporter_parameters["end_value"],
-                                               total_number_steps, append_file,
-                                               parameters.update_reporter_parameters["continuous"]))
+    if parameters.use_update_reporter:
+        simulation.reporters.append(UpdateReporter(parameters.update_reporter_parameters["update_reporter_filename"],
+                                                   parameters.update_reporter_parameters["report_interval"],
+                                                   simulation, parameters.update_reporter_parameters["variant"],
+                                                   parameters.update_reporter_parameters["start_value"],
+                                                   parameters.update_reporter_parameters["end_value"],
+                                                   total_number_steps, append_file,
+                                                   parameters.update_reporter_parameters["continuous"]))
     
 
 def main():

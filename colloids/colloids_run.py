@@ -128,16 +128,6 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
 
-    if parameters.use_gravity:
-        assert all_walls
-        gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density,
-                                          parameters.particle_density)
-        for i, t in enumerate(types):
-            # noinspection PyTypeChecker
-            gravitational_potential.add_particle(index=i, radius=parameters.radii[t])
-        for force in gravitational_potential.yield_potentials():
-            system.addForce(force)
-
     if parameters.use_depletion:
         depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,
                                                  brush_length=parameters.brush_length,
@@ -148,6 +138,17 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
             depletion_potential.add_particle(radius=parameters.radii[t])
         for force in depletion_potential.yield_potentials():
             system.addForce(force)
+
+    if parameters.use_gravity:
+        assert all_walls
+        gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density,
+                                          parameters.particle_density)
+        for i, t in enumerate(types):
+            # noinspection PyTypeChecker
+            gravitational_potential.add_particle(index=i, radius=parameters.radii[t])
+        for force in gravitational_potential.yield_potentials():
+            system.addForce(force)
+        assert not system.usesPeriodicBoundaryConditions()
 
     if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":
         # Set different force groups for the nonbonded potentials to allow for different cutoffs on the OpenCL and CUDA

@@ -224,7 +224,7 @@ class RunParameters(Parameters):
     :param update_reporter_parameters:
         The parameters that are forwarded to the initialization method of the UpdateReporter, if enabled for a
         simulation. Note that the initialization method of the UpdateReporter class expects an OpenMM simulation object
-        that should not appear in this dictionary.
+        and an append_file boolean that should not appear in this dictionary.
         Defaults to None.
     :type update_reporter_parameters: Optional[dict[str, Any]]
 
@@ -436,10 +436,12 @@ class RunParameters(Parameters):
                 raise ValueError("Density of particle must not be specified if gravity is not on.")
         if self.use_update_reporter:
             if self.update_reporter_parameters is None:
-                raise ValueError("Update reporter parameters must be specified if the update reporter is on.")
+                raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")
+            if "simulation" in self.update_reporter_parameters or "append_file" in self.update_reporter_parameters:
+                raise ValueError("Update-reporter parameters should not contain simulation and append_file keys.")
         else:
             if self.update_reporter_parameters is not None:
-                raise ValueError("Update reporter parameters must not be specified if the update reporter is not on.")
+                raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")
 
     def check_types_of_initial_configuration(self):
         """

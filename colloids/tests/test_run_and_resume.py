@@ -30,6 +30,7 @@ class TestRunAndResume(object):
         assert os.path.isfile(directory_name + "/final_frame.xyz")
         assert os.path.isfile(directory_name + "/state_data.csv")
         assert os.path.isfile(directory_name + "/trajectory.gsd")
+        assert os.path.isfile(directory_name + "/update_reporter.csv")
         # Remove speed column from state_data.csv which varies between runs.
         f = pd.read_csv(directory_name + "/state_data.csv", usecols=[0, 1, 2, 3])
         f.to_csv(directory_name + "/state_data.csv")
@@ -44,6 +45,7 @@ class TestRunAndResume(object):
         assert os.path.isfile(directory_name + "/final_frame_resume.xyz")
         assert os.path.isfile(directory_name + "/state_data_resume.csv")
         assert os.path.isfile(directory_name + "/trajectory_resume.gsd")
+        assert os.path.isfile(directory_name + "/update_reporter.csv")
         # Remove speed column from state_data_resume.csv which varies between runs.
         f = pd.read_csv(directory_name + "/state_data_resume.csv", usecols=[0, 1, 2, 3])
         f.to_csv(directory_name + "/state_data_resume.csv")

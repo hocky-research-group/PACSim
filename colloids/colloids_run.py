@@ -193,7 +193,8 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                                                        parameters.checkpoint_interval))
     if parameters.use_update_reporter:
         try:
-            simulation.reporters.append(UpdateReporter(simulation=simulation, **parameters.update_reporter_parameters))
+            simulation.reporters.append(UpdateReporter(simulation=simulation, append_file=append_file,
+                                                       **parameters.update_reporter_parameters))
         except TypeError:
             raise TypeError(
                 f"UpdateReporter does not accept the given arguments {parameters.update_reporter_parameters}. "

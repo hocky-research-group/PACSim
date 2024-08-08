@@ -97,6 +97,9 @@ class UpdateReporter(object):
             Whether positions should be wrapped to lie in a single periodic box (False))
         :rtype: tuple[int, bool, bool, bool, bool, bool]
         """
+        if simulation.currentStep >= self._final_update_step:
+            # 0 signals to not interrupt the simulation again.
+            return 0, False, False, False, False, False
         steps = self._update_interval - simulation.currentStep % self._update_interval
         return steps, False, False, False, False, False
 

@@ -123,7 +123,7 @@ class UpdateReporter(object):
         print(f"{step},{new_value}", file=self._file)
 
     def __del__(self) -> None:
-        """Destructor of the OutputReporter class."""
+        """Destructor of the UpdateReporter class."""
         try:
             self._file.close()
         except AttributeError:

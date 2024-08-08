@@ -215,6 +215,18 @@ class RunParameters(Parameters):
         cubed, and the value must be greater than zero.
         Defaults to None.
     :type particle_density: Optional[unit.Quantity]
+    :param use_update_reporter:
+        A boolean indicating whether the to use the update reporter to vary the value of a force-related global
+        parameter over time in a simulation.
+        If true, the update reporter parameters must be specified.
+        Defaults to False.
+    :type use_update_reporter: bool
+    :param update_reporter_parameters:
+        The parameters that are forwarded to the initialization method of the UpdateReporter, if enabled for a
+        simulation. Note that the initialization method of the UpdateReporter class expects an OpenMM simulation object
+        and an append_file boolean that should not appear in this dictionary.
+        Defaults to None.
+    :type update_reporter_parameters: Optional[dict[str, Any]]
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -267,6 +279,8 @@ class RunParameters(Parameters):
     gravitational_acceleration: Optional[unit.Quantity] = None
     water_density: Optional[unit.Quantity] = None
     particle_density: Optional[unit.Quantity] = None
+    use_update_reporter: bool = False
+    update_reporter_parameters: Optional[dict[str, Any]] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -420,6 +434,14 @@ class RunParameters(Parameters):
                 raise ValueError("Density of water must not be specified if gravity is not on.")
             if self.particle_density is not None:
                 raise ValueError("Density of particle must not be specified if gravity is not on.")
+        if self.use_update_reporter:
+            if self.update_reporter_parameters is None:
+                raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")
+            if "simulation" in self.update_reporter_parameters or "append_file" in self.update_reporter_parameters:
+                raise ValueError("Update-reporter parameters should not contain simulation and append_file keys.")
+        else:
+            if self.update_reporter_parameters is not None:
+                raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")
 
     def check_types_of_initial_configuration(self):
         """

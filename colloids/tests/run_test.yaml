@@ -32,7 +32,8 @@ integrator_parameters:
   stepSize: !Quantity
     unit: picosecond
     value: 0.00317647015905543
-  temperature: potential_temperature
+  temperature: !Copy
+    key: potential_temperature
 masses:
   N: !Quantity
     unit: dalton
@@ -67,9 +68,21 @@ potential_temperature: !Quantity
   value: 298.0
 trajectory_filename: test_run_and_resume/trajectory.gsd
 trajectory_interval: 10
+update_reporter_parameters:
+  filename: test_run_and_resume/update_reporter.csv
+  update_interval: 10
+  final_update_step: !Copy
+    key: run_steps
+  global_parameter_name: debye_length
+  start_value: !Copy
+    key: debye_length
+  end_value: !Quantity
+    unit: nanometer
+    value: 6.0
 use_depletion: true
 use_gravity: true
 use_log: false
+use_update_reporter: true
 use_tabulated: false
 velocity_seed: 2
 wall_directions:

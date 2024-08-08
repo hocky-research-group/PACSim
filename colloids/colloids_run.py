@@ -1,4 +1,5 @@
 import argparse
+import inspect
 import numpy.typing as npt
 import openmm
 from openmm import app
@@ -10,6 +11,7 @@ from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_f
 import colloids.integrators as integrators
 from colloids.run_parameters import RunParameters
 from colloids.status_reporter import StatusReporter
+from colloids.update_reporter import UpdateReporter
 
 
 class ExampleAction(argparse.Action):
@@ -187,6 +189,16 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                                                       parameters.state_data_interval, time=True,
                                                       kineticEnergy=True, potentialEnergy=True, temperature=True,
                                                       speed=True, append=append_file))
+    if parameters.use_update_reporter:
+        try:
+            simulation.reporters.append(UpdateReporter(simulation=simulation, append_file=append_file,
+                                                       **parameters.update_reporter_parameters))
+        except TypeError:
+            raise TypeError(
+                f"UpdateReporter does not accept the given arguments {parameters.update_reporter_parameters}. "
+                f"The expected signature is {inspect.signature(UpdateReporter)} (the simulation argument need not be "
+                f"specified).")
+    # The CheckpointReporter should always be last to ensure that all other reporters have been executed before it.
     simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
                                                        parameters.checkpoint_interval))
 
@@ -223,15 +235,16 @@ def main():
     set_up_reporters(parameters, simulation, False, parameters.run_steps, cell)
 
     simulation.step(parameters.run_steps)
+
     # TODO: Automatically plot energies etc.
     # TODO: CHECK ALL SURFACE SEPARATIONS
 
     if parameters.final_configuration_gsd_filename is not None:
         write_gsd_file(parameters.final_configuration_gsd_filename, simulation, parameters.radii,
-                       parameters.surface_potentials)
+                       parameters.surface_potentials, cell * (unit.nano * unit.meter))
 
     if parameters.final_configuration_xyz_filename is not None:
-        write_xyz_file(parameters.final_configuration_xyz_filename, simulation)
+        write_xyz_file(parameters.final_configuration_xyz_filename, simulation, cell * (unit.nano * unit.meter))
 
 
 if __name__ == '__main__':

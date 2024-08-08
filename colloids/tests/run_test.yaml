@@ -74,6 +74,8 @@ update_reporter_parameters:
   final_update_step: !Copy
     key: run_steps
   global_parameter_name: debye_length
+  start_value: !Copy
+    key: debye_length
   end_value: !Quantity
     unit: nanometer
     value: 6.0

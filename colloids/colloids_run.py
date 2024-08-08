@@ -189,8 +189,6 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                                                       parameters.state_data_interval, time=True,
                                                       kineticEnergy=True, potentialEnergy=True, temperature=True,
                                                       speed=True, append=append_file))
-    simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
-                                                       parameters.checkpoint_interval))
     if parameters.use_update_reporter:
         try:
             simulation.reporters.append(UpdateReporter(simulation=simulation, append_file=append_file,
@@ -200,6 +198,9 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                 f"UpdateReporter does not accept the given arguments {parameters.update_reporter_parameters}. "
                 f"The expected signature is {inspect.signature(UpdateReporter)} (the simulation argument need not be "
                 f"specified).")
+    # The CheckpointReporter should always be last to ensure that all other reporters have been executed before it.
+    simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
+                                                       parameters.checkpoint_interval))
 
 
 def main():

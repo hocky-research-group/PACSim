@@ -1,3 +1,4 @@
+import warnings
 import openmm.app
 from openmm import unit
 
@@ -29,9 +30,14 @@ class UpdateReporter(object):
         The name of the global parameter to be updated.
         This must be one of the global parameters passed into any of the OpenMM Force objects.
     :type global_parameter_name: str
+    :param start_value:
+        The start value of the global parameter.
+        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
+        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type start_value: unit.Quantity
     :param end_value:
         The end value of the global parameter.
-        OpenMM does not store the units of global parameters, so the user must be sure to pass in a quantity with a
+        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
         sensible unit here. This quantity will only be converted to the unit system of OpenMM.
     :type end_value: unit.Quantity
     :param simulation:
@@ -52,7 +58,8 @@ class UpdateReporter(object):
     """
     
     def __init__(self, filename: str, update_interval: int, final_update_step, global_parameter_name: str,
-                 end_value: unit.Quantity, simulation: openmm.app.Simulation, append_file: bool = False):
+                 start_value: unit.Quantity, end_value: unit.Quantity, simulation: openmm.app.Simulation,
+                 append_file: bool = False):
         """Constructor of the UpdateReporter class."""
         if not filename.endswith(".csv"):
             raise ValueError("The file must have the .csv extension.")
@@ -65,10 +72,19 @@ class UpdateReporter(object):
         self._global_parameter_name = global_parameter_name
         if self._global_parameter_name not in simulation.context.getParameters():
             raise ValueError(f"The global parameter {self._global_parameter_name} is not in the simulation context.")
-        self._start_value = simulation.context.getParameters()[self._global_parameter_name]
+        if not start_value.unit.is_compatible(end_value.unit):
+            raise ValueError(f"The start and end values have incompatible units.")
+        self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
+        # Check if the start value of the global parameter matches the value in the OpenMM simulation.
+        # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
+        # the start value is not necessarily the same as the value in the OpenMM simulation.
+        if (not append_file
+                and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
+            warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
         self._file = open(filename, "a" if append_file else "w")
-        print(f"timestep,{self._global_parameter_name}", file=self._file)
+        if not append_file:
+            print(f"timestep,{self._global_parameter_name}", file=self._file)
 
     # noinspection PyPep8Naming
     def describeNextReport(self, simulation: openmm.app.Simulation) -> tuple[int, bool, bool, bool, bool, bool]:

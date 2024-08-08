@@ -1,4 +1,4 @@
-from openmm import Context, LangevinIntegrator, Platform, System, unit, Vec3
+from openmm import Context, LangevinIntegrator, NonbondedForce, OpenMMException, Platform, System, unit, Vec3
 import pytest
 from colloids import Gravity
 import numpy as np
@@ -32,10 +32,6 @@ class TestGravityParameters(object):
                                             Vec3(0.0, box_length, 0.0),
                                             Vec3(0.0, 0.0, box_length))
         return system
-
-    @pytest.fixture
-    def openmm_platform(self):
-        return Platform.getPlatformByName("Reference")
 
     @pytest.fixture
     def openmm_dummy_integrator(self):
@@ -120,19 +116,36 @@ class TestGravity(TestGravityParameters):
     def gravitational_force_exp(particle_density, water_density, particle_radius, z, g):
         return ((particle_density - water_density) * 4.0 / 3.0 * np.pi * particle_radius ** 3) * z * g
 
-    @pytest.fixture(autouse=True)
-    def add_particle(self, openmm_system, gravitational_potential, particle_radius):
+    @pytest.fixture(autouse=True, params=["periodic", "non_periodic"])
+    def add_particle(self, openmm_system, gravitational_potential, particle_radius, request):
         openmm_system.addParticle(mass=1.0)
         gravitational_potential.add_particle(index=0, radius=particle_radius)
         for potential in gravitational_potential.yield_potentials():
             openmm_system.addForce(potential)
+        # Add a nonbonded force with a periodic cutoff to the system so that it uses periodic boundary conditions.
+        # This tests a potential issue on the CUDA/OpenCL platforms: https://github.com/openmm/openmm/issues/4611
+        if request.param == "periodic":
+            nonbonded_force = NonbondedForce()
+            nonbonded_force.addParticle(0.0, 1.0, 0.0)
+            nonbonded_force.setNonbondedMethod(NonbondedForce.CutoffPeriodic)
+            nonbonded_force.setCutoffDistance(5.0)
+            openmm_system.addForce(nonbonded_force)
+            pytest.xfail("on the CUDA and OpenCL platforms, the gravitational potential will not be correctly computed "
+                         "if the system uses periodic boundary conditions because the z positions are changed to lie "
+                         "outside the range from -L/2 to L/2 (see https://github.com/openmm/openmm/issues/4611)")
 
-    @pytest.fixture
-    def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
-        return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
+    @pytest.fixture(params=[("Reference", 1.0e-7), ("CPU", 1.0e-7), ("CUDA", 1.0e-3), ("OpenCL", 1.0e-3)])
+    def openmm_context_rel(self, openmm_system, openmm_dummy_integrator, request):
+        try:
+            platform = Platform.getPlatformByName(request.param[0])
+        except OpenMMException:
+            pytest.skip("Platform {} not available.".format(request.param[0]))
+        return Context(openmm_system, openmm_dummy_integrator, platform), request.param[1]
 
-    def test_gravitational_potentials(self, openmm_context, particle_density, particle_radius,
+    def test_gravitational_potentials(self, openmm_context_rel, particle_density, particle_radius,
                                       test_z_positions, gravitational_acceleration, water_density):
+        openmm_context, rel = openmm_context_rel
+
         openmm_grav_potentials = np.zeros(len(test_z_positions))
 
         for index, dir_z_position in enumerate(test_z_positions):
@@ -144,8 +157,7 @@ class TestGravity(TestGravityParameters):
         expected_numpy_grav_potentials = (self.gravitational_force_exp(
             particle_density, water_density, particle_radius, test_z_positions, gravitational_acceleration)
                                           * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
-
-        assert openmm_grav_potentials == pytest.approx(expected_numpy_grav_potentials, rel=1.0e-7, abs=1.0e-13)
+        assert openmm_grav_potentials == pytest.approx(expected_numpy_grav_potentials, rel=rel, abs=1.0e-13)
 
 
 if __name__ == '__main__':

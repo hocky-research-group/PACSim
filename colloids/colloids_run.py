@@ -198,7 +198,8 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
         except TypeError:
             raise TypeError(
                 f"UpdateReporter does not accept the given arguments {parameters.update_reporter_parameters}. "
-                f"The expected signature is {inspect.signature(UpdateReporter.__init__)}")
+                f"The expected signature is {inspect.signature(UpdateReporter)} (the simulation argument need not be "
+                f"specified).")
 
 
 def main():

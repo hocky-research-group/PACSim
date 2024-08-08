@@ -156,10 +156,10 @@ class Parameters(object):
     class. In the yaml file, OpenMM quantities are stored with the tag !Quantity and two key-value pairs with the keys
     "value" and "unit".
 
-    In the yaml file, every value of a given key may be a reference to another value with another key in the top level
-    of the yaml file. For example, the following excerpt from a yaml file contains a reference to the value of the key
-    "potential_temperature" in the top level of the yaml file in the value of the key "temperature" in the dictionary
-    "integrator_parameters":
+    Furthermore, this dataclass provides methods to store references to other keys in the top level of the yaml file.
+    For this the !Copy tag should be used. For example, the following excerpt from a yaml file contains a reference to
+    the value of the key "potential_temperature" in the top level of the yaml file in the value of the key
+    "temperature" in the dictionary "integrator_parameters":
 
     potential_temperature: !Quantity
         unit: kelvin
@@ -172,7 +172,8 @@ class Parameters(object):
         stepSize: !Quantity
             unit: picosecond
             value: 0.00317647015905543
-        temperature: potential_temperature
+        temperature: !Copy
+            key: potential_temperature
 
     This reference is resolved when the data is read from the yaml file and effectively becomes:
 
@@ -191,6 +192,31 @@ class Parameters(object):
             unit: kelvin
             value: 298.0
     """
+
+    class _Copy(yaml.YAMLObject):
+        """
+        Yaml tag for a reference to another value in the yaml file.
+
+        This class defines the application-specific yaml tag !Copy by following the description in
+        https://pyyaml.org/wiki/PyYAMLDocumentation.
+
+        :param key:
+            The key of the value to which the reference points.
+        :type key: str
+
+        :ivar key:
+            The key of the value to which the reference points.
+        :vartype key: str
+
+        :cvar yaml_tag:
+            The yaml tag for this class.
+        :vartype yaml_tag: str
+        """
+
+        yaml_tag = u'!Copy'
+
+        def __init__(self, key: str) -> None:
+            self.key = key
 
     class _Quantity(yaml.YAMLObject):
         """
@@ -330,8 +356,10 @@ class Parameters(object):
     @staticmethod
     def _resolve_reference_values(base_params: dict[str, Any], value: Any) -> Any:
         """Recursively resolve references to other parameters in the base_params dictionary."""
-        if isinstance(value, str) and value in base_params:
-            return base_params[value]
+        if isinstance(value, Parameters._Copy):
+            if value.key not in base_params:
+                raise ValueError(f"Reference to {value.key} not found at the top level of the yaml file.")
+            return base_params[value.key]
         elif isinstance(value, dict):
             return_dict = value
             for key, sub_value in value.items():

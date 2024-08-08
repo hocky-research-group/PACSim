@@ -32,7 +32,8 @@ integrator_parameters:
   stepSize: !Quantity
     unit: picosecond
     value: 0.00317647015905543
-  temperature: potential_temperature
+  temperature: !Copy
+    key: potential_temperature
 masses:
   N: !Quantity
     unit: dalton

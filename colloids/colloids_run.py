@@ -244,7 +244,7 @@ def main():
                        parameters.surface_potentials, cell * (unit.nano * unit.meter))
 
     if parameters.final_configuration_xyz_filename is not None:
-        write_xyz_file(parameters.final_configuration_xyz_filename, simulation)
+        write_xyz_file(parameters.final_configuration_xyz_filename, simulation, cell * (unit.nano * unit.meter))
 
 
 if __name__ == '__main__':

@@ -1,7 +1,6 @@
 import ase.io
 import gsd.hoomd
 import numpy.typing as npt
-from typing import Optional
 import openmm
 from openmm import app
 from openmm import unit
@@ -18,8 +17,7 @@ def read_xyz_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[
 
 # noinspection PyUnresolvedReferences
 def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict: dict[str, unit.Quantity],
-                   surface_potentials_dict: dict[str, unit.Quantity],
-                   cell: Optional[npt.NDArray[unit.Quantity]]) -> None:
+                   surface_potentials_dict: dict[str, unit.Quantity], cell: npt.NDArray[unit.Quantity]) -> None:
     nanometer = unit.nano * unit.meter
     millivolt = unit.milli * unit.volt
 
@@ -29,11 +27,10 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict
     assert topology.getNumChains() == 1
     assert topology.getNumResidues() == 1
     assert topology.getNumAtoms() == openmm_simulation.system.getNumParticles() == len(positions)
-    periodic_box_vectors = cell if cell is not None else openmm_simulation.context.getState().getPeriodicBoxVectors()
-    assert len(periodic_box_vectors) == 3
-    assert periodic_box_vectors[0][1].value_in_unit(nanometer) == 0.0
-    assert periodic_box_vectors[0][2].value_in_unit(nanometer) == 0.0
-    assert periodic_box_vectors[1][2].value_in_unit(nanometer) == 0.0
+    assert len(cell) == 3
+    assert cell[0][1].value_in_unit(nanometer) == 0.0
+    assert cell[0][2].value_in_unit(nanometer) == 0.0
+    assert cell[1][2].value_in_unit(nanometer) == 0.0
 
     frame = gsd.hoomd.Frame()
     frame.particles.N = topology.getNumAtoms()
@@ -61,29 +58,43 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict
     # See http://docs.openmm.org/7.6.0/userguide/theory/05_other_features.html
     # See https://hoomd-blue.readthedocs.io/en/v2.9.3/box.html
     frame.configuration.box = [
-        periodic_box_vectors[0][0].value_in_unit(nanometer),
-        periodic_box_vectors[1][1].value_in_unit(nanometer),
-        periodic_box_vectors[2][2].value_in_unit(nanometer),
-        periodic_box_vectors[1][0] / periodic_box_vectors[1][1],
-        periodic_box_vectors[2][0] / periodic_box_vectors[2][2],
-        periodic_box_vectors[2][1] / periodic_box_vectors[2][2]
+        cell[0][0].value_in_unit(nanometer),
+        cell[1][1].value_in_unit(nanometer),
+        cell[2][2].value_in_unit(nanometer),
+        cell[1][0] / cell[1][1],
+        cell[2][0] / cell[2][2],
+        cell[2][1] / cell[2][2]
     ]
     with gsd.hoomd.open(name=filename, mode="w") as f:
         f.append(frame)
 
 
-def write_xyz_file(filename: str, openmm_simulation: app.Simulation) -> None:
+# noinspection PyUnresolvedReferences
+def write_xyz_file(filename: str, openmm_simulation: app.Simulation, cell: npt.NDArray[unit.Quantity]) -> None:
+    nanometer = unit.nano * unit.meter
     positions = (
-        openmm_simulation.context.getState(getPositions=True, enforcePeriodicBox=True).getPositions(asNumpy=True))
-    positions = positions.value_in_unit(unit.nano * unit.meter)
+        openmm_simulation.context.getState(getPositions=True, enforcePeriodicBox=False).getPositions(asNumpy=True))
+    positions = positions.value_in_unit(nanometer)
     topology = openmm_simulation.topology
     assert topology.getNumChains() == 1
     assert topology.getNumResidues() == 1
     assert topology.getNumAtoms() == openmm_simulation.system.getNumParticles() == len(positions)
     assert len(list(topology.atoms())) == len(positions)
+    assert len(cell) == 3
+    assert cell[0][1].value_in_unit(nanometer) == 0.0
+    assert cell[0][2].value_in_unit(nanometer) == 0.0
+    assert cell[1][2].value_in_unit(nanometer) == 0.0
+    box = [cell[0][0].value_in_unit(nanometer),
+           cell[1][1].value_in_unit(nanometer),
+           cell[2][2].value_in_unit(nanometer),
+           cell[1][0] / cell[1][1],
+           cell[2][0] / cell[2][2],
+           cell[2][1] / cell[2][2]]
     with open(filename, "w") as file:
         print(openmm_simulation.system.getNumParticles(), file=file)
-        print("Atom positions:", file=file)
+        print(f"Lattice=\"{box[0]} 0.0 0.0 {box[3] * box[1]} {box[1]} 0.0 {box[4] * box[2]} {box[5] * box[2]} {box[2]}"
+              f"\" Properties=species:S:1:pos:R:3 Origin=\"{-box[0] / 2.0} {-box[1] / 2.0} {-box[2] / 2.0}\"",
+              file=file)
         for atom, position in zip(topology.atoms(), positions):
             assert len(position) == 3
             print(f"{atom.name} {position[0]} {position[1]} {position[2]}", file=file)
@@ -112,7 +123,6 @@ def main() -> None:
     radius_negative = 95.0 * (unit.nano * unit.meter)
     mass_positive = 1.0 * unit.amu
     mass_negative = (radius_negative / radius_positive) ** 3 * mass_positive
-    side_length = 12328.05 * (unit.nano * unit.meter)
     temperature = 298.0 * unit.kelvin
     # noinspection PyUnresolvedReferences
     collision_rate = 0.01 / (unit.pico * unit.second)
@@ -142,7 +152,8 @@ def main() -> None:
 
     write_gsd_file("tests/first_frame.gsd", simulation,
                    {"P": radius_positive, "N": radius_negative},
-                   {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
+                   {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)},
+                   cell * (unit.nano * unit.meter))
 
 
 if __name__ == '__main__':

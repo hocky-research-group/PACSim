@@ -129,6 +129,7 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         system.addForce(force)
 
     if parameters.use_gravity:
+        assert parameters.wall_directions[2]
         gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density,
                                           parameters.particle_density)
         for i, t in enumerate(types):

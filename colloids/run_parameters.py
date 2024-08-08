@@ -427,6 +427,8 @@ class RunParameters(Parameters):
                 raise TypeError("The particle density must have a unit compatible with grams per centimeter cubed.")
             if self.particle_density <= 0.0 * (unit.gram / (unit.centi * unit.meter)**3):
                 raise ValueError("The particle density must be greater than zero.")
+            if not self.wall_directions[2]:
+                raise ValueError("Gravity can only be turned on if the walls in the z-direction are active.")
         else:
             if self.gravitational_acceleration is not None:
                 raise ValueError("Gravitational acceleration must not be specified if gravity is not on.")

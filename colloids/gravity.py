@@ -64,8 +64,7 @@ class Gravity(OpenMMPotentialAbstract):
 
     def _set_up_gravitational_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the gravitational potential."""
-
-        gravitational_potential = CustomExternalForce("(gravitational_acceleration * particle_mass * z)")
+        gravitational_potential = CustomExternalForce("gravitational_acceleration * particle_mass * z")
 
         gravitational_potential.addGlobalParameter(
             "gravitational_acceleration",

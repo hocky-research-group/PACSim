@@ -27,9 +27,7 @@ class UpdateReporter(object):
     :type final_update_step: int
     :param global_parameter_name:
         The name of the global parameter to be updated.
-        This must be one of the parameters passed into the simulation context.
-        The string must be formatted such that it begins with the '-' character followed by the name of the parameter 
-        exactly as passed into the openmm Force object. 
+        This must be one of the global parameters passed into any of the OpenMM Force objects.
     :type global_parameter_name: str
     :param end_value:
         The end value of the variant parameter.
@@ -50,7 +48,6 @@ class UpdateReporter(object):
         If the filename does not end with the .csv extension.
         If the update_interval is not greater than zero.
         If the final_update_step is not greater than or equal to the update_interval.
-        If the global_parameter_name does not start with the '-' character.
         If the global_parameter_name is not in the simulation context.
         If the unit of the end_value is not compatible with the unit of the global parameter.
     """
@@ -64,11 +61,9 @@ class UpdateReporter(object):
             raise ValueError("The update frequency must be greater than zero.")
         if not final_update_step >= update_interval:
             raise ValueError("The final update step must be greater than or equal to the update frequency.")
-        if not global_parameter_name.startswith("-"):
-            raise ValueError("The variant parameter string is improperly formatted. Must begin with the '-' character.")
         self._update_interval = update_interval
         self._final_update_step = final_update_step
-        self._global_parameter_name = global_parameter_name.split("-")[1]
+        self._global_parameter_name = global_parameter_name
         if self._global_parameter_name not in simulation.context.getParameters():
             raise ValueError("The variant parameter is not in the simulation context.")
         self._start_value = simulation.context.getParameters()[self._global_parameter_name]

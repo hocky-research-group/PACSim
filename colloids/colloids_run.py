@@ -180,7 +180,6 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
 
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
                      total_number_steps: int, cell: npt.NDArray[float]) -> None:
-    
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
                                             parameters.radii, parameters.surface_potentials, simulation,
                                             append_file=append_file,

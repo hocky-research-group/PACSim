@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "colloids"
 readme = "README.md"
-requires-python = "~=3.10"
+requires-python = ">=3.10"
 version = "0.0.1"
 dependencies = [
     "jupyterlab >= 4.1",

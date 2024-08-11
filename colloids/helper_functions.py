@@ -39,7 +39,6 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict
     # See https://stackoverflow.com/questions/1653970/does-python-have-an-ordered-set
     # Works since Python 3.7.
     types_set = list(dict.fromkeys(atom.name for atom in topology.atoms()))
-    assert len(types_set) == 2
     types = list(types_set)
     assert all(t in radius_dict for t in types)
     frame.particles.types = types

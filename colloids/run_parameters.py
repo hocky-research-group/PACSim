@@ -29,7 +29,8 @@ class RunParameters(Parameters):
     :param masses:
         The masses of the different types of colloidal particles that appear in the initial configuration file.
         The keys of the dictionary are the types of the colloidal particles and the values are the masses.
-        The unit of the masses must be compatible with atomic mass units and the values must be greater than zero.
+        The unit of the masses must be compatible with atomic mass units and the values must be greater than zero,
+        except for immobile particles (as the substrate), which should have a mass of zero.
         Defaults to {"P": 1.0 * unit.amu, "N": (95.0 / 105.0) ** 3 * unit.amu}.
     :type masses: dict[str, unit.Quantity]
     :param radii:
@@ -227,6 +228,19 @@ class RunParameters(Parameters):
         and an append_file boolean that should not appear in this dictionary.
         Defaults to None.
     :type update_reporter_parameters: Optional[dict[str, Any]]
+    :param use_substrate:
+        A boolean indicating whether to use a substrate at the bottom of the simulation box.
+        A substrate can only be used when all walls are active. The bottom wall is then replaced by the substrate.
+        If True, the substrate radius and the substrate potential depth must be specified.
+        A substrate can only be used with the algebraic colloid potentials (use_tabulated=False).
+        Defaults to False.
+    :type use_substrate: bool
+    :param substrate_type:
+        The type of the substrate that is used at the bottom of the simulation box.
+        If a substrate is used, the substrate type must not be None and it must appear in the radii, masses, and
+        surface_potentials dictionaries.
+        Defaults to None.
+    :type substrate_type: Optional[str]
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -281,6 +295,8 @@ class RunParameters(Parameters):
     particle_density: Optional[unit.Quantity] = None
     use_update_reporter: bool = False
     update_reporter_parameters: Optional[dict[str, Any]] = None
+    use_substrate: bool = False
+    substrate_type: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -289,8 +305,10 @@ class RunParameters(Parameters):
         for t in self.masses:
             if not self.masses[t].unit.is_compatible(unit.amu):
                 raise TypeError(f"Mass of type {t} must have a unit compatible with atomic mass units.")
-            if self.masses[t] <= 0.0 * unit.amu:
+            if self.masses[t] < 0.0 * unit.amu:
                 raise ValueError(f"Mass of type {t} must be greater than zero.")
+            if t != self.substrate_type and self.masses[t] == 0.0 * unit.amu:
+                raise ValueError(f"Mass of type {t} must be greater than zero unless it is the substrate.")
             if t not in self.radii:
                 raise ValueError(f"Type {t} of the masses dictionary is not in radii dictionary.")
             if t not in self.surface_potentials:
@@ -445,6 +463,24 @@ class RunParameters(Parameters):
         else:
             if self.update_reporter_parameters is not None:
                 raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")
+        if self.use_substrate:
+            if not all(self.wall_directions):
+                raise ValueError("A substrate can only be used if all walls are active.")
+            if self.substrate_type is None:
+                raise ValueError("The substrate type must be specified if a substrate is used.")
+            if self.substrate_type not in self.radii:
+                raise ValueError("The substrate type must be in the radii dictionary.")
+            if self.substrate_type not in self.masses:
+                raise ValueError("The substrate type must be in the masses dictionary.")
+            if self.substrate_type not in self.surface_potentials:
+                raise ValueError("The substrate type must be in the surface potentials dictionary.")
+            if self.masses[self.substrate_type] != 0.0 * unit.amu:
+                warnings.warn("The mass of the substrate type is not zero. Substrate will move during the simulation.")
+            if self.use_tabulated:
+                raise ValueError("A substrate can only be used with the algebraic colloid potentials.")
+        else:
+            if self.substrate_type is not None:
+                raise ValueError("The substrate type must not be specified if a substrate is not used.")
 
     def check_types_of_initial_configuration(self):
         """
@@ -465,13 +501,13 @@ class RunParameters(Parameters):
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
         for t in self.masses:
-            if t not in types:
+            if t != self.substrate_type and t not in types:
                 raise ValueError(f"Type {t} of the masses dictionary is not in the initial configuration.")
         for t in self.radii:
-            if t not in types:
+            if t != self.substrate_type and t not in types:
                 raise ValueError(f"Type {t} of the radii dictionary is not in the initial configuration.")
         for t in self.surface_potentials:
-            if t not in types:
+            if t != self.substrate_type and t not in types:
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in the initial configuration.")
 
 

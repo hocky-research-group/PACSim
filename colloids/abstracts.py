@@ -109,9 +109,13 @@ class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
         self._periodic_boundary_conditions = periodic_boundary_conditions
 
     @abstractmethod
-    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:
+    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity, substrate_flag: bool) -> None:
         """
         Add a colloid with a given radius and surface potential to the system.
+
+        If the substrate flag is True, the colloid is considered to be a substrate particle. Substrate particles should
+        not interact with each other. They should only interact with the other particles in the system. How this is
+        implemented is up to the inheriting class.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -127,6 +131,9 @@ class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
             The surface potential of the colloid.
             The unit of the surface_potential must be compatible with millivolts.
         :type surface_potential: unit.Quantity
+        :param substrate_flag:
+            Whether the colloid is a substrate particle.
+        :type substrate_flag: bool
 
         :raises TypeError:
             If the radius or surface_potential is not a Quantity with a proper unit.

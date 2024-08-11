@@ -43,6 +43,9 @@ masses:
   P: !Quantity
     unit: dalton
     value: 1.0
+  S: !Quantity
+    unit: dalton
+    value: 0.0
 minimize_energy_initially: false
 particle_density: !Quantity
   unit: gram/(centimeter**3)
@@ -58,9 +61,13 @@ radii:
   P: !Quantity
     unit: nanometer
     value: 105.0
+  S: !Quantity
+    unit: nanometer
+    value: 30.0
 run_steps: 50
 state_data_filename: test_run_and_resume/state_data_resume.csv
 state_data_interval: 10
+substrate_type: S
 surface_potentials:
   N: !Quantity
     unit: millivolt
@@ -68,6 +75,9 @@ surface_potentials:
   P: !Quantity
     unit: millivolt
     value: 44.0
+  S: !Quantity
+    unit: millivolt
+    value: -47.94502672295134  # Tuned with colloids-tune so that potential depth is at -3 k_B T.
 trajectory_filename: test_run_and_resume/trajectory_resume.gsd
 trajectory_interval: 10
 update_reporter_parameters:
@@ -83,6 +93,7 @@ update_reporter_parameters:
 use_depletion: true
 use_gravity: true
 use_log: false
+use_substrate: true
 use_update_reporter: true
 use_tabulated: false
 velocity_seed: 2

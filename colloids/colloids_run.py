@@ -1,5 +1,6 @@
 import argparse
 import inspect
+import numpy as np
 import numpy.typing as npt
 import openmm
 from openmm import app
@@ -10,6 +11,7 @@ from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
 import colloids.integrators as integrators
 from colloids.run_parameters import RunParameters
+from colloids.substrate import substrate_positions_hexagonal
 from colloids.status_reporter import StatusReporter
 from colloids.update_reporter import UpdateReporter
 
@@ -114,28 +116,47 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     for t in types:
         system.addParticle(parameters.masses[t])
         colloid_potentials.add_particle(radius=parameters.radii[t],
-                                        surface_potential=parameters.surface_potentials[t])
+                                        surface_potential=parameters.surface_potentials[t],
+                                        substrate_flag=False)
+
+    if parameters.use_substrate:
+        assert all_walls
+        substrate_positions = substrate_positions_hexagonal(parameters.radii[parameters.substrate_type], cell)
+        for _ in substrate_positions:
+            # Setting the mass to zero tells the integrator that the particle is immobile.
+            # See http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.System.html.
+            topology.addAtom(parameters.substrate_type, None, residue)
+            system.addParticle(parameters.masses[parameters.substrate_type])
+            colloid_potentials.add_particle(radius=parameters.radii[parameters.substrate_type],
+                                            surface_potential=parameters.surface_potentials[parameters.substrate_type],
+                                            substrate_flag=True)
+    else:
+        substrate_positions = np.array([])
+
+    for force in colloid_potentials.yield_potentials():
+        system.addForce(force)
 
     if include_walls:
         slj_walls = ShiftedLennardJonesWalls(wall_distances, parameters.epsilon, parameters.alpha,
-                                             parameters.wall_directions)
+                                             parameters.wall_directions, parameters.use_substrate)
+        # No need to potentially add the substrate particles to the wall potentials as they are immobile.
         for i, t in enumerate(types):
             # noinspection PyTypeChecker
             slj_walls.add_particle(index=i, radius=parameters.radii[t])
         for force in slj_walls.yield_potentials():
             system.addForce(force)
 
-    for force in colloid_potentials.yield_potentials():
-        system.addForce(force)
-
     if parameters.use_depletion:
         depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,
                                                  brush_length=parameters.brush_length,
                                                  temperature=parameters.potential_temperature,
                                                  periodic_boundary_conditions=not all_walls)
+        # Be careful to add the particles in the same order as to the system.
         for i, t in enumerate(types):
             # noinspection PyTypeChecker
-            depletion_potential.add_particle(radius=parameters.radii[t])
+            depletion_potential.add_particle(radius=parameters.radii[t], substrate_flag=False)
+        for _ in substrate_positions:
+            depletion_potential.add_particle(radius=parameters.radii[parameters.substrate_type], substrate_flag=True)
         for force in depletion_potential.yield_potentials():
             system.addForce(force)
 
@@ -143,6 +164,7 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         assert all_walls
         gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density,
                                           parameters.particle_density)
+        # No need to potentially add the substrate particles to the gravitational potential as they are immobile.
         for i, t in enumerate(types):
             # noinspection PyTypeChecker
             gravitational_potential.add_particle(index=i, radius=parameters.radii[t])
@@ -177,7 +199,7 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     else:
         simulation = app.Simulation(topology, system, integrator, platform)
 
-    return simulation
+    return simulation, substrate_positions
 
 
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
@@ -219,9 +241,10 @@ def main():
 
     types, positions, cell = read_xyz_file(parameters.initial_configuration)
 
-    simulation = set_up_simulation(parameters, types, cell)
+    simulation, extra_positions = set_up_simulation(parameters, types, cell)
 
-    simulation.context.setPositions(positions)
+    simulation.context.setPositions(np.concatenate((positions, extra_positions)) if len(extra_positions) > 0
+                                    else positions)
     if parameters.velocity_seed is not None:
         simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
                                                       parameters.velocity_seed)

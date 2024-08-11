@@ -46,6 +46,11 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         A list of three booleans indicating whether the walls in the x, y, and z directions are active.
         Defaults to [False, False, False].
     :type wall_directions: list[bool]
+    :param use_substrate:
+        A boolean indicating whether the bottom wall is replaced by a substrate.
+        This is only possible if all wall directions are active.
+        Defaults to False.
+    :type use_substrate: bool
 
     :raises TypeError:
         If epsilon or any wall distance for an active wall direction is not a Quantity with a proper unit.
@@ -58,12 +63,13 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         If not exactly three wall distances are specified.
         If a wall distance is specified for an inactive wall direction.
         If a wall distance is not specified for an active wall direction.
+        If not all wall directions are active if a substrate is used.
     """
 
     _nanometer = unit.nano * unit.meter
 
     def __init__(self, wall_distances: Sequence[Optional[unit.Quantity]], epsilon: unit.Quantity, alpha: float,
-                 wall_directions: Sequence[bool] = (True, True, True)) -> None:
+                 wall_directions: Sequence[bool] = (True, True, True), use_substrate: bool = False) -> None:
         """Constructor of the ShiftedLennardJonesWalls class."""
         super().__init__()
 
@@ -92,11 +98,15 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             raise ValueError("argument alpha must satisfy 0 <= alpha <= 1")
         if alpha != 1.0:
             warnings.warn("The force of the shifted Lennard-Jones potential as a wall is only continuous if alpha = 1.")
+        if use_substrate:
+            if not all(wall_directions):
+                raise ValueError("all wall directions must be active if a substrate is used")
 
         self._wall_distances = wall_distances
         self._epsilon = epsilon
         self._alpha = alpha
         self._wall_directions = wall_directions
+        self._use_substrate = use_substrate
         self._slj_potential = self._set_up_slj_potential()
 
     def _set_up_slj_potential(self) -> CustomExternalForce:
@@ -123,6 +133,10 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             slj_x = slj_x.replace("periodicdistance(x, 0, 0, 0, 0, 0)", "abs(x)")
             slj_y = slj_y.replace("periodicdistance(0, y, 0, 0, 0, 0)", "abs(y)")
             slj_z = slj_z.replace("periodicdistance(0, 0, z, 0, 0, 0)", "abs(z)")
+            if self._use_substrate:
+                # Only the bottom wall is replaced by a substrate.
+                # The top wall is still a shifted Lennard-Jones wall.
+                slj_z = slj_z.replace("abs(z)", "z")
 
         slj_string = "+".join(slj for slj, wdir in zip([slj_x, slj_y, slj_z], self._wall_directions) if wdir)
         assert slj_string

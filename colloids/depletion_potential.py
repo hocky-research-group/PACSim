@@ -71,10 +71,11 @@ class DepletionPotential(OpenMMPotentialAbstract):
         """Set up the basic functional form of the Asakura-Oosawa depletion potential for a solution of binary colloidal 
         particles in a background of non-adsorbing polymers."""
         depletion_potential = CustomNonbondedForce(
+            "select(flag1 * flag2, 0, "
             "step(depletion_q1 + depletion_q2 + 2 - n) * "
             "depletion_prefactor * (depletion_q1 + depletion_q2 + 2 - n)^2 "
             "* (n + 2 * (depletion_q1 + depletion_q2 + 2) "
-            "- 3.0 / n * (depletion_q1^2 + depletion_q2^2 - 2.0 * depletion_q1 * depletion_q2));"
+            "- 3.0 / n * (depletion_q1^2 + depletion_q2^2 - 2.0 * depletion_q1 * depletion_q2)));"
             "n = r / depletant_radius;"
         )
         depletion_potential.addGlobalParameter(
@@ -84,11 +85,17 @@ class DepletionPotential(OpenMMPotentialAbstract):
         depletion_potential.addGlobalParameter("depletant_radius",
                                                self._depletant_radius.value_in_unit(self._nanometer))
         depletion_potential.addPerParticleParameter("depletion_q")
+        depletion_potential.addPerParticleParameter("flag")
         return depletion_potential
     
-    def add_particle(self, radius: unit.Quantity) -> None:
+    def add_particle(self, radius: unit.Quantity, substrate_flag: bool) -> None:
         """
         Add a colloid with a given radius to the system.
+
+        If the substrate flag is True, the colloid is considered to be a substrate particle. Substrate particles do
+        not interact with each other. In this class, this is achieved by setting the flag per-particle parameter to 1
+        for substrate particles and to 0 for non-substrate particles. This flag is used in the algebraic expression of
+        the steric and electrostatic potentials. Interaction groups would also work but are considerably slower.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -96,6 +103,9 @@ class DepletionPotential(OpenMMPotentialAbstract):
             The radius of the colloid.
             The unit of the radius must be compatible with nanometers and the value must be greater than zero.
         :type radius: unit.Quantity
+        :param substrate_flag:
+            Whether the colloid is a substrate particle.
+        :type substrate_flag: bool
 
         :raises TypeError:
             If the radius is not a Quantity with a proper unit.
@@ -111,7 +121,8 @@ class DepletionPotential(OpenMMPotentialAbstract):
             raise ValueError("argument radius must have a value greater than zero")
         if radius.in_units_of(self._nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(self._nanometer)
-        self._depletion_potential.addParticle([(radius + self._brush_length) / self._depletant_radius])
+        self._depletion_potential.addParticle([(radius + self._brush_length) / self._depletant_radius,
+                                               int(substrate_flag)])
 
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """
@@ -140,33 +151,3 @@ class DepletionPotential(OpenMMPotentialAbstract):
         self._depletion_potential.setUseSwitchingFunction(False)
 
         yield self._depletion_potential
-
-    def add_interaction_group(self, group_one: set[int], group_two: set[int]) -> None:
-        """
-        Add an OpenMM interaction group to the OpenMM forces handled by this class.
-
-        One can add as many interaction groups as one wants. If a particle appears in two different interaction groups,
-        it won't interact with itself. If a particle pair appears in two different interaction groups, its interaction
-        will be computed twice. If one does not add any interaction groups to an OpenMM force, it operates in the
-        default mode where every particle interacts with every other particle.
-
-        This method has to be called after the method add_particle was called for every particle in the system. It has
-        to be called before the method yield_potentials is used.
-
-        :param group_one:
-            The indices of the particles in the first group.
-        :type group_one: set[int]
-        :param group_two:
-            The indices of the particles in the second group.
-        :type group_two: set[int]
-
-        :raises RuntimeError:
-            If the method add_particle was not called for every particle in the system before this method.
-            If the method yield_potentials was called before this method.
-        """
-        if not self._add_particle_called:
-            raise RuntimeError("method add_particle must be called for every particle in the system before the method "
-                               "add_interaction_group is used")
-        if self._yield_potentials_called:
-            raise RuntimeError("method add_interaction_group must be called before the method yield_potentials is used")
-        self._depletion_potential.addInteractionGroup(group_one, group_two)

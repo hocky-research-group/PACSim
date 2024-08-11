@@ -241,9 +241,13 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
         return potential_11, potential_22, potential_12
 
-    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:
+    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity, substrate_flag: bool) -> None:
         """
         Add a colloid with a given radius and surface potential to the system.
+
+        If the substrate flag is True, the colloid is considered to be a substrate particle. Substrate particles do
+        not interact with each other. Since this class does not support substrate particles anyway (since this would
+        require more than two types of colloids), the substrate flag should always be false.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -255,6 +259,9 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
             The surface potential of the colloid.
             The unit of the surface_potential must be compatible with millivolts.
         :type surface_potential: unit.Quantity
+        :param substrate_flag:
+            Whether the colloid is a substrate particle.
+        :type substrate_flag: bool
 
         :raises TypeError:
             If the radius or surface_potential is not a Quantity with a proper unit (via the abstract base class).
@@ -268,8 +275,10 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         :raises ValueError:
             If the given surface potential is not compatible with the surface potential of the first or the second
             colloid that was specified during the initialization of this class.
+        :raises ValueError:
+            If the substrate flag is True.
         """
-        super().add_particle(radius, surface_potential)
+        super().add_particle(radius, surface_potential, substrate_flag)
 
         if surface_potential == self._surface_potential_one:
             if not radius == self._radius_one:
@@ -289,6 +298,8 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
             raise ValueError(
                 "the given surface potential must be the same as the surface potential of the first or the second "
                 "colloid that was specified during the initialization of this class")
+        if substrate_flag:
+            raise ValueError("this class does not support substrate particles")
         self._potential_11.addParticle([])
         self._potential_22.addParticle([])
         self._potential_12.addParticle([])
@@ -315,35 +326,6 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         yield self._potential_11
         yield self._potential_22
         yield self._potential_12
-
-    def add_interaction_group(self, group_one: set[int], group_two: set[int]) -> None:
-        """
-        Add an OpenMM interaction group to the OpenMM forces handled by this class.
-
-        One can add as many interaction groups as one wants. If a particle appears in two different interaction groups,
-        it won't interact with itself. If a particle pair appears in two different interaction groups, its interaction
-        will be computed twice. If one does not add any interaction groups to an OpenMM force, it operates in the
-        default mode where every particle interacts with every other particle.
-
-        This method has to be called after the method add_particle was called for every particle in the system. It has
-        to be called before the method yield_potentials is used.
-
-        :param group_one:
-            The indices of the particles in the first group.
-        :type group_one: set[int]
-        :param group_two:
-            The indices of the particles in the second group.
-        :type group_two: set[int]
-
-        :raises RuntimeError:
-            If the method add_particle was not called for every particle in the system before this method (via the
-            abstract base class).
-            If the method yield_potentials was called before this method (via the abstract base class).
-        """
-        super().add_interaction_group(group_one, group_two)
-        self._potential_11.addInteractionGroup(group_one, group_two)
-        self._potential_22.addInteractionGroup(group_one, group_two)
-        self._potential_12.addInteractionGroup(group_one, group_two)
 
 
 if __name__ == '__main__':

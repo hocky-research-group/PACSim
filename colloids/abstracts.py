@@ -109,9 +109,13 @@ class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
         self._periodic_boundary_conditions = periodic_boundary_conditions
 
     @abstractmethod
-    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:
+    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity, substrate_flag: bool) -> None:
         """
         Add a colloid with a given radius and surface potential to the system.
+
+        If the substrate flag is True, the colloid is considered to be a substrate particle. Substrate particles should
+        not interact with each other. They should only interact with the other particles in the system. How this is
+        implemented is up to the inheriting class.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -127,6 +131,9 @@ class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
             The surface potential of the colloid.
             The unit of the surface_potential must be compatible with millivolts.
         :type surface_potential: unit.Quantity
+        :param substrate_flag:
+            Whether the colloid is a substrate particle.
+        :type substrate_flag: bool
 
         :raises TypeError:
             If the radius or surface_potential is not a Quantity with a proper unit.
@@ -142,38 +149,6 @@ class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
             raise ValueError("argument radius must have a value greater than zero")
         if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts")
-
-    @abstractmethod
-    def add_interaction_group(self, group_one: set[int], group_two: set[int]) -> None:
-        """
-        Add an OpenMM interaction group to the OpenMM forces handled by this class.
-
-        One can add as many interaction groups as one wants. If a particle appears in two different interaction groups,
-        it won't interact with itself. If a particle pair appears in two different interaction groups, its interaction
-        will be computed twice. If one does not add any interaction groups to an OpenMM force, it operates in the
-        default mode where every particle interacts with every other particle.
-
-        This method has to be called after the method add_particle was called for every particle in the system. It has
-        to be called before the method yield_potentials is used. Note that the overriding method in the inheriting class
-        should call this method first because it checks that the method add_particle was called before and that the
-        method yield_potentials was not called before.
-
-        :param group_one:
-            The indices of the particles in the first group.
-        :type group_one: set[int]
-        :param group_two:
-            The indices of the particles in the second group.
-        :type group_two: set[int]
-
-        :raises RuntimeError:
-            If the method add_particle was not called for every particle in the system before this method.
-            If the method yield_potentials was called before this method.
-        """
-        if not self._add_particle_called:
-            raise RuntimeError("method add_particle must be called for every particle in the system before the method "
-                               "add_interaction_group is used")
-        if self._yield_potentials_called:
-            raise RuntimeError("method add_interaction_group must be called before the method yield_potentials is used")
 
 
 @dataclass(order=True, frozen=True)

@@ -116,7 +116,8 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
     for t in types:
         system.addParticle(parameters.masses[t])
         colloid_potentials.add_particle(radius=parameters.radii[t],
-                                        surface_potential=parameters.surface_potentials[t])
+                                        surface_potential=parameters.surface_potentials[t],
+                                        substrate_flag=False)
 
     if parameters.use_substrate:
         assert all_walls
@@ -127,9 +128,8 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
             topology.addAtom(parameters.substrate_type, None, residue)
             system.addParticle(parameters.masses[parameters.substrate_type])
             colloid_potentials.add_particle(radius=parameters.radii[parameters.substrate_type],
-                                            surface_potential=parameters.surface_potentials[parameters.substrate_type])
-        colloid_potentials.add_interaction_group(set(i for i in range(len(types))),
-                                                 set(i for i in range(len(types) + len(substrate_positions))))
+                                            surface_potential=parameters.surface_potentials[parameters.substrate_type],
+                                            substrate_flag=True)
     else:
         substrate_positions = np.array([])
 
@@ -154,11 +154,9 @@ def set_up_simulation(parameters: RunParameters, types: npt.NDArray[str],
         # Be careful to add the particles in the same order as to the system.
         for i, t in enumerate(types):
             # noinspection PyTypeChecker
-            depletion_potential.add_particle(radius=parameters.radii[t])
+            depletion_potential.add_particle(radius=parameters.radii[t], substrate_flag=False)
         for _ in substrate_positions:
-            depletion_potential.add_particle(radius=parameters.radii[parameters.substrate_type])
-        depletion_potential.add_interaction_group(set(i for i in range(len(types))),
-                                                  set(i for i in range(len(types) + len(substrate_positions))))
+            depletion_potential.add_particle(radius=parameters.radii[parameters.substrate_type], substrate_flag=True)
         for force in depletion_potential.yield_potentials():
             system.addForce(force)
 

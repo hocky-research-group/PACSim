@@ -75,11 +75,12 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
     def set_up_steric_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""
         steric_potential = CustomNonbondedForce(
+            "select(flag1 * flag2, 0, "
             "step(two_l - h) * "
             "steric_prefactor * rs / 2.0 * brush_length * brush_length * ("
             "28.0 * ((two_l / h)^0.25 - 1.0) "
             "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
-            "+ 12.0 * (h / two_l - 1.0)); "
+            "+ 12.0 * (h / two_l - 1.0))); "
             "h = r - rs;"
             "rs = radius1 + radius2;"
             "two_l = 2.0 * brush_length"
@@ -95,20 +96,23 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         steric_potential.addGlobalParameter("brush_length",
                                             self._parameters.brush_length.value_in_unit(self._nanometer))
         steric_potential.addPerParticleParameter("radius")
+        steric_potential.addPerParticleParameter("flag")
         return steric_potential
 
     def set_up_electrostatic_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""
         if self._use_log:
             electrostatic_potential = CustomNonbondedForce(
+                "select(flag1 * flag2, 0, "
                 "electrostatic_prefactor * radius * psi1 * psi2 * log(1.0 + exp(-h / debye_length)); "
-                "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
+                "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2));"
                 "h = r - rs;"
                 "rs = radius1 + radius2"
             )
         else:
             electrostatic_potential = CustomNonbondedForce(
-                "electrostatic_prefactor * radius * psi1 * psi2 * exp(-h / debye_length); "
+                "select(flag1 * flag2, 0, "
+                "electrostatic_prefactor * radius * psi1 * psi2 * exp(-h / debye_length)); "
                 "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
                 "h = r - rs;"
                 "rs = radius1 + radius2"
@@ -124,11 +128,17 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         electrostatic_potential.addPerParticleParameter("radius")
         # Psi should be given in millivolts.
         electrostatic_potential.addPerParticleParameter("psi")
+        electrostatic_potential.addPerParticleParameter("flag")
         return electrostatic_potential
 
-    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:
+    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity, substrate_flag: bool) -> None:
         """
         Add a colloid with a given radius and surface potential to the system.
+
+        If the substrate flag is True, the colloid is considered to be a substrate particle. Substrate particles do
+        not interact with each other. In this class, this is achieved by setting the flag per-particle parameter to 1
+        for substrate particles and to 0 for non-substrate particles. This flag is used in the algebraic expression of
+        the steric and electrostatic potentials. Interaction groups would also work but are considerably slower.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -140,6 +150,9 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             The surface potential of the colloid.
             The unit of the surface_potential must be compatible with millivolts.
         :type surface_potential: unit.Quantity
+        :param substrate_flag:
+            If True, the colloid is considered to be a substrate particle.
+        :type substrate_flag: bool
 
         :raises TypeError:
             If the radius or surface_potential is not a Quantity with a proper unit (via the abstract base class).
@@ -148,14 +161,15 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         :raises RuntimeError:
             If the method yield_potentials was called before this method (via the abstract base class).
         """
-        super().add_particle(radius, surface_potential)
+        super().add_particle(radius, surface_potential, substrate_flag)
 
         if radius.in_units_of(self._nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(self._nanometer)
 
-        self._steric_potential.addParticle([radius.value_in_unit(self._nanometer)])
+        self._steric_potential.addParticle([radius.value_in_unit(self._nanometer), int(substrate_flag)])
         self._electrostatic_potential.addParticle([radius.value_in_unit(self._nanometer),
-                                                   surface_potential.value_in_unit(self._millivolt)])
+                                                   surface_potential.value_in_unit(self._millivolt),
+                                                   int(substrate_flag)])
 
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """
@@ -198,34 +212,6 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
 
         yield self._steric_potential
         yield self._electrostatic_potential
-
-    def add_interaction_group(self, group_one: set[int], group_two: set[int]) -> None:
-        """
-        Add an OpenMM interaction group to the OpenMM forces handled by this class.
-
-        One can add as many interaction groups as one wants. If a particle appears in two different interaction groups,
-        it won't interact with itself. If a particle pair appears in two different interaction groups, its interaction
-        will be computed twice. If one does not add any interaction groups to an OpenMM force, it operates in the
-        default mode where every particle interacts with every other particle.
-
-        This method has to be called after the method add_particle was called for every particle in the system. It has
-        to be called before the method yield_potentials is used.
-
-        :param group_one:
-            The indices of the particles in the first group.
-        :type group_one: set[int]
-        :param group_two:
-            The indices of the particles in the second group.
-        :type group_two: set[int]
-
-        :raises RuntimeError:
-            If the method add_particle was not called for every particle in the system before this method (via the
-            abstract base class).
-            If the method yield_potentials was called before this method (via the abstract base class).
-        """
-        super().add_interaction_group(group_one, group_two)
-        self._steric_potential.addInteractionGroup(group_one, group_two)
-        self._electrostatic_potential.addInteractionGroup(group_one, group_two)
 
 
 if __name__ == '__main__':

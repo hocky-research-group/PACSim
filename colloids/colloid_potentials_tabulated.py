@@ -316,37 +316,32 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         yield self._potential_22
         yield self._potential_12
 
-    def tune_surface_potential(self, positive_radius: unit.Quantity, positive_surface_potential: unit.Quantity,
-                               negative_radius: unit.Quantity, potential_depth: unit.Quantity) -> unit.Quantity:
+    def tune_surface_potential(self, other_radius: unit.Quantity, other_surface_potential: unit.Quantity,
+                               tuned_radius: unit.Quantity, tuned_potential_depth: unit.Quantity) -> unit.Quantity:
         """
-        Tune the negative surface potential of a colloid with a given radius so that the potential depth of the
-        combined steric and electrostatic potentials with another positively charged colloid is equal to the given
-        potential depth.
+        Tune the surface potential of a colloid with a given radius so that the potential depth of the combined steric
+        and electrostatic potentials with another colloid is equal to the given potential depth.
 
-        This method is not implemented for this class.
-
-        :param positive_radius:
-            The radius of the positively charged colloid.
+        :param other_radius:
+            The radius of the other colloid.
             The unit of the radius must be compatible with nanometers and the value must be greater than zero.
-        :type positive_radius: unit.Quantity
-        :param positive_surface_potential:
-            The surface potential of the positively charged colloid.
-            The unit of the surface_potential must be compatible with millivolts and the value must be greater than
-            zero.
-        :type positive_surface_potential: unit.Quantity
-        :param negative_radius:
-            The radius of the negatively charged colloid.
+        :type other_radius: unit.Quantity
+        :param other_surface_potential:
+            The surface potential of the other colloid.
+            The unit of the surface_potential must be compatible with millivolts.
+        :type other_surface_potential: unit.Quantity
+        :param tuned_radius:
+            The radius of the colloid whose surface potential will be tuned.
             The unit of the radius must be compatible with nanometers and the value must be greater than zero.
-        :type negative_radius: unit.Quantity
-        :param potential_depth:
-            The desired potential depth of the combined steric and electrostatic potential with the positively charged
-            colloid.
+        :type tuned_radius: unit.Quantity
+        :param tuned_potential_depth:
+            The desired potential depth of the combined steric and electrostatic potential with the other colloid.
             The unit of the potential_depth must be compatible with kilojoules per mole and the value must be smaller
             than zero.
-        :type potential_depth: unit.Quantity
+        :type tuned_potential_depth: unit.Quantity
 
         :return:
-            The negative surface potential of the negatively charged colloid in millivolts.
+            The tuned surface potential of the colloid in millivolts.
         :rtype: unit.Quantity
 
         :raises NotImplementedError:

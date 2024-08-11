@@ -295,7 +295,7 @@ class RunParameters(Parameters):
     particle_density: Optional[unit.Quantity] = None
     use_update_reporter: bool = False
     update_reporter_parameters: Optional[dict[str, Any]] = None
-    use_substrate: bool = True
+    use_substrate: bool = False
     substrate_type: Optional[str] = None
 
     def __post_init__(self) -> None:

@@ -55,6 +55,7 @@ radii:
 run_steps: 100000
 state_data_filename: state_data.csv
 state_data_interval: 1000
+substrate_type: null
 surface_potentials:
   N: !Quantity
     unit: millivolt
@@ -68,6 +69,7 @@ update_reporter_parameters: null
 use_depletion: true
 use_gravity: false
 use_log: false
+use_substrate: false
 use_tabulated: false
 use_update_reporter: false
 velocity_seed: null

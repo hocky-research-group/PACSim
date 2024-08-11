@@ -18,7 +18,7 @@ depletion_phi: 0.5
 dielectric_constant: 80.0
 epsilon: !Quantity
     unit: kilojoule/mole
-    value: 2.477709860209665
+    value: 2.477709860209665  # 1 k_B T
 final_configuration_gsd_filename: test_run_and_resume/final_frame.gsd
 final_configuration_xyz_filename: test_run_and_resume/final_frame.xyz
 gravitational_acceleration: !Quantity
@@ -43,6 +43,9 @@ masses:
   P: !Quantity
     unit: dalton
     value: 1.0
+  S: !Quantity
+    unit: dalton
+    value: 0.0
 minimize_energy_initially: false
 particle_density: !Quantity
   unit: gram/(centimeter**3)
@@ -55,9 +58,13 @@ radii:
   P: !Quantity
     unit: nanometer
     value: 105.0
+  S: !Quantity
+    unit: nanometer
+    value: 30.0
 run_steps: 100
 state_data_filename: test_run_and_resume/state_data.csv
 state_data_interval: 10
+substrate_type: S
 surface_potentials:
   N: !Quantity
     unit: millivolt
@@ -65,6 +72,9 @@ surface_potentials:
   P: !Quantity
     unit: millivolt
     value: 44.0
+  S: !Quantity
+    unit: millivolt
+    value: -47.94502672295134  # Tuned with colloids-tune so that potential depth is at -3 k_B T.
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0
@@ -84,6 +94,7 @@ update_reporter_parameters:
 use_depletion: true
 use_gravity: true
 use_log: false
+use_substrate: true
 use_update_reporter: true
 use_tabulated: false
 velocity_seed: 2

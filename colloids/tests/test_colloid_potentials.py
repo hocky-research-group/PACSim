@@ -634,5 +634,103 @@ class TestColloidPotentialsWithLogForFourParticles(TestParameters):
                 == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
 
 
+class TestTuneSurfacePotential(TestParameters):
+    @pytest.fixture
+    def positive_tune_radius(self):
+        return 85.0 * (unit.nano * unit.meter)
+
+    @pytest.fixture
+    def negative_tune_radius(self):
+        return 30.0 * (unit.nano * unit.meter)
+
+    @pytest.fixture
+    def positive_tune_surface_potential(self):
+        return 50.0 * (unit.milli * unit.volt)
+
+    @pytest.fixture
+    def tune_potential_depth(self):
+        return -3.0 * 298.0 * unit.kelvin * unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA
+
+    @pytest.fixture(params=["algebraic", "algebraic_log"])
+    def tune_algebraic_colloid_potentials(self, colloid_potentials_algebraic, colloid_potentials_algebraic_log,
+                                          request):
+        if request.param == "algebraic":
+            return colloid_potentials_algebraic
+        else:
+            return colloid_potentials_algebraic_log
+
+    @pytest.fixture(params=["tabulated", "tabulated_log"])
+    def tune_tabulated_colloid_potentials(self, colloid_potentials_tabulated, colloid_potentials_tabulated_log,
+                                            request):
+        if request.param == "tabulated":
+            return colloid_potentials_tabulated
+        else:
+            return colloid_potentials_tabulated_log
+
+    def test_tune_surface_potential_exceptions_algebraic(self, tune_algebraic_colloid_potentials,
+                                                         positive_tune_radius, negative_tune_radius,
+                                                         positive_tune_surface_potential, tune_potential_depth):
+        # Test exception on radius with wrong unit.
+        with pytest.raises(TypeError):
+            tune_algebraic_colloid_potentials.tune_surface_potential(
+                positive_tune_radius * (unit.nano * unit.meter), positive_tune_surface_potential, negative_tune_radius,
+                tune_potential_depth)
+        with pytest.raises(TypeError):
+            tune_algebraic_colloid_potentials.tune_surface_potential(
+                positive_tune_radius, positive_tune_surface_potential, negative_tune_radius * (unit.nano * unit.meter),
+                tune_potential_depth)
+        # Test exception on negative radius.
+        with pytest.raises(ValueError):
+            tune_algebraic_colloid_potentials.tune_surface_potential(
+                -positive_tune_radius, positive_tune_surface_potential, negative_tune_radius, tune_potential_depth)
+        with pytest.raises(ValueError):
+            tune_algebraic_colloid_potentials.tune_surface_potential(
+                positive_tune_radius, positive_tune_surface_potential, -negative_tune_radius, tune_potential_depth)
+        # Test exception on surface potential with wrong unit.
+        with pytest.raises(TypeError):
+            tune_algebraic_colloid_potentials.tune_surface_potential(
+                positive_tune_radius, positive_tune_surface_potential * (unit.milli * unit.volt), negative_tune_radius,
+                tune_potential_depth)
+        # Test exception on negative surface potential.
+        with pytest.raises(ValueError):
+            tune_algebraic_colloid_potentials.tune_surface_potential(
+                positive_tune_radius, -positive_tune_surface_potential, negative_tune_radius, tune_potential_depth)
+        # Test exception on potential depth with wrong unit.
+        with pytest.raises(TypeError):
+            tune_algebraic_colloid_potentials.tune_surface_potential(
+                positive_tune_radius, positive_tune_surface_potential, negative_tune_radius,
+                tune_potential_depth / unit.kelvin)
+        # Test exception on positive potential depth.
+        with pytest.raises(ValueError):
+            tune_algebraic_colloid_potentials.tune_surface_potential(
+                positive_tune_radius, positive_tune_surface_potential, negative_tune_radius, -tune_potential_depth)
+
+    def test_tune_surface_potential_exceptions_tabulated(self, tune_tabulated_colloid_potentials, positive_tune_radius,
+                                                         negative_tune_radius, positive_tune_surface_potential,
+                                                         tune_potential_depth):
+        with pytest.raises(RuntimeError):
+            tune_tabulated_colloid_potentials.tune_surface_potential(
+                positive_tune_radius, positive_tune_surface_potential, negative_tune_radius, tune_potential_depth)
+
+    def test_tune_surface_potential_algebraic(self, colloid_potentials_algebraic, positive_tune_radius,
+                                              negative_tune_radius, positive_tune_surface_potential,
+                                              tune_potential_depth):
+        result = colloid_potentials_algebraic.tune_surface_potential(
+            positive_tune_radius, positive_tune_surface_potential,
+            negative_tune_radius, tune_potential_depth)
+        # Tested with Mathematica, see test_colloid_potentials.nb.
+        assert result.value_in_unit(unit.milli * unit.volt) == pytest.approx(-57.55640041253047)
+
+    def test_tune_surface_potential_algebraic_log(self, colloid_potentials_algebraic_log, positive_tune_radius,
+                                                  negative_tune_radius, positive_tune_surface_potential,
+                                                  tune_potential_depth):
+        result = colloid_potentials_algebraic_log.tune_surface_potential(
+            positive_tune_radius, positive_tune_surface_potential,
+            negative_tune_radius, tune_potential_depth)
+        # Tested with Mathematica, see test_colloid_potentials.nb.
+        print(result)
+        assert result.value_in_unit(unit.milli * unit.volt) == pytest.approx(-58.23701709900136)
+
+
 if __name__ == '__main__':
     pytest.main([__file__])

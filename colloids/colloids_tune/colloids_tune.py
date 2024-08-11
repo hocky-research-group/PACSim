@@ -141,7 +141,7 @@ def tune_surface_potential(colloid_potentials: ColloidPotentialsAlgebraic, other
         plt.xlabel("Surface separation (nm)")
         plt.ylabel("Potential energy (kJ/mol)")
         plt.axhline(tuned_potential_depth.value_in_unit(unit.kilojoule_per_mole), color="black", linestyle="--")
-        plt.ylim(1.1 * tuned_potential_depth, 0.0)
+        plt.ylim(1.1 * tuned_potential_depth.value_in_unit(unit.kilojoule_per_mole), 0.0)
         plt.savefig(plot_filename)
         plt.close()
 
@@ -165,14 +165,23 @@ def main():
 
     parameters = RunParameters.from_yaml(args.simulation_parameters)
     tune_parameters = TuneParameters.from_yaml(args.tune_parameters)
-    if tune_parameters.other_colloid_type not in parameters.masses:
-        raise ValueError(f"The type of the other colloid {tune_parameters.other_colloid_type} is not present in the "
+    if tune_parameters.tuned_type not in parameters.masses:
+        raise ValueError(f"The type of the tuned colloid {tune_parameters.tuned_type} is not present in the "
                          "masses dictionary in the simulation parameters.")
-    if tune_parameters.other_colloid_type not in parameters.radii:
-        raise ValueError(f"The type of the other colloid {tune_parameters.other_colloid_type} is not present in the "
+    if tune_parameters.tuned_type not in parameters.radii:
+        raise ValueError(f"The type of the tuned colloid {tune_parameters.tuned_type} is not present in the "
                          "radii dictionary in the simulation parameters.")
-    if tune_parameters.other_colloid_type not in parameters.surface_potentials:
-        raise ValueError(f"The type of the other colloid {tune_parameters.other_colloid_type} is not present in the "
+    if tune_parameters.tuned_type not in parameters.surface_potentials:
+        raise ValueError(f"The type of the tuned colloid {tune_parameters.tuned_type} is not present in the "
+                         "surface_potentials dictionary in the simulation parameters.")
+    if tune_parameters.other_type not in parameters.masses:
+        raise ValueError(f"The type of the other colloid {tune_parameters.other_type} is not present in the "
+                         "masses dictionary in the simulation parameters.")
+    if tune_parameters.other_type not in parameters.radii:
+        raise ValueError(f"The type of the other colloid {tune_parameters.other_type} is not present in the "
+                         "radii dictionary in the simulation parameters.")
+    if tune_parameters.other_type not in parameters.surface_potentials:
+        raise ValueError(f"The type of the other colloid {tune_parameters.other_type} is not present in the "
                          "surface_potentials dictionary in the simulation parameters.")
 
     potentials_parameters = ColloidPotentialsParameters(
@@ -185,9 +194,9 @@ def main():
         cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=False)
 
     tuned_surface_potential = tune_surface_potential(colloid_potentials,
-                                                     parameters.radii[tune_parameters.other_colloid_type],
-                                                     parameters.surface_potentials[tune_parameters.other_colloid_type],
-                                                     tune_parameters.tuned_radius,
+                                                     parameters.radii[tune_parameters.other_type],
+                                                     parameters.surface_potentials[tune_parameters.other_type],
+                                                     parameters.radii[tune_parameters.tuned_type],
                                                      tune_parameters.tuned_potential_depth,
                                                      tune_parameters.plot_filename)
 

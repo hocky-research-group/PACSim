@@ -1,8 +1,6 @@
 plot_filename: tuned_potential_energy.pdf
-substrate_potential_depth: !Quantity
+tuned_potential_depth: !Quantity
     unit: kilojoule/mole
     value: -7.4331295806289965  # -3 k_B T
-substrate_radius: !Quantity
-  unit: nanometer
-  value: 30.0
-substrate_tuned_colloid_type: P
+tuned_type: S
+other_type: P

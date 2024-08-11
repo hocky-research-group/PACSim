@@ -184,9 +184,11 @@ class TestColloidPotentialsForTwoParticles(TestParameters):
     def add_two_particles(self, openmm_system, colloid_potentials, radius_one, radius_two, surface_potential_one,
                           surface_potential_two):
         openmm_system.addParticle(mass=1.0)
-        colloid_potentials.add_particle(radius=radius_one, surface_potential=surface_potential_one)
+        colloid_potentials.add_particle(radius=radius_one, surface_potential=surface_potential_one,
+                                        substrate_flag=False)
         openmm_system.addParticle(mass=1.0)
-        colloid_potentials.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        colloid_potentials.add_particle(radius=radius_two, surface_potential=surface_potential_two,
+                                        substrate_flag=False)
         for potential in colloid_potentials.yield_potentials():
             openmm_system.addForce(potential)
 
@@ -394,6 +396,157 @@ class TestColloidPotentialsWithLogForTwoParticles(TestParameters):
                 == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
 
 
+class TestColloidPotentialsAlgebraicForTwoSubstrateParticles(TestParameters):
+    @pytest.fixture(autouse=True, params=["algebraic", "algebraic_log"])
+    def add_two_substrate_particles(self, openmm_system, colloid_potentials_algebraic, colloid_potentials_algebraic_log,
+                                    radius_one, radius_two, surface_potential_one, surface_potential_two, request):
+        if request.param == "algebraic":
+            openmm_system.addParticle(mass=1.0)
+            colloid_potentials_algebraic.add_particle(radius=radius_one, surface_potential=surface_potential_one,
+                                                      substrate_flag=True)
+            openmm_system.addParticle(mass=1.0)
+            colloid_potentials_algebraic.add_particle(radius=radius_two, surface_potential=surface_potential_two,
+                                                      substrate_flag=True)
+            for potential in colloid_potentials_algebraic.yield_potentials():
+                openmm_system.addForce(potential)
+        else:
+            openmm_system.addParticle(mass=1.0)
+            colloid_potentials_algebraic_log.add_particle(radius=radius_one, surface_potential=surface_potential_one,
+                                                      substrate_flag=True)
+            openmm_system.addParticle(mass=1.0)
+            colloid_potentials_algebraic_log.add_particle(radius=radius_two, surface_potential=surface_potential_two,
+                                                      substrate_flag=True)
+            for potential in colloid_potentials_algebraic_log.yield_potentials():
+                openmm_system.addForce(potential)
+
+    # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
+    # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
+    @pytest.fixture
+    def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
+        return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
+
+    # The potential should always be zero between the substrate particles.
+    @pytest.mark.parametrize("surface_separation",
+                             [   # Test at h=0.
+                                 10.0 * (unit.nano * unit.meter),
+                                 # Test at h=2L.
+                                 20.0 * (unit.nano * unit.meter),
+                                 # Test slightly below h=2L.
+                                 (20.0 - 0.1) * (unit.nano * unit.meter),
+                                 # Test slightly above h=2L.
+                                 (20.0 + 0.1) * (unit.nano * unit.meter),
+                                 # Test at h=3L.
+                                 30.0 * (unit.nano * unit.meter),
+                                 # Test at h=20*debye_length.
+                                 100.0 * (unit.nano * unit.meter)
+                             ])
+    def test_potential(self, openmm_context, radius_one, radius_two, surface_separation):
+        openmm_context.setPositions([[radius_one + radius_two + surface_separation, 0.0, 0.0],
+                                     [0.0, 0.0, 0.0]])
+        openmm_state = openmm_context.getState(getEnergy=True)
+        assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+                == pytest.approx(0.0, rel=1.0e-7, abs=1.0e-13))
+
+
+class TestColloidPotentialsTabulatedForTwoSubstrateParticles(TestParameters):
+    def test_add_substrate_particle_raises_exception(self, colloid_potentials_tabulated,
+                                                     colloid_potentials_tabulated_log, radius_one,
+                                                     surface_potential_one):
+        with pytest.raises(ValueError):
+            colloid_potentials_tabulated.add_particle(radius=radius_one, surface_potential=surface_potential_one,
+                                                      substrate_flag=True)
+        with pytest.raises(ValueError):
+            colloid_potentials_tabulated_log.add_particle(radius=radius_one, surface_potential=surface_potential_one,
+                                                          substrate_flag=True)
+
+
+class TestColloidPotentialsAlgebraicForOneParticleOneSubstrateParticle(TestParameters):
+    @pytest.fixture(autouse=True)
+    def add_two_particles(self, openmm_system, colloid_potentials_algebraic, radius_one, radius_two,
+                          surface_potential_one, surface_potential_two):
+        openmm_system.addParticle(mass=1.0)
+        colloid_potentials_algebraic.add_particle(radius=radius_one, surface_potential=surface_potential_one,
+                                                  substrate_flag=False)
+        openmm_system.addParticle(mass=1.0)
+        colloid_potentials_algebraic.add_particle(radius=radius_two, surface_potential=surface_potential_two,
+                                                  substrate_flag=True)
+        for potential in colloid_potentials_algebraic.yield_potentials():
+            openmm_system.addForce(potential)
+
+    # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
+    # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
+    @pytest.fixture
+    def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
+        return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
+
+    @pytest.mark.parametrize("surface_separation,expected",
+                             [   # Test at h=0.
+                                 (10.0 * (unit.nano * unit.meter), 1505.829355134808 * unit.kilojoule_per_mole),
+                                 # Test at h=2L.
+                                 (20.0 * (unit.nano * unit.meter), -10.63613061419315 * unit.kilojoule_per_mole),
+                                 # Test slightly below h=2L where steric potential is not zero.
+                                 ((20.0 - 0.1) * (unit.nano * unit.meter),
+                                  -10.84996692702675 * unit.kilojoule_per_mole),
+                                 # Test slightly above h=2L where steric potential is strictly zero.
+                                 ((20.0 + 0.1) * (unit.nano * unit.meter),
+                                  -10.42552111714948 * unit.kilojoule_per_mole),
+                                 # Test at h=3L.
+                                 (30.0 * (unit.nano * unit.meter), -1.439443749213437 * unit.kilojoule_per_mole),
+                                 # Test at h=20*debye_length, where electrostatic potential should not yet be cutoff.
+                                 (100.0 * (unit.nano * unit.meter), -1.196938817005087e-6 * unit.kilojoule_per_mole)
+                             ])
+    def test_potential(self, openmm_context, radius_one, radius_two, surface_separation, expected):
+        openmm_context.setPositions([[radius_one + radius_two + surface_separation, 0.0, 0.0],
+                                     [0.0, 0.0, 0.0]])
+        openmm_state = openmm_context.getState(getEnergy=True)
+        assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+                == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
+
+
+# noinspection DuplicatedCode
+class TestColloidPotentialsAlgebraicWithLogForOneParticleOneSubstrateParticle(TestParameters):
+    @pytest.fixture(autouse=True)
+    def add_two_particles(self, openmm_system, colloid_potentials_algebraic_log,
+                          radius_one, radius_two, surface_potential_one, surface_potential_two):
+        openmm_system.addParticle(mass=1.0)
+        colloid_potentials_algebraic_log.add_particle(radius=radius_one, surface_potential=surface_potential_one,
+                                                      substrate_flag=False)
+        openmm_system.addParticle(mass=1.0)
+        colloid_potentials_algebraic_log.add_particle(radius=radius_two, surface_potential=surface_potential_two,
+                                                      substrate_flag=True)
+        for potential in colloid_potentials_algebraic_log.yield_potentials():
+            openmm_system.addForce(potential)
+
+    # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
+    # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
+    @pytest.fixture
+    def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
+        return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
+
+    @pytest.mark.parametrize("surface_separation,expected",
+                             [   # Test at h=0.
+                                 (10.0 * (unit.nano * unit.meter), 1510.711567854979 * unit.kilojoule_per_mole),
+                                 # Test at h=2L.
+                                 (20.0 * (unit.nano * unit.meter), -10.53990009001303 * unit.kilojoule_per_mole),
+                                 # Test slightly below h=2L where steric potential is not zero.
+                                 ((20.0 - 0.1) * (unit.nano * unit.meter),
+                                  -10.74983348860948 * unit.kilojoule_per_mole),
+                                 # Test slightly above h=2L where steric potential is strictly zero.
+                                 ((20.0 + 0.1) * (unit.nano * unit.meter),
+                                  -10.33304182104529 * unit.kilojoule_per_mole),
+                                 # Test at h=3L.
+                                 (30.0 * (unit.nano * unit.meter), -1.437662679662967 * unit.kilojoule_per_mole),
+                                 # Test at h=20*debye_length, where electrostatic potential should not yet be cutoff.
+                                 (100.0 * (unit.nano * unit.meter), -1.196938856264202e-6 * unit.kilojoule_per_mole)
+                             ])
+    def test_potential(self, openmm_context, radius_one, radius_two, surface_separation, expected):
+        openmm_context.setPositions([[radius_one + radius_two + surface_separation, 0.0, 0.0],
+                                     [0.0, 0.0, 0.0]])
+        openmm_state = openmm_context.getState(getEnergy=True)
+        assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+                == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
+
+
 # noinspection DuplicatedCode
 class TestColloidPotentialsForFourParticles(TestParameters):
     @pytest.fixture(autouse=True)
@@ -514,6 +667,61 @@ class TestColloidPotentialsForFourParticles(TestParameters):
                 == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
 
 
+class TestColloidPotentialsAlgebraicForTwoParticlesTwoSubstrateParticles(TestParameters):
+    @pytest.fixture(autouse=True)
+    def add_four_particles(self, openmm_system, colloid_potentials_algebraic,
+                           radius_one, radius_two, surface_potential_one, surface_potential_two):
+        for _ in range(2):
+            openmm_system.addParticle(mass=1.0)
+            colloid_potentials_algebraic.add_particle(radius=radius_one, surface_potential=surface_potential_one,
+                                                      substrate_flag=False)
+        for _ in range(2):
+            openmm_system.addParticle(mass=1.0)
+            colloid_potentials_algebraic.add_particle(radius=radius_two, surface_potential=surface_potential_two,
+                                                      substrate_flag=True)
+        for potential in colloid_potentials_algebraic.yield_potentials():
+            openmm_system.addForce(potential)
+
+    # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
+    # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
+    @pytest.fixture
+    def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
+        return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
+
+    @pytest.mark.parametrize("positions,expected",
+                             [
+                                 ([[0.0, 0.0, 0.0],
+                                     # Place at h=30 with reference to first particle.
+                                     [680.0 * (unit.nano * unit.meter), 0.0, 0.0],
+                                     # Place at h=20 with reference to first particle.
+                                     [0.0, 410.0 * (unit.nano * unit.meter), 0.0],
+                                     # Place at h=10 with reference to first particle.
+                                     [0.0, 0.0, 400.0 * (unit.nano * unit.meter)]],
+                                  1500.591138580165 * unit.kilojoule_per_mole),
+                                 ([[0.0, 0.0, 0.0],
+                                   # Place at h=10 with reference to first particle.
+                                   [660.0 * (unit.nano * unit.meter), 0.0, 0.0],
+                                   # Place at h=30 with reference to first particle.
+                                   [0.0, 420.0 * (unit.nano * unit.meter), 0.0],
+                                   # Place at h=100 with reference to first particle.
+                                   [0.0, 0.0, 490.0 * (unit.nano * unit.meter)]],
+                                  2933.97721160759 * unit.kilojoule_per_mole),
+                                 ([# Place at h=25 with reference to last particle.
+                                   [0.0, 0.0, 515.0],
+                                   # Place at h=15 with reference to last particle.
+                                   [0.0, 405.0, 0.0],
+                                   # Place at h=10 with reference to last particle.
+                                   [140, 0.0, 0.0],
+                                   [0.0, 0.0, 0.0]],
+                                  13832.31028122305 * unit.kilojoule_per_mole)
+                             ])
+    def test_potential(self, openmm_context, radius_one, radius_two, positions, expected):
+        openmm_context.setPositions(positions)
+        openmm_state = openmm_context.getState(getEnergy=True)
+        assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+                == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
+
+
 # noinspection DuplicatedCode
 class TestColloidPotentialsWithLogForFourParticles(TestParameters):
     @pytest.fixture(autouse=True)
@@ -626,6 +834,61 @@ class TestColloidPotentialsWithLogForFourParticles(TestParameters):
                                    [140, 0.0, 0.0],
                                    [0.0, 0.0, 0.0]],
                                   14284.77185919515 * unit.kilojoule_per_mole)
+                             ])
+    def test_potential(self, openmm_context, radius_one, radius_two, positions, expected):
+        openmm_context.setPositions(positions)
+        openmm_state = openmm_context.getState(getEnergy=True)
+        assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+                == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
+
+
+class TestColloidPotentialsAlgebraicWithLogForTwoParticlesTwoSubstrateParticles(TestParameters):
+    @pytest.fixture(autouse=True)
+    def add_four_particles(self, openmm_system, colloid_potentials_algebraic_log,
+                           radius_one, radius_two, surface_potential_one, surface_potential_two):
+        for _ in range(2):
+            openmm_system.addParticle(mass=1.0)
+            colloid_potentials_algebraic_log.add_particle(radius=radius_one, surface_potential=surface_potential_one,
+                                                          substrate_flag=True)
+        for _ in range(2):
+            openmm_system.addParticle(mass=1.0)
+            colloid_potentials_algebraic_log.add_particle(radius=radius_two, surface_potential=surface_potential_two,
+                                                          substrate_flag=False)
+        for potential in colloid_potentials_algebraic_log.yield_potentials():
+            openmm_system.addForce(potential)
+
+    # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
+    # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
+    @pytest.fixture
+    def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
+        return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
+
+    @pytest.mark.parametrize("positions,expected",
+                             [
+                                 ([[0.0, 0.0, 0.0],
+                                     # Place at h=30 with reference to first particle.
+                                     [680.0 * (unit.nano * unit.meter), 0.0, 0.0],
+                                     # Place at h=20 with reference to first particle.
+                                     [0.0, 410.0 * (unit.nano * unit.meter), 0.0],
+                                     # Place at h=10 with reference to first particle.
+                                     [0.0, 0.0, 400.0 * (unit.nano * unit.meter)]],
+                                  1500.171667764966 * unit.kilojoule_per_mole),
+                                 ([[0.0, 0.0, 0.0],
+                                   # Place at h=10 with reference to first particle.
+                                   [660.0 * (unit.nano * unit.meter), 0.0, 0.0],
+                                   # Place at h=30 with reference to first particle.
+                                   [0.0, 420.0 * (unit.nano * unit.meter), 0.0],
+                                   # Place at h=100 with reference to first particle.
+                                   [0.0, 0.0, 490.0 * (unit.nano * unit.meter)]],
+                                  -1.437663876601824 * unit.kilojoule_per_mole),
+                                 ([# Place at h=25 with reference to last particle.
+                                   [0.0, 0.0, 515.0],
+                                   # Place at h=15 with reference to last particle.
+                                   [0.0, 405.0, 0.0],
+                                   # Place at h=10 with reference to last particle.
+                                   [140, 0.0, 0.0],
+                                   [0.0, 0.0, 0.0]],
+                                  688.4738152224481 * unit.kilojoule_per_mole)
                              ])
     def test_potential(self, openmm_context, radius_one, radius_two, positions, expected):
         openmm_context.setPositions(positions)

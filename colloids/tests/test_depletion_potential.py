@@ -138,9 +138,9 @@ class TestDepletionPotentialForTwoParticles(TestParameters):
     @pytest.fixture(autouse=True)
     def add_two_particles(self, openmm_system, depletion_potential, radius_one, radius_two):
         openmm_system.addParticle(mass=1.0)
-        depletion_potential.add_particle(radius=radius_one)
+        depletion_potential.add_particle(radius=radius_one, substrate_flag=False)
         openmm_system.addParticle(mass=1.0)
-        depletion_potential.add_particle(radius=radius_two)
+        depletion_potential.add_particle(radius=radius_two, substrate_flag=True)
         for potential in depletion_potential.yield_potentials():
             openmm_system.addForce(potential)
 
@@ -169,6 +169,43 @@ class TestDepletionPotentialForTwoParticles(TestParameters):
             - kt * depletant_phi / 16 * (q1 + q2 + 2 - n) ** 2 * (n + 2 * (q1 + q2 + 2)
                                                                   - 3 / n * (q1 ** 2 + q2 ** 2 - 2 * q1 * q2)),
             0.0)
+
+    def test_depletion_potential(self, openmm_context, test_separations, radius_one, radius_two, brush_length,
+                                 depletant_phi, depletant_radius, temperature):
+
+        openmm_potentials = np.zeros(len(test_separations))  # use surface separation as test positions
+        for index, sep in enumerate(test_separations):
+            openmm_context.setPositions([[sep.value_in_unit(unit.nano * unit.meter), 0.0, 0.0], [0.0, 0.0, 0.0]])
+            state = openmm_context.getState(getEnergy=True)
+            openmm_potentials[index] = (state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole))
+
+        expected_potentials = self.depletion_potential_expected(test_separations, radius_one, radius_two, brush_length,
+                                                                depletant_phi, depletant_radius, temperature)
+
+        assert openmm_potentials == pytest.approx(expected_potentials, rel=1.0e-7, abs=1.0e-13)
+
+
+# noinspection DuplicatedCode
+class TestDepletionPotentialForTwoSubstrateParticles(TestParameters):
+    @pytest.fixture(autouse=True)
+    def add_two_particles(self, openmm_system, depletion_potential, radius_one, radius_two):
+        openmm_system.addParticle(mass=1.0)
+        depletion_potential.add_particle(radius=radius_one, substrate_flag=True)
+        openmm_system.addParticle(mass=1.0)
+        depletion_potential.add_particle(radius=radius_two, substrate_flag=True)
+        for potential in depletion_potential.yield_potentials():
+            openmm_system.addForce(potential)
+
+    # This function cannot be moved to TestParameters class because add_two_particles fixture should be called before
+    # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
+    @pytest.fixture
+    def openmm_context(self, openmm_system, openmm_dummy_integrator, openmm_platform):
+        return Context(openmm_system, openmm_dummy_integrator, openmm_platform)
+
+    @staticmethod
+    def depletion_potential_expected(r, radius_one, radius_two, brush_length, depletant_phi, depletant_radius,
+                                     temperature):
+        return np.array([0.0 for _ in range(len(r))])
 
     def test_depletion_potential(self, openmm_context, test_separations, radius_one, radius_two, brush_length,
                                  depletant_phi, depletant_radius, temperature):

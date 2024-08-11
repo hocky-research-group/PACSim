@@ -143,6 +143,38 @@ class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
         if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts")
 
+    @abstractmethod
+    def add_interaction_group(self, group_one: set[int], group_two: set[int]) -> None:
+        """
+        Add an OpenMM interaction group to the OpenMM forces handled by this class.
+
+        One can add as many interaction groups as one wants. If a particle appears in two different interaction groups,
+        it won't interact with itself. If a particle pair appears in two different interaction groups, its interaction
+        will be computed twice. If one does not add any interaction groups to an OpenMM force, it operates in the
+        default mode where every particle interacts with every other particle.
+
+        This method has to be called after the method add_particle was called for every particle in the system. It has
+        to be called before the method yield_potentials is used. Note that the overriding method in the inheriting class
+        should call this method first because it checks that the method add_particle was called before and that the
+        method yield_potentials was not called before.
+
+        :param group_one:
+            The indices of the particles in the first group.
+        :type group_one: set[int]
+        :param group_two:
+            The indices of the particles in the second group.
+        :type group_two: set[int]
+
+        :raises RuntimeError:
+            If the method add_particle was not called for every particle in the system before this method.
+            If the method yield_potentials was called before this method.
+        """
+        if not self._add_particle_called:
+            raise RuntimeError("method add_particle must be called for every particle in the system before the method "
+                               "add_interaction_group is used")
+        if self._yield_potentials_called:
+            raise RuntimeError("method add_interaction_group must be called before the method yield_potentials is used")
+
 
 @dataclass(order=True, frozen=True)
 class Parameters(object):

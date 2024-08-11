@@ -1,8 +1,6 @@
 import math
-from typing import Iterator, Sequence
-import numpy as np
-from openmm import Context, CustomNonbondedForce, LangevinIntegrator, Platform, System, unit, Vec3
-from scipy.optimize import minimize, root_scalar
+from typing import Iterator
+from openmm import CustomNonbondedForce, unit
 from colloids.abstracts import ColloidPotentialsAbstract
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
@@ -69,12 +67,12 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             raise ValueError("The cutoff factor must be greater than zero.")
 
         self._use_log = use_log
-        self._steric_potential = self._set_up_steric_potential()
-        self._electrostatic_potential = self._set_up_electrostatic_potential()
+        self._steric_potential = self.set_up_steric_potential()
+        self._electrostatic_potential = self.set_up_electrostatic_potential()
         self._max_radius = -math.inf * self._nanometer
         self._cutoff_factor = cutoff_factor
 
-    def _set_up_steric_potential(self) -> CustomNonbondedForce:
+    def set_up_steric_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""
         steric_potential = CustomNonbondedForce(
             "step(two_l - h) * "
@@ -99,7 +97,7 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         steric_potential.addPerParticleParameter("radius")
         return steric_potential
 
-    def _set_up_electrostatic_potential(self) -> CustomNonbondedForce:
+    def set_up_electrostatic_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""
         if self._use_log:
             electrostatic_potential = CustomNonbondedForce(
@@ -200,93 +198,6 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
 
         yield self._steric_potential
         yield self._electrostatic_potential
-
-    def tune_surface_potential(self, other_radius: unit.Quantity, other_surface_potential: unit.Quantity,
-                               tuned_radius: unit.Quantity, tuned_potential_depth: unit.Quantity) -> unit.Quantity:
-        """
-        Tune the surface potential of a colloid with a given radius so that the potential depth of the combined steric
-        and electrostatic potentials with another colloid is equal to the given potential depth.
-
-        :param other_radius:
-            The radius of the other colloid.
-            The unit of the radius must be compatible with nanometers and the value must be greater than zero.
-        :type other_radius: unit.Quantity
-        :param other_surface_potential:
-            The surface potential of the other colloid.
-            The unit of the surface_potential must be compatible with millivolts.
-        :type other_surface_potential: unit.Quantity
-        :param tuned_radius:
-            The radius of the colloid whose surface potential will be tuned.
-            The unit of the radius must be compatible with nanometers and the value must be greater than zero.
-        :type tuned_radius: unit.Quantity
-        :param tuned_potential_depth:
-            The desired potential depth of the combined steric and electrostatic potential with the other colloid.
-            The unit of the potential_depth must be compatible with kilojoules per mole and the value must be smaller
-            than zero.
-        :type tuned_potential_depth: unit.Quantity
-
-        :return:
-            The tuned surface potential of the colloid in millivolts.
-        :rtype: unit.Quantity
-
-        :raises TypeError:
-            If other_radius, other_radius, or tuned_potential_depth is not a Quantity with a proper unit (via the
-            abstract base class).
-        :raises ValueError:
-            If other_radius or tuned_radius is not greater than zero (via the abstract base class).
-            If the tuned_potential_depth is not smaller than zero (via the abstract base class).
-        """
-        super().tune_surface_potential(other_radius, other_surface_potential, tuned_radius, tuned_potential_depth)
-
-        system = System()
-        platform = Platform.getPlatformByName("Reference")
-        dummy_integrator = LangevinIntegrator(0.0, 0.0, 0.0)
-        electrostatic_potential = self._set_up_electrostatic_potential()
-        steric_potential = self._set_up_steric_potential()
-        electrostatic_potential.setNonbondedMethod(electrostatic_potential.NoCutoff)
-        steric_potential.setNonbondedMethod(steric_potential.NoCutoff)
-        system.addParticle(1.0 * unit.amu)
-        system.addParticle(1.0 * unit.amu)
-        # Force the surface potential of the other colloid to be positive.
-        electrostatic_potential.addParticle([other_radius.value_in_unit(self._nanometer),
-                                             abs(other_surface_potential.value_in_unit(self._millivolt))])
-        # We use the global electrostatic prefactor to tune the (negative) surface potential.
-        electrostatic_potential.addParticle([tuned_radius.value_in_unit(self._nanometer), 1.0])
-        steric_potential.addParticle([other_radius.value_in_unit(self._nanometer)])
-        steric_potential.addParticle([tuned_radius.value_in_unit(self._nanometer)])
-        system.addForce(electrostatic_potential)
-        system.addForce(steric_potential)
-        context = Context(system, dummy_integrator, platform)
-        original_electrostatic_prefactor = context.getParameter("electrostatic_prefactor")
-        radius_sum = (other_radius + tuned_radius).value_in_unit(self._nanometer)
-
-        def potential_energy(surface_separation: Sequence[float], surface_potential: float) -> float:
-            # Surface separation must be a numpy array for the minimize function.
-            assert len(surface_separation) == 1
-            assert surface_potential <= 0.0
-            # We use the global electrostatic prefactor to tune the negative surface potential.
-            context.setParameter("electrostatic_prefactor", original_electrostatic_prefactor * surface_potential)
-            context.setPositions([Vec3(0.0, 0.0, 0.0),
-                                  Vec3(radius_sum + surface_separation[0], 0.0, 0.0)])
-            return context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-
-        def deviation_potential_energy(surface_potential: float) -> float:
-            minimum_energy_result = minimize(potential_energy, np.array([10.0]), args=(surface_potential,), tol=1.0e-3)
-            if not minimum_energy_result.success:
-                raise RuntimeError(minimum_energy_result.message + " Minimization failed.")
-            assert len(minimum_energy_result.x) == 1
-            return (potential_energy(minimum_energy_result.x, surface_potential)
-                    - tuned_potential_depth.value_in_unit(unit.kilojoule_per_mole))
-
-        result = root_scalar(
-            deviation_potential_energy,
-            bracket=[-10.0 * abs(other_surface_potential.value_in_unit(self._millivolt)), 0.0],
-            method="brentq")
-        if not result.converged:
-            raise RuntimeError(result.flag)
-
-        # Choose the opposite sign of the surface potential.
-        return -math.copysign(result.root, other_surface_potential.value_in_unit(self._millivolt)) * self._millivolt
 
 
 if __name__ == '__main__':

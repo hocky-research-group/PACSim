@@ -316,39 +316,6 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         yield self._potential_22
         yield self._potential_12
 
-    def tune_surface_potential(self, other_radius: unit.Quantity, other_surface_potential: unit.Quantity,
-                               tuned_radius: unit.Quantity, tuned_potential_depth: unit.Quantity) -> unit.Quantity:
-        """
-        Tune the surface potential of a colloid with a given radius so that the potential depth of the combined steric
-        and electrostatic potentials with another colloid is equal to the given potential depth.
-
-        :param other_radius:
-            The radius of the other colloid.
-            The unit of the radius must be compatible with nanometers and the value must be greater than zero.
-        :type other_radius: unit.Quantity
-        :param other_surface_potential:
-            The surface potential of the other colloid.
-            The unit of the surface_potential must be compatible with millivolts.
-        :type other_surface_potential: unit.Quantity
-        :param tuned_radius:
-            The radius of the colloid whose surface potential will be tuned.
-            The unit of the radius must be compatible with nanometers and the value must be greater than zero.
-        :type tuned_radius: unit.Quantity
-        :param tuned_potential_depth:
-            The desired potential depth of the combined steric and electrostatic potential with the other colloid.
-            The unit of the potential_depth must be compatible with kilojoules per mole and the value must be smaller
-            than zero.
-        :type tuned_potential_depth: unit.Quantity
-
-        :return:
-            The tuned surface potential of the colloid in millivolts.
-        :rtype: unit.Quantity
-
-        :raises NotImplementedError:
-            This method is not implemented for the tabulated potentials.
-        """
-        raise NotImplementedError("This method is not implemented for the tabulated potentials.")
-
 
 if __name__ == '__main__':
     ColloidPotentialsTabulated(radius_one=105 * (unit.nano * unit.meter), radius_two=95.0 * (unit.nano * unit.meter),

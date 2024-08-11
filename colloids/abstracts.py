@@ -143,59 +143,6 @@ class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
         if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts")
 
-    @abstractmethod
-    def tune_surface_potential(self, other_radius: unit.Quantity, other_surface_potential: unit.Quantity,
-                               tuned_radius: unit.Quantity, tuned_potential_depth: unit.Quantity) -> unit.Quantity:
-        """
-        Tune the surface potential of a colloid with a given radius so that the potential depth of the combined steric
-        and electrostatic potentials with another colloid is equal to the given potential depth.
-
-        Note that the overriding method in the inheriting class should call this method first because it checks the
-        input arguments.
-
-        :param other_radius:
-            The radius of the other colloid.
-            The unit of the radius must be compatible with nanometers and the value must be greater than zero.
-        :type other_radius: unit.Quantity
-        :param other_surface_potential:
-            The surface potential of the other colloid.
-            The unit of the surface_potential must be compatible with millivolts.
-        :type other_surface_potential: unit.Quantity
-        :param tuned_radius:
-            The radius of the colloid whose surface potential will be tuned.
-            The unit of the radius must be compatible with nanometers and the value must be greater than zero.
-        :type tuned_radius: unit.Quantity
-        :param tuned_potential_depth:
-            The desired potential depth of the combined steric and electrostatic potential with the other colloid.
-            The unit of the potential_depth must be compatible with kilojoules per mole and the value must be smaller
-            than zero.
-        :type tuned_potential_depth: unit.Quantity
-
-        :return:
-            The tuned surface potential of the colloid in millivolts.
-        :rtype: unit.Quantity
-
-        :raises TypeError:
-            If other_radius, other_radius, or tuned_potential_depth is not a Quantity with a proper unit.
-        :raises ValueError:
-            If other_radius or tuned_radius is not greater than zero.
-            If the tuned_potential_depth is not smaller than zero.
-        """
-        if not other_radius.unit.is_compatible(self._nanometer):
-            raise TypeError("The radius must be a Quantity with a unit compatible with nanometers.")
-        if not other_radius.value_in_unit(self._nanometer) > 0.0:
-            raise ValueError("The radius must be greater than zero.")
-        if not other_surface_potential.unit.is_compatible(self._millivolt):
-            raise TypeError("The positive_surface_potential must be a Quantity with a unit compatible with millivolts.")
-        if not tuned_radius.unit.is_compatible(self._nanometer):
-            raise TypeError("The tune_radius must be a Quantity with a unit compatible with nanometers.")
-        if not tuned_radius.value_in_unit(self._nanometer) > 0.0:
-            raise ValueError("The tune_radius must be greater than zero.")
-        if not tuned_potential_depth.unit.is_compatible(unit.kilojoule_per_mole):
-            raise TypeError("The potential_depth must be a Quantity with a unit compatible with kilojoule per mole.")
-        if not tuned_potential_depth.value_in_unit(unit.kilojoule_per_mole) < 0.0:
-            raise ValueError("The potential_depth must be less than zero.")
-
 
 @dataclass(order=True, frozen=True)
 class Parameters(object):

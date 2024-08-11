@@ -241,7 +241,8 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
         return potential_11, potential_22, potential_12
 
-    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity, substrate_flag: bool) -> None:
+    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity,
+                     substrate_flag: bool = False) -> None:
         """
         Add a colloid with a given radius and surface potential to the system.
 

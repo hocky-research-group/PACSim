@@ -104,8 +104,8 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         if self._use_log:
             electrostatic_potential = CustomNonbondedForce(
                 "select(flag1 * flag2, 0, "
-                "electrostatic_prefactor * radius * psi1 * psi2 * log(1.0 + exp(-h / debye_length)); "
-                "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2));"
+                "electrostatic_prefactor * radius * psi1 * psi2 * log(1.0 + exp(-h / debye_length))); "
+                "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
                 "h = r - rs;"
                 "rs = radius1 + radius2"
             )
@@ -131,7 +131,8 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         electrostatic_potential.addPerParticleParameter("flag")
         return electrostatic_potential
 
-    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity, substrate_flag: bool) -> None:
+    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity,
+                     substrate_flag: bool = False) -> None:
         """
         Add a colloid with a given radius and surface potential to the system.
 

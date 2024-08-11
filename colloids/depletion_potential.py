@@ -88,7 +88,7 @@ class DepletionPotential(OpenMMPotentialAbstract):
         depletion_potential.addPerParticleParameter("flag")
         return depletion_potential
     
-    def add_particle(self, radius: unit.Quantity, substrate_flag: bool) -> None:
+    def add_particle(self, radius: unit.Quantity, substrate_flag: bool = False) -> None:
         """
         Add a colloid with a given radius to the system.
 

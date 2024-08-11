@@ -89,11 +89,12 @@ def tune_surface_potential(colloid_potentials: ColloidPotentialsAlgebraic, other
     system.addParticle(1.0 * unit.amu)
     # Force the surface potential of the other colloid to be positive.
     electrostatic_potential.addParticle([other_radius.value_in_unit(unit.nano * unit.meter),
-                                         abs(other_surface_potential.value_in_unit(unit.milli * unit.volt))])
+                                         abs(other_surface_potential.value_in_unit(unit.milli * unit.volt)),
+                                         False])
     # We use the global electrostatic prefactor to tune the (negative) surface potential.
-    electrostatic_potential.addParticle([tuned_radius.value_in_unit(unit.nano * unit.meter), 1.0])
-    steric_potential.addParticle([other_radius.value_in_unit(unit.nano * unit.meter)])
-    steric_potential.addParticle([tuned_radius.value_in_unit(unit.nano * unit.meter)])
+    electrostatic_potential.addParticle([tuned_radius.value_in_unit(unit.nano * unit.meter), 1.0, False])
+    steric_potential.addParticle([other_radius.value_in_unit(unit.nano * unit.meter), False])
+    steric_potential.addParticle([tuned_radius.value_in_unit(unit.nano * unit.meter), False])
     system.addForce(electrostatic_potential)
     system.addForce(steric_potential)
     context = openmm.Context(system, dummy_integrator, platform)

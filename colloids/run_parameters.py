@@ -560,13 +560,25 @@ class RunParameters(Parameters):
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
         for t in self.masses:
-            if t != self.substrate_type and t not in types:
+            if t not in types:
+                if t == self.substrate_type:
+                    continue
+                if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
+                    continue
                 raise ValueError(f"Type {t} of the masses dictionary is not in the initial configuration.")
         for t in self.radii:
-            if t != self.substrate_type and t not in types:
+            if t not in types:
+                if t == self.substrate_type:
+                    continue
+                if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
+                    continue
                 raise ValueError(f"Type {t} of the radii dictionary is not in the initial configuration.")
         for t in self.surface_potentials:
-            if t != self.substrate_type and t not in types:
+            if t not in types:
+                if t == self.substrate_type:
+                    continue
+                if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
+                    continue
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in the initial configuration.")
 
 

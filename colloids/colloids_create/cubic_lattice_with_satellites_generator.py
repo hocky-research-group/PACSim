@@ -1,11 +1,9 @@
 from enum import auto, Enum
-from math import acos, cos, pi, sin, sqrt
-from typing import Iterator
 from ase import Atom, build
 import numpy as np
-import numpy.typing as npt
 from openmm import unit
 from colloids.colloids_create import ConfigurationGenerator
+from colloids.helper_functions import generate_fibonacci_sphere_grid_points
 
 
 class CubicLattice(Enum):
@@ -57,17 +55,6 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         self._type_lattice = type_lattice
         self._type_satellite = type_satellite
 
-    @staticmethod
-    def _generate_fibonacci_sphere_grid_points(number_points: int, radius: float) -> Iterator[npt.NDArray[np.floating]]:
-        # See https://extremelearning.com.au/how-to-evenly-distribute-points-on-a-sphere-more-effectively-than-the-canonical-fibonacci-lattice/
-        # Output, real xgB(3,ng): the grid points.
-        golden_ratio = (1.0 + sqrt(5.0)) / 2.0
-        epsilon = 0.36
-        for i in range(number_points):
-            theta = 2.0 * pi * i / golden_ratio
-            phi = acos(1.0 - 2.0 * (i + epsilon) / (number_points - 1.0 + 2.0 * epsilon))
-            yield np.array([cos(theta) * sin(phi) * radius, sin(theta) * sin(phi) * radius, cos(phi) * radius])
-
     def write_positions(self) -> None:
         # Use X as the atom name to avoid a clash with an existing chemical symbol.
         atoms = build.bulk(name="X", crystalstructure=self._lattice.to_ase_string(),
@@ -77,9 +64,12 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         atoms.center(about=(0.0, 0.0, 0.0))
         new_atoms = []
         for atom in atoms:
-            for satellite_position in self._generate_fibonacci_sphere_grid_points(
-                    self._satellites_per_center, self._orbit_distance.value_in_unit(self._nanometer)):
-                new_atoms.append(Atom(symbol="Y", position=atom.position + satellite_position))
+            # Tag for centers.
+            atom.tag = 0
+            for satellite_position in generate_fibonacci_sphere_grid_points(
+                    self._satellites_per_center, self._orbit_distance.value_in_unit(self._nanometer),
+                    False):
+                new_atoms.append(Atom(symbol="X", position=atom.position + satellite_position, tag=1))
         for new_atom in new_atoms:
             atoms.append(new_atom)
         atoms = atoms.repeat(self._lattice_repeats)
@@ -99,8 +89,9 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
             print(f"Lattice=\"{' '.join(map(str, scaled_cell.flatten()))}\" Properties=species:S:1:pos:R:3 "
                   f"Origin=\"{' '.join(map(str, origin_vector))}\"",
                   file=file)
+            tag_to_type_dictionary = {0: self._type_lattice, 1: self._type_satellite}
             for atom in atoms:
-                print(f"{self._type_lattice if atom.symbol=='X' else self._type_satellite} "
+                print(f"{tag_to_type_dictionary[atom.tag]} "
                       f"{atom.position[0]} {atom.position[1]} {atom.position[2]}", file=file)
 
 

@@ -241,6 +241,29 @@ class RunParameters(Parameters):
         surface_potentials dictionaries.
         Defaults to None.
     :type substrate_type: Optional[str]
+    :param use_snowman:
+        A boolean indicating whether to use the snowman colloids in the simulation.
+        In a snowman colloid, a colloidal head particle is attached to a colloidal base particle at a fixed distance.
+        If True, the snowman bond types, the snowman distances, and optionally the snowman seed must be specified.
+        Defaults to False.
+    :type use_snowman: bool
+    :param snowman_seed:
+        The seed for the random number generator that is used to sample the positions of the snowman heads.
+        If None, a random seed is used.
+        Defaults to None.
+    :type snowman_seed: Optional[int]
+    :param snowman_bond_types:
+        Dictionary mapping from the type of the base particle to the type of the head particle in the snowman colloid.
+        Snowman heads are attached to every base particle type in this dictionary.
+        Every snowman head type must appear in the masses, radii, and surface potentials dictionaries.
+        Defaults to None.
+    :type snowman_bond_types: Optional[dict[str, str]]
+    :param snowman_distances:
+        Dictionary mapping from the type of the base particle to the desired distance to the snowman head.
+        Every type appearing in the snowman bond types dictionary must have a corresponding distance in this dictionary.
+        The unit of every distance must be compatible with nanometers and the value must be greater than zero.
+        Defaults to None.
+    :type snowman_distances: Optional[dict[str, unit.Quantity]]
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -297,6 +320,10 @@ class RunParameters(Parameters):
     update_reporter_parameters: Optional[dict[str, Any]] = None
     use_substrate: bool = False
     substrate_type: Optional[str] = None
+    use_snowman: bool = False
+    snowman_seed: Optional[int] = None
+    snowman_bond_types: Optional[dict[str, str]] = None
+    snowman_distances: Optional[dict[str, unit.Quantity]] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -321,7 +348,7 @@ class RunParameters(Parameters):
             if t not in self.masses:
                 raise ValueError(f"Type {t} of the radii dictionary is not in masses dictionary.")
             if t not in self.surface_potentials:
-                raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
+                raise ValueError(f"Type {t} of the radii dictionary is not in surface potentials dictionary.")
         for t in self.surface_potentials:
             if not self.surface_potentials[t].unit.is_compatible(unit.milli * unit.volt):
                 raise TypeError(f"Surface potential of type {t} must have a unit compatible with millivolts.")
@@ -483,6 +510,38 @@ class RunParameters(Parameters):
         else:
             if self.substrate_type is not None:
                 raise ValueError("The substrate type must not be specified if a substrate is not used.")
+        if self.use_snowman:
+            if self.snowman_bond_types is None:
+                raise ValueError("Snowman bond types must be specified if snowman is on.")
+            if self.snowman_distances is None:
+                raise ValueError("Snowman distances must be specified if snowman is on.")
+            for t in self.snowman_bond_types:
+                st = self.snowman_bond_types[t]
+                if st not in self.masses:
+                    raise ValueError(f"Type {st} of the snowman bond types dictionary is not in masses dictionary.")
+                if st not in self.radii:
+                    raise ValueError(f"Type {st} of the snowman bond types dictionary is not in radii dictionary.")
+                if st not in self.surface_potentials:
+                    raise ValueError(f"Type {st} of the snowman bond types dictionary is not in surface potentials "
+                                     f"dictionary.")
+                if t not in self.snowman_distances:
+                    raise ValueError(f"Type {t} of the snowman bond types dictionary is not in snowman distances "
+                                     f"dictionary.")
+            for t in self.snowman_distances:
+                if t not in self.snowman_bond_types:
+                    raise ValueError(f"Type {t} of the snowman distances dictionary is not in snowman bond types "
+                                     f"dictionary.")
+                if not self.snowman_distances[t].unit.is_compatible(unit.nano * unit.meter):
+                    raise TypeError(f"Distance of type {t} must have a unit compatible with nanometers.")
+                if self.snowman_distances[t] <= 0.0 * (unit.nano * unit.meter):
+                    raise ValueError(f"Distance of type {t} must be greater than zero.")
+        else:
+            if self.snowman_bond_types is not None:
+                raise ValueError("Snowman bond types must not be specified if snowman is not on.")
+            if self.snowman_distances is not None:
+                raise ValueError("Snowman distances must not be specified if snowman is not on.")
+            if self.snowman_seed is not None:
+                raise ValueError("Snowman seed must not be specified if snowman is not on.")
 
     def check_types_of_initial_configuration(self):
         """
@@ -502,14 +561,32 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the initial configuration is not in radii dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
+            if t == self.substrate_type:
+                raise ValueError(f"Type {t} of the initial configuration cannot be the substrate type. Use "
+                                 f"checkpoints to restart simulations with a substrate.")
+            if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
+                raise ValueError(f"Type {t} of the initial configuration cannot be a snowman head type. Use "
+                                 f"checkpoints to restart simulations with snowman colloids.")
         for t in self.masses:
-            if t != self.substrate_type and t not in types:
+            if t not in types:
+                if t == self.substrate_type:
+                    continue
+                if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
+                    continue
                 raise ValueError(f"Type {t} of the masses dictionary is not in the initial configuration.")
         for t in self.radii:
-            if t != self.substrate_type and t not in types:
+            if t not in types:
+                if t == self.substrate_type:
+                    continue
+                if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
+                    continue
                 raise ValueError(f"Type {t} of the radii dictionary is not in the initial configuration.")
         for t in self.surface_potentials:
-            if t != self.substrate_type and t not in types:
+            if t not in types:
+                if t == self.substrate_type:
+                    continue
+                if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
+                    continue
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in the initial configuration.")
 
 

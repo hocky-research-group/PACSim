@@ -189,6 +189,11 @@ class TestColloidPotentialsForTwoParticles(TestParameters):
         openmm_system.addParticle(mass=1.0)
         colloid_potentials.add_particle(radius=radius_two, surface_potential=surface_potential_two,
                                         substrate_flag=False)
+        # Add another particle but exclude it from all interactions.
+        openmm_system.addParticle(mass=2.0)
+        colloid_potentials.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        colloid_potentials.add_exclusion(0, 2)
+        colloid_potentials.add_exclusion(1, 2)
         for potential in colloid_potentials.yield_potentials():
             openmm_system.addForce(potential)
 
@@ -261,8 +266,8 @@ class TestColloidPotentialsForTwoParticles(TestParameters):
                         (radius_one + radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
                         rel=1e-12, abs=1e-12))
             assert openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0) == [(0,), (0,)]
-            assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(1,), (1,)]
-            assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0,), (1,)]
+            assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(1, 2), (1, 2)]
+            assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0,), (1, 2)]
 
     @pytest.mark.parametrize("surface_separation,expected",
                              [   # Test at h=0.
@@ -282,7 +287,7 @@ class TestColloidPotentialsForTwoParticles(TestParameters):
                              ])
     def test_potential(self, openmm_context, radius_one, radius_two, surface_separation, expected):
         openmm_context.setPositions([[radius_one + radius_two + surface_separation, 0.0, 0.0],
-                                     [0.0, 0.0, 0.0]])
+                                     [0.0, 0.0, 0.0], [100.0, 100.0, 100.0]])
         openmm_state = openmm_context.getState(getEnergy=True)
         assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
                 == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
@@ -297,6 +302,11 @@ class TestColloidPotentialsWithLogForTwoParticles(TestParameters):
         colloid_potentials_log.add_particle(radius=radius_one, surface_potential=surface_potential_one)
         openmm_system.addParticle(mass=1.0)
         colloid_potentials_log.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        # Add another particle but exclude it from all interactions.
+        openmm_system.addParticle(mass=2.0)
+        colloid_potentials_log.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        colloid_potentials_log.add_exclusion(0, 2)
+        colloid_potentials_log.add_exclusion(1, 2)
         for potential in colloid_potentials_log.yield_potentials():
             openmm_system.addForce(potential)
 
@@ -369,8 +379,8 @@ class TestColloidPotentialsWithLogForTwoParticles(TestParameters):
                         (radius_one + radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
                         rel=1e-12, abs=1e-12))
             assert openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0) == [(0,), (0,)]
-            assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(1,), (1,)]
-            assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0,), (1,)]
+            assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(1, 2), (1, 2)]
+            assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0,), (1, 2)]
 
     @pytest.mark.parametrize("surface_separation,expected",
                              [   # Test at h=0.
@@ -390,7 +400,7 @@ class TestColloidPotentialsWithLogForTwoParticles(TestParameters):
                              ])
     def test_potential(self, openmm_context, radius_one, radius_two, surface_separation, expected):
         openmm_context.setPositions([[radius_one + radius_two + surface_separation, 0.0, 0.0],
-                                     [0.0, 0.0, 0.0]])
+                                     [0.0, 0.0, 0.0], [100.0, 100.0, 100.0]])
         openmm_state = openmm_context.getState(getEnergy=True)
         assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
                 == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
@@ -558,6 +568,13 @@ class TestColloidPotentialsForFourParticles(TestParameters):
         for _ in range(2):
             openmm_system.addParticle(mass=1.0)
             colloid_potentials.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        # Add another particle but exclude it from all interactions
+        openmm_system.addParticle(mass=2.0)
+        colloid_potentials.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        colloid_potentials.add_exclusion(0, 4)
+        colloid_potentials.add_exclusion(1, 4)
+        colloid_potentials.add_exclusion(2, 4)
+        colloid_potentials.add_exclusion(3, 4)
         for potential in colloid_potentials.yield_potentials():
             openmm_system.addForce(potential)
 
@@ -630,8 +647,8 @@ class TestColloidPotentialsForFourParticles(TestParameters):
                         (radius_one + radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
                         rel=1e-12, abs=1e-12))
             assert openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0) == [(0, 1), (0, 1)]
-            assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(2, 3), (2, 3)]
-            assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0, 1), (2, 3)]
+            assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(2, 3, 4), (2, 3, 4)]
+            assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0, 1), (2, 3, 4)]
 
     @pytest.mark.parametrize("positions,expected",
                              [
@@ -641,7 +658,8 @@ class TestColloidPotentialsForFourParticles(TestParameters):
                                      # Place at h=20 with reference to first particle.
                                      [0.0, 410.0 * (unit.nano * unit.meter), 0.0],
                                      # Place at h=10 with reference to first particle.
-                                     [0.0, 0.0, 400.0 * (unit.nano * unit.meter)]],
+                                     [0.0, 0.0, 400.0 * (unit.nano * unit.meter)],
+                                     [100.0, 100.0, 100.0] * (unit.nano * unit.meter)],
                                   1500.591138580165 * unit.kilojoule_per_mole),
                                  ([[0.0, 0.0, 0.0],
                                    # Place at h=10 with reference to first particle.
@@ -649,7 +667,8 @@ class TestColloidPotentialsForFourParticles(TestParameters):
                                    # Place at h=30 with reference to first particle.
                                    [0.0, 420.0 * (unit.nano * unit.meter), 0.0],
                                    # Place at h=100 with reference to first particle.
-                                   [0.0, 0.0, 490.0 * (unit.nano * unit.meter)]],
+                                   [0.0, 0.0, 490.0 * (unit.nano * unit.meter)],
+                                   [100.0, 100.0, 100.0] * (unit.nano * unit.meter)],
                                   2933.97721160759 * unit.kilojoule_per_mole),
                                  ([# Place at h=25 with reference to last particle.
                                    [0.0, 0.0, 515.0],
@@ -657,7 +676,8 @@ class TestColloidPotentialsForFourParticles(TestParameters):
                                    [0.0, 405.0, 0.0],
                                    # Place at h=10 with reference to last particle.
                                    [140, 0.0, 0.0],
-                                   [0.0, 0.0, 0.0]],
+                                   [0.0, 0.0, 0.0],
+                                   [100.0, 100.0, 100.0] * (unit.nano * unit.meter)],
                                   14398.17405177216 * unit.kilojoule_per_mole)
                              ])
     def test_potential(self, openmm_context, radius_one, radius_two, positions, expected):
@@ -733,6 +753,13 @@ class TestColloidPotentialsWithLogForFourParticles(TestParameters):
         for _ in range(2):
             openmm_system.addParticle(mass=1.0)
             colloid_potentials_log.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        # Add another particle but exclude it from all interactions
+        openmm_system.addParticle(mass=2.0)
+        colloid_potentials_log.add_particle(radius=radius_two, surface_potential=surface_potential_two)
+        colloid_potentials_log.add_exclusion(0, 4)
+        colloid_potentials_log.add_exclusion(1, 4)
+        colloid_potentials_log.add_exclusion(2, 4)
+        colloid_potentials_log.add_exclusion(3, 4)
         for potential in colloid_potentials_log.yield_potentials():
             openmm_system.addForce(potential)
 
@@ -805,8 +832,8 @@ class TestColloidPotentialsWithLogForFourParticles(TestParameters):
                         (radius_one + radius_two + 20.0 * debye_length).value_in_unit(unit.nano * unit.meter),
                         rel=1e-12, abs=1e-12))
             assert openmm_context.getSystem().getForce(0).getInteractionGroupParameters(0) == [(0, 1), (0, 1)]
-            assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(2, 3), (2, 3)]
-            assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0, 1), (2, 3)]
+            assert openmm_context.getSystem().getForce(1).getInteractionGroupParameters(0) == [(2, 3, 4), (2, 3, 4)]
+            assert openmm_context.getSystem().getForce(2).getInteractionGroupParameters(0) == [(0, 1), (2, 3, 4)]
 
     @pytest.mark.parametrize("positions,expected",
                              [
@@ -816,7 +843,8 @@ class TestColloidPotentialsWithLogForFourParticles(TestParameters):
                                      # Place at h=20 with reference to first particle.
                                      [0.0, 410.0 * (unit.nano * unit.meter), 0.0],
                                      # Place at h=10 with reference to first particle.
-                                     [0.0, 0.0, 400.0 * (unit.nano * unit.meter)]],
+                                     [0.0, 0.0, 400.0 * (unit.nano * unit.meter)],
+                                     [100.0, 100.0, 100.0] * (unit.nano * unit.meter)],
                                   1505.562902813702 * unit.kilojoule_per_mole),
                                  ([[0.0, 0.0, 0.0],
                                    # Place at h=10 with reference to first particle.
@@ -824,7 +852,8 @@ class TestColloidPotentialsWithLogForFourParticles(TestParameters):
                                    # Place at h=30 with reference to first particle.
                                    [0.0, 420.0 * (unit.nano * unit.meter), 0.0],
                                    # Place at h=100 with reference to first particle.
-                                   [0.0, 0.0, 490.0 * (unit.nano * unit.meter)]],
+                                   [0.0, 0.0, 490.0 * (unit.nano * unit.meter)],
+                                   [100.0, 100.0, 100.0] * (unit.nano * unit.meter)],
                                   2915.670694976501 * unit.kilojoule_per_mole),
                                  ([# Place at h=25 with reference to last particle.
                                    [0.0, 0.0, 515.0],
@@ -832,7 +861,8 @@ class TestColloidPotentialsWithLogForFourParticles(TestParameters):
                                    [0.0, 405.0, 0.0],
                                    # Place at h=10 with reference to last particle.
                                    [140, 0.0, 0.0],
-                                   [0.0, 0.0, 0.0]],
+                                   [0.0, 0.0, 0.0],
+                                   [100.0, 100.0, 100.0] * (unit.nano * unit.meter)],
                                   14284.77185919515 * unit.kilojoule_per_mole)
                              ])
     def test_potential(self, openmm_context, radius_one, radius_two, positions, expected):

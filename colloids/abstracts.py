@@ -9,7 +9,9 @@ from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
 class OpenMMPotentialAbstract(ABC):
     """
-    Abstract class for a potential implemented with the CustomNonbondedForces class of openmm.
+    Abstract wrapper class for a potential of OpenMM.
+
+    This class is a convenience wrapper for interactions that are handled by several OpenMM potentials
 
     The inheriting classes must implement the add_particle and yield_potentials methods so that they can be conveniently
     added to an openmm system.
@@ -26,7 +28,7 @@ class OpenMMPotentialAbstract(ABC):
     @abstractmethod
     def add_particle(self, *args: Any, **kwargs: Any) -> None:
         """
-        Add a particle with the given parameters to the system.
+        Add a particle with the given parameters to the handled OpenMM potentials.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -73,7 +75,33 @@ class OpenMMPotentialAbstract(ABC):
         self._yield_potentials_called = True
 
 
-class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
+class OpenMMNonbondedPotentialAbstract(OpenMMPotentialAbstract):
+    """
+    Abstract wrapper class for a non-bonded potential of OpenMM.
+
+    This class is a convenience wrapper for interactions that are handled by several OpenMM CustomNonbondedForce
+    potentials.
+
+    In addition to the add_particle and yield_potentials methods, the inheriting classes must implement the
+    add_exclusion method.
+    """
+
+    @abstractmethod
+    def add_exclusion(self, particle_one: int, particle_two: int) -> None:
+        """
+        Exclude a particle pair from the non-bonded interactions handled by this class.
+
+        :param particle_one:
+            The index of the first particle.
+        :type particle_one: int
+        :param particle_two:
+            The index of the second particle.
+        :type particle_two: int
+        """
+        raise NotImplementedError
+
+
+class ColloidPotentialsAbstract(OpenMMNonbondedPotentialAbstract):
     """
     Abstract class for the steric and electrostatic pair potentials between colloids in a solution with periodic
     boundary conditions using the CustomNonbondedForces class of openmm.
@@ -290,15 +318,17 @@ class Parameters(object):
             stop_index = 0
             while stop_index < len(string_wo_whitespaces) and string_wo_whitespaces[stop_index] not in ["*", "/"]:
                 stop_index += 1
-            # The first unit in the composite unit may contain a SI prefix that must be found explicitly because units
-            # like millivolt are not directly recognized by openmm.
-            for si_prefix in unit.si_prefixes:
-                if string_wo_whitespaces.startswith(si_prefix.prefix):
-                    assert stop_index > len(si_prefix.prefix)
-                    openmm_unit = si_prefix * unit.__dict__[string_wo_whitespaces[len(si_prefix.prefix):stop_index]]
-                    break
-            else:
+            try:
                 openmm_unit = unit.__dict__[string_wo_whitespaces[:stop_index]]
+            except KeyError:
+                # The first unit in the composite unit may contain a SI prefix that must be found explicitly because
+                # units like millivolt are not directly recognized by openmm.
+                openmm_unit = None
+                for si_prefix in unit.si_prefixes:
+                    if string_wo_whitespaces.startswith(si_prefix.prefix):
+                        assert stop_index > len(si_prefix.prefix)
+                        openmm_unit = si_prefix * unit.__dict__[string_wo_whitespaces[len(si_prefix.prefix):stop_index]]
+                        break
             # If the composite unit only contains one unit, the conversion is finished.
             if stop_index == len(string_wo_whitespaces):
                 return openmm_unit

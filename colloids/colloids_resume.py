@@ -23,9 +23,9 @@ def colloids_resume(argv: Sequence[str]) -> app.Simulation:
         raise ValueError("The number of steps must be positive.")
 
     parameters = RunParameters.from_yaml(args.yaml_file)
-    types, _, cell = read_xyz_file(parameters.initial_configuration)
+    types, positions, cell = read_xyz_file(parameters.initial_configuration)
 
-    simulation, _ = set_up_simulation(parameters, types, cell)
+    simulation, _ = set_up_simulation(parameters, types, cell, positions)
 
     simulation.loadCheckpoint(args.checkpoint_file)
 

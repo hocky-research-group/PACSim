@@ -30,7 +30,8 @@ class TestEnergies(object):
                               ("run_cp_depletion.yaml", -44424.402360702596),
                               ("run_cp_walls_substrate.yaml", -12286.15816959927),
                               ("run_cp_walls_substrate_depletion.yaml", -54312.08243054912),
-                              ("run_cp_walls_substrate_gravity.yaml", -12286.225633072137)])
+                              ("run_cp_walls_substrate_gravity.yaml", -12286.225633072137),
+                              ("run_cp_walls_snowman.yaml", -231.80203391587074)])
     def test_energies(self, yaml_file, expected_energy):
         simulation = colloids_run([yaml_file])
         potential_energy = simulation.context.getState(getEnergy=True).getPotentialEnergy()

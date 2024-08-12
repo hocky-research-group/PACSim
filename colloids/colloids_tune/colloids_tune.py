@@ -153,8 +153,8 @@ def main():
     parser = argparse.ArgumentParser(description="Tune the surface potential of a colloid with a given radius so that "
                                                  "the potential depth of the combined steric and electrostatic "
                                                  "potentials is equal to a given potential depth.")
-    parser.add_argument("tune_parameters", help="YAML file with tune parameters", type=str)
     parser.add_argument("simulation_parameters", help="YAML file with simulation parameters", type=str)
+    parser.add_argument("tune_parameters", help="YAML file with tune parameters", type=str)
     parser.add_argument("--example", help="write an example analysis YAML file and exit",
                         action=ExampleAction)
     args = parser.parse_args()

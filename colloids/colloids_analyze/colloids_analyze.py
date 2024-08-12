@@ -18,10 +18,10 @@ class ExampleAction(argparse.Action):
 def main():
     parser = argparse.ArgumentParser(description="Create an initial configuration for an OpenMM simulation of a "
                                                  "colloids system.")
-    parser.add_argument("analysis_parameters", help="YAML file with analysis parameters",
-                        type=str)
     parser.add_argument("simulation_parameters", help="YAML file with simulation parameters", type=str,
                         nargs="+")
+    parser.add_argument("analysis_parameters", help="YAML file with analysis parameters",
+                        type=str)
     parser.add_argument("--example", help="write an example analysis YAML file and exit",
                         action=ExampleAction)
     args = parser.parse_args()

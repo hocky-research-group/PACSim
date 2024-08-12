@@ -561,6 +561,12 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the initial configuration is not in radii dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
+            if t == self.substrate_type:
+                raise ValueError(f"Type {t} of the initial configuration cannot be the substrate type. Use "
+                                 f"checkpoints to restart simulations with a substrate.")
+            if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
+                raise ValueError(f"Type {t} of the initial configuration cannot be a snowman head type. Use "
+                                 f"checkpoints to restart simulations with snowman colloids.")
         for t in self.masses:
             if t not in types:
                 if t == self.substrate_type:

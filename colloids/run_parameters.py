@@ -46,44 +46,6 @@ class RunParameters(Parameters):
         The unit of the surface potentials must be compatible with millivolts.
         Defaults to {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)}.
     :type surface_potentials: dict[str, unit.Quantity]
-    :param snowman_masses:
-        The masses of the different types of snowman heads on the colloidal base particles that appear in the initial
-        configuration file.
-        By convention, the types of the snowman heads should be twice the type of their colloidal base particles.
-        If the value is None, the snowman head is not present.
-        The unit of the masses must be compatible with atomic mass units and the values must be greater than zero.
-        Defaults to {"PP": None, "NN": None}.
-    :type snowman_masses: Optional[dict[str, Optional[unit.Quantity]]]
-    :param snowman_radii:
-        The radii of the different types of snowman heads on the colloidal base particles that appear in the initial
-        configuration file.
-        By convention, the types of the snowman heads should be twice the type of their colloidal base particles.
-        If the value is None, the snowman head is not present.
-        The unit of the radii must be compatible with nanometers and the values must be greater than zero.
-        Defaults to {"PP": None, "NN": None}.
-    :type snowman_radii: Optional[dict[str, Optional[unit.Quantity]]]
-    :param snowman_surface_potentials:
-        The surface potentials of the different types of snowman heads on the colloidal base particles that appear in
-        the initial configuration file.
-        By convention, the types of the snowman heads should be twice the type of their colloidal base particles.
-        If the value is None, the snowman head is not present.
-        The unit of the surface potentials must be compatible with millivolts.
-        Defaults to {"PP": None, "NN", None}.
-    :type snowman_surface_potentials: Optional[dict[str, Optional[unit.Quantity]]]
-    :param snowman_distances:
-        The fixed distances of the different types of snowman heads to their colloidal base particles that appear in the
-        initial configuration.
-        By convention, the types of the snowman heads should be twice the type of their colloidal base particles.
-        If the value is None, the snowman head is not present.
-        The unit of the distances must be compatible with nanometers and the values must be greater than zero.
-        Defaults to {"PP": None, "NN": None}.
-    :type snowman_distances: Optional[dict[str, Optional[unit.Quantity]]]
-    :param snowman_seed:
-        The seed for the random number generator for the positions of the snowman heads around their colloidal base
-        particles.
-        If None, a random seed is used.
-        Defaults to None.
-    :type snowman_seed: Optional[int]
     :param platform_name:
         The name of the platform to use for the simulation.
         Defaults to "Reference". Other possible choices are "CPU", "CUDA", or "OpenCL".
@@ -279,6 +241,29 @@ class RunParameters(Parameters):
         surface_potentials dictionaries.
         Defaults to None.
     :type substrate_type: Optional[str]
+    :param use_snowman:
+        A boolean indicating whether to use the snowman colloids in the simulation.
+        In a snowman colloid, a colloidal head particle is attached to a colloidal base particle at a fixed distance.
+        If True, the snowman bond types, the snowman distances, and optionally the snowman seed must be specified.
+        Defaults to False.
+    :type use_snowman: bool
+    :param snowman_seed:
+        The seed for the random number generator that is used to sample the positions of the snowman heads.
+        If None, a random seed is used.
+        Defaults to None.
+    :type snowman_seed: Optional[int]
+    :param snowman_bond_types:
+        Dictionary mapping from the type of the base particle to the type of the head particle in the snowman colloid.
+        Snowman heads are attached to every base particle type in this dictionary.
+        Every snowman head type must appear in the masses, radii, and surface potentials dictionaries.
+        Defaults to None.
+    :type snowman_bond_types: Optional[dict[str, str]]
+    :param snowman_distances:
+        Dictionary mapping from the type of the base particle to the desired distance to the snowman head.
+        Every type appearing in the snowman bond types dictionary must have a corresponding distance in this dictionary.
+        The unit of every distance must be compatible with nanometers and the value must be greater than zero.
+        Defaults to None.
+    :type snowman_distances: Optional[dict[str, unit.Quantity]]
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -293,15 +278,6 @@ class RunParameters(Parameters):
         default_factory=lambda: {"P": 105.0 * (unit.nano * unit.meter), "N": 95.0 * (unit.nano * unit.meter)})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
-    snowman_masses: Optional[dict[str, Optional[unit.Quantity]]] = field(
-        default_factory=lambda: {"PP": None, "NN": None})
-    snowman_radii: Optional[dict[str, Optional[unit.Quantity]]] = field(
-        default_factory=lambda: {"PP": None, "NN": None})
-    snowman_distances: Optional[dict[str, Optional[unit.Quantity]]] = field(
-        default_factory=lambda: {"PP": None, "NN": None})
-    snowman_surface_potentials: Optional[dict[str, Optional[unit.Quantity]]] = field(
-        default_factory=lambda: {"PP": None, "NN": None})
-    snowman_seed: Optional[int] = None
     platform_name: str = "Reference"
     potential_temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
     integrator: str = "LangevinIntegrator"
@@ -344,6 +320,10 @@ class RunParameters(Parameters):
     update_reporter_parameters: Optional[dict[str, Any]] = None
     use_substrate: bool = False
     substrate_type: Optional[str] = None
+    use_snowman: bool = False
+    snowman_seed: Optional[int] = None
+    snowman_bond_types: Optional[dict[str, str]] = None
+    snowman_distances: Optional[dict[str, unit.Quantity]] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -360,19 +340,6 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the masses dictionary is not in radii dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the masses dictionary is not in surface potentials dictionary.")
-            snowman_type = t + t
-            if self.snowman_masses is not None and snowman_type not in self.snowman_masses:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the masses dictionary is "
-                                 f"not in snowman masses dictionary.")
-            if self.snowman_radii is not None and snowman_type not in self.snowman_radii:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the masses dictionary is "
-                                 f"not in snowman radii dictionary.")
-            if self.snowman_surface_potentials is not None and snowman_type not in self.snowman_surface_potentials:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the masses dictionary is "
-                                 f"not in snowman surface potentials dictionary.")
-            if self.snowman_distances is not None and snowman_type not in self.snowman_distances:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the masses dictionary is "
-                                 f"not in snowman distances dictionary.")
         for t in self.radii:
             if not self.radii[t].unit.is_compatible(unit.nano * unit.meter):
                 raise TypeError(f"Radius of type {t} must have a unit compatible with nanometers.")
@@ -382,19 +349,6 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the radii dictionary is not in masses dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the radii dictionary is not in surface potentials dictionary.")
-            snowman_type = t + t
-            if self.snowman_masses is not None and snowman_type not in self.snowman_masses:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the radii dictionary is "
-                                 f"not in snowman masses dictionary.")
-            if self.snowman_radii is not None and snowman_type not in self.snowman_radii:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the radii dictionary is "
-                                 f"not in snowman radii dictionary.")
-            if self.snowman_surface_potentials is not None and snowman_type not in self.snowman_surface_potentials:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the radii dictionary is "
-                                 f"not in snowman surface potentials dictionary.")
-            if self.snowman_distances is not None and snowman_type not in self.snowman_distances:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the radii dictionary is "
-                                 f"not in snowman distances dictionary.")
         for t in self.surface_potentials:
             if not self.surface_potentials[t].unit.is_compatible(unit.milli * unit.volt):
                 raise TypeError(f"Surface potential of type {t} must have a unit compatible with millivolts.")
@@ -402,179 +356,6 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
             if t not in self.radii:
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
-            snowman_type = t + t
-            if self.snowman_masses is not None and snowman_type not in self.snowman_masses:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the surface potentials "
-                                 f"dictionary is not in snowman masses dictionary.")
-            if self.snowman_radii is not None and snowman_type not in self.snowman_radii:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the surface potentials "
-                                 f"dictionary is not in snowman radii dictionary.")
-            if self.snowman_surface_potentials is not None and snowman_type not in self.snowman_surface_potentials:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the surface potentials "
-                                 f"dictionary is not in snowman surface potentials dictionary.")
-            if self.snowman_distances is not None and snowman_type not in self.snowman_distances:
-                raise ValueError(f"Snowman type {snowman_type} corresponding to type {t} of the surface potentials "
-                                 f"dictionary is not in snowman distances dictionary.")
-        if self.snowman_masses is not None:
-            if self.snowman_radii is None:
-                raise ValueError("If snowman masses are specified, snowman radii must be specified.")
-            if self.snowman_surface_potentials is None:
-                raise ValueError("If snowman masses are specified, snowman surface potentials must be specified.")
-            if self.snowman_distances is None:
-                raise ValueError("If snowman masses are specified, snowman distances must be specified.")
-            for t in self.snowman_masses:
-                if self.snowman_masses[t] is not None:
-                    if not self.snowman_masses[t].unit.is_compatible(unit.amu):
-                        raise TypeError(
-                            f"Mass of type {t} in snowman masses must have a unit compatible with atomic mass units.")
-                    if self.snowman_masses[t] <= 0.0 * unit.amu:
-                        raise ValueError(f"Mass of type {t} in snowman masses must be greater than zero.")
-                if not len(t) % 2 == 0:
-                    raise ValueError(f"By convention, the types of the snowman head should be twice the type of its "
-                                     f"colloidal particle so that the length of the snowman type must be even which is "
-                                     f"true for the snowman type {t} in the snowman masses dictionary.")
-                colloid_type = t[:len(t) // 2]
-                if colloid_type not in self.masses:
-                    raise ValueError(f"Type {colloid_type} corresponding to snowman type {t} of the snowman masses "
-                                     f"dictionary is not in masses dictionary.")
-                if colloid_type not in self.radii:
-                    raise ValueError(f"Type {colloid_type} corresponding to snowman type {t} of the snowman masses "
-                                     f"dictionary is not in radii dictionary.")
-                if colloid_type not in self.surface_potentials:
-                    raise ValueError(
-                        f"Type {colloid_type} corresponding to snowman type {t} of the snowman masses dictionary is "
-                        f"not in surface potentials dictionary.")
-                if t not in self.snowman_radii:
-                    raise ValueError(f"Type {t} of the snowman masses dictionary is not in snowman radii dictionary.")
-                if t not in self.snowman_surface_potentials:
-                    raise ValueError(f"Type {t} of the snowman masses dictionary is not in snowman surface potentials "
-                                     f"dictionary.")
-                if t not in self.snowman_distances:
-                    raise ValueError(
-                        f"Type {t} of the snowman masses dictionary is not in snowman distances dictionary.")
-        if self.snowman_radii is not None:
-            if self.snowman_masses is None:
-                raise ValueError("If snowman radii are specified, snowman masses must be specified.")
-            if self.snowman_surface_potentials is None:
-                raise ValueError("If snowman radii are specified, snowman surface potentials must be specified.")
-            if self.snowman_distances is None:
-                raise ValueError("If snowman radii are specified, snowman distances must be specified.")
-            for t in self.snowman_radii:
-                if self.snowman_radii[t] is not None:
-                    if not self.snowman_radii[t].unit.is_compatible(unit.nano * unit.meter):
-                        raise TypeError(
-                            f"Radius of type {t} in snowman radii must have a unit compatible with nanometers.")
-                    if self.snowman_radii[t] <= 0.0 * (unit.nano * unit.meter):
-                        raise ValueError(f"Radius of type {t} in snowman radii must be greater than zero.")
-                if not len(t) % 2 == 0:
-                    raise ValueError(f"By convention, the types of the snowman head should be twice the type of its "
-                                     f"colloidal particle so that the length of the snowman type must be even which is "
-                                     f"true for the snowman type {t} in the snowman radii dictionary.")
-                colloid_type = t[:len(t) // 2]
-                if colloid_type not in self.masses:
-                    raise ValueError(f"Type {colloid_type} corresponding to snowman type {t} of the snowman radii "
-                                     f"dictionary is not in masses dictionary.")
-                if colloid_type not in self.radii:
-                    raise ValueError(f"Type {colloid_type} corresponding to snowman type {t} of the snowman radii "
-                                     f"dictionary is not in radii dictionary.")
-                if colloid_type not in self.surface_potentials:
-                    raise ValueError(
-                        f"Type {colloid_type} corresponding to snowman type {t} of the snowman radii dictionary is "
-                        f"not in surface potentials dictionary.")
-                if t not in self.snowman_masses:
-                    raise ValueError(f"Type {t} of the snowman radii dictionary is not in snowman masses dictionary.")
-                if t not in self.snowman_surface_potentials:
-                    raise ValueError(f"Type {t} of the snowman radii dictionary is not in snowman surface potentials "
-                                     f"dictionary.")
-                if t not in self.snowman_distances:
-                    raise ValueError(
-                        f"Type {t} of the snowman radii dictionary is not in snowman distances dictionary.")
-        if self.snowman_surface_potentials is not None:
-            if self.snowman_masses is None:
-                raise ValueError("If snowman surface potentials are specified, snowman masses must be specified.")
-            if self.snowman_radii is None:
-                raise ValueError("If snowman surface potentials are specified, snowman radii must be specified.")
-            if self.snowman_distances is None:
-                raise ValueError("If snowman surface potentials are specified, snowman distances must be specified.")
-            for t in self.snowman_surface_potentials:
-                if self.snowman_surface_potentials[t] is not None:
-                    if not self.snowman_surface_potentials[t].unit.is_compatible(unit.milli * unit.volt):
-                        raise TypeError(
-                            f"Surface potential of type {t} in snowman surface potentials must have a unit compatible "
-                            f"with millivolts.")
-                if not len(t) % 2 == 0:
-                    raise ValueError(f"By convention, the types of the snowman head should be twice the type of its "
-                                     f"colloidal particle so that the length of the snowman type must be even which is "
-                                     f"true for the snowman type {t} in the snowman surface potentials dictionary.")
-                colloid_type = t[:len(t) // 2]
-                if colloid_type not in self.masses:
-                    raise ValueError(f"Type {colloid_type} corresponding to snowman type {t} of the snowman surface "
-                                     f"potentials dictionary is not in masses dictionary.")
-                if colloid_type not in self.radii:
-                    raise ValueError(f"Type {colloid_type} corresponding to snowman type {t} of the snowman surface "
-                                     f"potentials dictionary is not in radii dictionary.")
-                if colloid_type not in self.surface_potentials:
-                    raise ValueError(
-                        f"Type {colloid_type} corresponding to snowman type {t} of the snowman surface potentials "
-                        f"dictionary is not in surface potentials dictionary.")
-                if t not in self.snowman_masses:
-                    raise ValueError(f"Type {t} of the snowman surface potentials dictionary is not in snowman masses "
-                                     f"dictionary.")
-                if t not in self.snowman_radii:
-                    raise ValueError(f"Type {t} of the snowman surface potentials dictionary is not in snowman radii "
-                                     f"dictionary.")
-                if t not in self.snowman_distances:
-                    raise ValueError(f"Type {t} of the snowman surface potentials dictionary is not in snowman "
-                                     f"distances dictionary.")
-        if self.snowman_distances is not None:
-            if self.snowman_masses is None:
-                raise ValueError("If snowman distances are specified, snowman masses must be specified.")
-            if self.snowman_radii is None:
-                raise ValueError("If snowman distances are specified, snowman radii must be specified.")
-            if self.snowman_surface_potentials is None:
-                raise ValueError("If snowman distances are specified, snowman surface potentials must be specified.")
-            for t in self.snowman_distances:
-                if self.snowman_distances[t] is not None:
-                    if not self.snowman_distances[t].unit.is_compatible(unit.nano * unit.meter):
-                        raise TypeError(
-                            f"Distance of type {t} in snowman distances must have a unit compatible with nanometers.")
-                    if self.snowman_distances[t] <= 0.0 * (unit.nano * unit.meter):
-                        raise ValueError(f"Distance of type {t} in snowman distances must be greater than zero.")
-                if not len(t) % 2 == 0:
-                    raise ValueError(f"By convention, the types of the snowman head should be twice the type of its "
-                                     f"colloidal particle so that the length of the snowman type must be even which is "
-                                     f"true for the snowman type {t} in the snowman distances dictionary.")
-                colloid_type = t[:len(t) // 2]
-                if colloid_type not in self.masses:
-                    raise ValueError(f"Type {colloid_type} corresponding to snowman type {t} of the snowman distances "
-                                     f"dictionary is not in masses dictionary.")
-                if colloid_type not in self.radii:
-                    raise ValueError(f"Type {colloid_type} corresponding to snowman type {t} of the snowman distances "
-                                     f"dictionary is not in radii dictionary.")
-                if colloid_type not in self.surface_potentials:
-                    raise ValueError(
-                        f"Type {colloid_type} corresponding to snowman type {t} of the distances radii dictionary is "
-                        f"not in surface potentials dictionary.")
-                if t not in self.snowman_masses:
-                    raise ValueError(
-                        f"Type {t} of the snowman distances dictionary is not in snowman masses dictionary.")
-                if t not in self.snowman_radii:
-                    raise ValueError(
-                        f"Type {t} of the snowman distances dictionary is not in snowman radii dictionary.")
-                if t not in self.snowman_surface_potentials:
-                    raise ValueError(
-                        f"Type {t} of the snowman distances dictionary is not in snowman surface potentials "
-                        f"dictionary.")
-        if self.snowman_seed is not None:
-            if self.snowman_masses is None or all(v is None for v in self.snowman_masses.values()):
-                raise ValueError(f"Snowman seed is not None but no snowman masses were specified.")
-            if self.snowman_radii is None or all(v is None for v in self.snowman_radii.values()):
-                raise ValueError(f"Snowman seed is not None but no snowman radii were specified.")
-            if self.snowman_surface_potentials is None or all(
-                    v is None for v in self.snowman_surface_potentials.values()):
-                raise ValueError(f"Snowman seed is not None but no snowman surface potentials were specified.")
-            if self.snowman_distances is None or all(v is None for v in self.snowman_distances.values()):
-                raise ValueError(f"Snowman seed is not None but not snowman distances were specified.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
         possible_integrators = [name for name, _ in inspect.getmembers(integrators, inspect.isfunction)]
@@ -727,6 +508,38 @@ class RunParameters(Parameters):
         else:
             if self.substrate_type is not None:
                 raise ValueError("The substrate type must not be specified if a substrate is not used.")
+        if self.use_snowman:
+            if self.snowman_bond_types is None:
+                raise ValueError("Snowman bond types must be specified if snowman is on.")
+            if self.snowman_distances is None:
+                raise ValueError("Snowman distances must be specified if snowman is on.")
+            for t in self.snowman_bond_types:
+                st = self.snowman_bond_types[t]
+                if st not in self.masses:
+                    raise ValueError(f"Type {st} of the snowman bond types dictionary is not in masses dictionary.")
+                if st not in self.radii:
+                    raise ValueError(f"Type {st} of the snowman bond types dictionary is not in radii dictionary.")
+                if st not in self.surface_potentials:
+                    raise ValueError(f"Type {st} of the snowman bond types dictionary is not in surface potentials "
+                                     f"dictionary.")
+                if t not in self.snowman_distances:
+                    raise ValueError(f"Type {t} of the snowman bond types dictionary is not in snowman distances "
+                                     f"dictionary.")
+            for t in self.snowman_distances:
+                if t not in self.snowman_bond_types:
+                    raise ValueError(f"Type {t} of the snowman distances dictionary is not in snowman bond types "
+                                     f"dictionary.")
+                if not self.snowman_distances[t].unit.is_compatible(unit.nano * unit.meter):
+                    raise TypeError(f"Distance of type {t} must have a unit compatible with nanometers.")
+                if self.snowman_distances[t] <= 0.0 * (unit.nano * unit.meter):
+                    raise ValueError(f"Distance of type {t} must be greater than zero.")
+        else:
+            if self.snowman_bond_types is not None:
+                raise ValueError("Snowman bond types must not be specified if snowman is not on.")
+            if self.snowman_distances is not None:
+                raise ValueError("Snowman distances must not be specified if snowman is not on.")
+            if self.snowman_seed is not None:
+                raise ValueError("Snowman seed must not be specified if snowman is not on.")
 
     def check_types_of_initial_configuration(self):
         """

@@ -1,4 +1,4 @@
-alpha: null
+alpha: 1.0
 brush_density: !Quantity
   unit: /(nanometer**2)
   value: 0.09
@@ -7,19 +7,35 @@ brush_length: !Quantity
   value: 10.6
 checkpoint_filename: test_run_and_resume/checkpoint.chk
 checkpoint_interval: 50
-collision_rate: !Quantity
-  unit: /picosecond
-  value: 0.01
 cutoff_factor: 21.0
 debye_length: !Quantity
   unit: nanometer
   value: 5.726968
+depletant_radius: !Quantity
+    unit: nanometer
+    value: 5.0
+depletion_phi: 0.5
 dielectric_constant: 80.0
-epsilon: null
+epsilon: !Quantity
+    unit: kilojoule/mole
+    value: 2.477709860209665
 final_configuration_gsd_filename: test_run_and_resume/final_frame_resume.gsd
 final_configuration_xyz_filename: test_run_and_resume/final_frame_resume.xyz
+gravitational_acceleration: !Quantity
+    unit: meter/(second**2)
+    value: 9.8
 initial_configuration: first_frame.xyz
-integrator_seed: 3
+integrator: LangevinIntegrator
+integrator_parameters:
+  frictionCoeff: !Quantity
+    unit: /picosecond
+    value: 0.001574074286750681
+  randomNumberSeed: 3
+  stepSize: !Quantity
+    unit: picosecond
+    value: 0.00317647015905543
+  temperature: !Copy
+    key: potential_temperature
 masses:
   N: !Quantity
     unit: dalton
@@ -27,8 +43,17 @@ masses:
   P: !Quantity
     unit: dalton
     value: 1.0
+  S: !Quantity
+    unit: dalton
+    value: 0.0
 minimize_energy_initially: false
+particle_density: !Quantity
+  unit: gram/(centimeter**3)
+  value: 1.05
 platform_name: Reference
+potential_temperature: !Quantity
+  unit: kelvin
+  value: 298.0
 radii:
   N: !Quantity
     unit: nanometer
@@ -36,6 +61,9 @@ radii:
   P: !Quantity
     unit: nanometer
     value: 105.0
+  S: !Quantity
+    unit: nanometer
+    value: 30.0
 run_steps: 50
 snowman_distances:
   NN: null
@@ -52,6 +80,7 @@ snowman_surface_potentials:
   PP: null
 state_data_filename: test_run_and_resume/state_data_resume.csv
 state_data_interval: 10
+substrate_type: S
 surface_potentials:
   N: !Quantity
     unit: millivolt
@@ -59,18 +88,32 @@ surface_potentials:
   P: !Quantity
     unit: millivolt
     value: 44.0
-temperature: !Quantity
-  unit: kelvin
-  value: 298.0
-timestep: !Quantity
-  unit: picosecond
-  value: 0.05
+  S: !Quantity
+    unit: millivolt
+    value: -47.94502672295134  # Tuned with colloids-tune so that potential depth is at -3 k_B T.
 trajectory_filename: test_run_and_resume/trajectory_resume.gsd
 trajectory_interval: 10
+update_reporter_parameters:
+  filename: test_run_and_resume/update_reporter_resume.csv
+  update_interval: 10
+  final_update_step: 100
+  global_parameter_name: debye_length
+  start_value: !Copy
+    key: debye_length
+  end_value: !Quantity
+    unit: nanometer
+    value: 6.0
+use_depletion: true
+use_gravity: true
 use_log: false
+use_substrate: true
+use_update_reporter: true
 use_tabulated: false
 velocity_seed: 2
 wall_directions:
-  - false
-  - false
-  - false
+  - true
+  - true
+  - true
+water_density: !Quantity
+  unit: gram/(centimeter**3)
+  value: 0.998

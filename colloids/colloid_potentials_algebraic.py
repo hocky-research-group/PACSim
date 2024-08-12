@@ -67,19 +67,20 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             raise ValueError("The cutoff factor must be greater than zero.")
 
         self._use_log = use_log
-        self._steric_potential = self._set_up_steric_potential()
-        self._electrostatic_potential = self._set_up_electrostatic_potential()
+        self._steric_potential = self.set_up_steric_potential()
+        self._electrostatic_potential = self.set_up_electrostatic_potential()
         self._max_radius = -math.inf * self._nanometer
         self._cutoff_factor = cutoff_factor
 
-    def _set_up_steric_potential(self) -> CustomNonbondedForce:
+    def set_up_steric_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""
         steric_potential = CustomNonbondedForce(
+            "select(flag1 * flag2, 0, "
             "step(two_l - h) * "
             "steric_prefactor * rs / 2.0 * brush_length * brush_length * ("
             "28.0 * ((two_l / h)^0.25 - 1.0) "
             "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
-            "+ 12.0 * (h / two_l - 1.0)); "
+            "+ 12.0 * (h / two_l - 1.0))); "
             "h = r - rs;"
             "rs = radius1 + radius2;"
             "two_l = 2.0 * brush_length"
@@ -95,20 +96,23 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         steric_potential.addGlobalParameter("brush_length",
                                             self._parameters.brush_length.value_in_unit(self._nanometer))
         steric_potential.addPerParticleParameter("radius")
+        steric_potential.addPerParticleParameter("flag")
         return steric_potential
 
-    def _set_up_electrostatic_potential(self) -> CustomNonbondedForce:
+    def set_up_electrostatic_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""
         if self._use_log:
             electrostatic_potential = CustomNonbondedForce(
-                "electrostatic_prefactor * radius * psi1 * psi2 * log(1.0 + exp(-h / debye_length)); "
+                "select(flag1 * flag2, 0, "
+                "electrostatic_prefactor * radius * psi1 * psi2 * log(1.0 + exp(-h / debye_length))); "
                 "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
                 "h = r - rs;"
                 "rs = radius1 + radius2"
             )
         else:
             electrostatic_potential = CustomNonbondedForce(
-                "electrostatic_prefactor * radius * psi1 * psi2 * exp(-h / debye_length); "
+                "select(flag1 * flag2, 0, "
+                "electrostatic_prefactor * radius * psi1 * psi2 * exp(-h / debye_length)); "
                 "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
                 "h = r - rs;"
                 "rs = radius1 + radius2"
@@ -124,11 +128,19 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         electrostatic_potential.addPerParticleParameter("radius")
         # Psi should be given in millivolts.
         electrostatic_potential.addPerParticleParameter("psi")
+        electrostatic_potential.addPerParticleParameter("flag")
         return electrostatic_potential
 
-    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:
+    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity,
+                     substrate_flag: bool = False) -> None:
         """
         Add a colloid with a given radius and surface potential to the system.
+
+        If the substrate flag is True, the colloid is considered to be a substrate particle. Substrate particles do
+        not interact with each other. In this class, this is achieved by setting the flag per-particle parameter to 1
+        for substrate particles and to 0 for non-substrate particles. This flag is used in the algebraic expression of
+        the steric and electrostatic potentials. Interaction groups would also work but are considerably slower
+        (see https://github.com/openmm/openmm/issues/2698).
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -140,6 +152,9 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             The surface potential of the colloid.
             The unit of the surface_potential must be compatible with millivolts.
         :type surface_potential: unit.Quantity
+        :param substrate_flag:
+            If True, the colloid is considered to be a substrate particle.
+        :type substrate_flag: bool
 
         :raises TypeError:
             If the radius or surface_potential is not a Quantity with a proper unit (via the abstract base class).
@@ -148,14 +163,15 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         :raises RuntimeError:
             If the method yield_potentials was called before this method (via the abstract base class).
         """
-        super().add_particle(radius, surface_potential)
+        super().add_particle(radius, surface_potential, substrate_flag)
 
         if radius.in_units_of(self._nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(self._nanometer)
 
-        self._steric_potential.addParticle([radius.value_in_unit(self._nanometer)])
+        self._steric_potential.addParticle([radius.value_in_unit(self._nanometer), int(substrate_flag)])
         self._electrostatic_potential.addParticle([radius.value_in_unit(self._nanometer),
-                                                   surface_potential.value_in_unit(self._millivolt)])
+                                                   surface_potential.value_in_unit(self._millivolt),
+                                                   int(substrate_flag)])
 
     def add_exclusion(self, particle_one: int, particle_two: int) -> None:
         """
@@ -196,9 +212,6 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(self._nanometer))
         self._steric_potential.setUseLongRangeCorrection(False)
         self._steric_potential.setUseSwitchingFunction(False)
-        # Set different force groups for steric and electrostatic potentials to allow for different cutoffs on the
-        # OpenCL and CUDA platforms.
-        self._steric_potential.setForceGroup(0)
 
         if self._periodic_boundary_conditions:
             self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffPeriodic)
@@ -212,7 +225,6 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         self._electrostatic_potential.setSwitchingDistance(
             (2.0 * self._max_radius
              + (self._cutoff_factor - 1.0) * self._parameters.debye_length).value_in_unit(self._nanometer))
-        self._electrostatic_potential.setForceGroup(1)
 
         yield self._steric_potential
         yield self._electrostatic_potential

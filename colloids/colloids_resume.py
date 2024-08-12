@@ -1,4 +1,5 @@
 import argparse
+from openmm import unit
 from colloids.colloids_run import set_up_simulation, set_up_reporters
 from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
 from colloids.run_parameters import RunParameters
@@ -31,10 +32,10 @@ def main():
 
     if parameters.final_configuration_gsd_filename is not None:
         write_gsd_file(parameters.final_configuration_gsd_filename, simulation, parameters.radii,
-                       parameters.surface_potentials)
+                       parameters.surface_potentials, cell * (unit.nano * unit.meter))
 
     if parameters.final_configuration_xyz_filename is not None:
-        write_xyz_file(parameters.final_configuration_xyz_filename, simulation)
+        write_xyz_file(parameters.final_configuration_xyz_filename, simulation, cell * (unit.nano * unit.meter))
 
 
 if __name__ == '__main__':

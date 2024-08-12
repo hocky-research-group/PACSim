@@ -32,7 +32,7 @@ def benchmark_hoomd(device: str = "CPU", number_steps: int = 100, shift: bool = 
     except RuntimeError as err:
         print(err, file=sys.stderr)
         exit(1)
-    snapshot = hoomd.data.gsd_snapshot("colloids/tests/first_frame.gsd")
+    snapshot = hoomd.data.gsd_snapshot("../colloids/tests/first_frame.gsd")
     hoomd.init.read_snapshot(snapshot)
     nl = hoomd.md.nlist.cell()
     ColloidPotentialsTabulatedHoomd(

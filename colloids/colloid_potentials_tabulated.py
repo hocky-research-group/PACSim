@@ -102,6 +102,8 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
             raise TypeError("argument surface_potential_one must have a unit that is compatible with millivolts")
         if not surface_potential_two.unit.is_compatible(self._millivolt):
             raise TypeError("argument surface_potential_two must have a unit that is compatible with millivolts")
+        if surface_potential_one == surface_potential_two:
+            raise ValueError("the surface potentials of the two types of colloids must be different")
 
         self._radius_one = radius_one.in_units_of(self._nanometer)
         self._radius_two = radius_two.in_units_of(self._nanometer)
@@ -239,9 +241,14 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
         return potential_11, potential_22, potential_12
 
-    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:
+    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity,
+                     substrate_flag: bool = False) -> None:
         """
         Add a colloid with a given radius and surface potential to the system.
+
+        If the substrate flag is True, the colloid is considered to be a substrate particle. Substrate particles do
+        not interact with each other. Since this class does not support substrate particles anyway (since this would
+        require more than two types of colloids), the substrate flag should always be false.
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 
@@ -253,6 +260,9 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
             The surface potential of the colloid.
             The unit of the surface_potential must be compatible with millivolts.
         :type surface_potential: unit.Quantity
+        :param substrate_flag:
+            Whether the colloid is a substrate particle.
+        :type substrate_flag: bool
 
         :raises TypeError:
             If the radius or surface_potential is not a Quantity with a proper unit (via the abstract base class).
@@ -266,27 +276,31 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         :raises ValueError:
             If the given surface potential is not compatible with the surface potential of the first or the second
             colloid that was specified during the initialization of this class.
+        :raises ValueError:
+            If the substrate flag is True.
         """
-        super().add_particle(radius, surface_potential)
+        super().add_particle(radius, surface_potential, substrate_flag)
 
-        if radius == self._radius_one:
-            if not surface_potential == self._surface_potential_one:
+        if surface_potential == self._surface_potential_one:
+            if not radius == self._radius_one:
                 raise ValueError(
-                    "the given surface potential must be compatible with the surface potential of the first colloid "
-                    "that was specified during the initialization of this class (because the given radius is the same "
-                    "as the radius of the first colloid)")
+                    "the given radius must be compatible with the radius of the first colloid that was specified "
+                    "during the initialization of this class (because the given surface potential is the same "
+                    "as the surface potential of the first colloid)")
             self._indices_one.append(self._current_particle_index)
-        elif radius == self._radius_two:
-            if not surface_potential == self._surface_potential_two:
+        elif surface_potential == self._surface_potential_two:
+            if not radius == self._radius_two:
                 raise ValueError(
-                    "the given surface potential must be compatible with the surface potential of the second colloid "
-                    "that was specified during the initialization of this class (because the given radius is the same "
-                    "as the radius of the second colloid)")
+                    "the given radius must be compatible with the radius of the second colloid that was specified "
+                    "during the initialization of this class (because the given surface potential is the same "
+                    "as the surface potential of the second colloid)")
             self._indices_two.append(self._current_particle_index)
         else:
             raise ValueError(
-                "the given radius must be the same as the radius of the first or the second colloid that was specified "
-                "during the initialization of this class")
+                "the given surface potential must be the same as the surface potential of the first or the second "
+                "colloid that was specified during the initialization of this class")
+        if substrate_flag:
+            raise ValueError("this class does not support substrate particles")
         self._potential_11.addParticle([])
         self._potential_22.addParticle([])
         self._potential_12.addParticle([])

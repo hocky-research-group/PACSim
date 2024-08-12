@@ -37,7 +37,7 @@ def benchmark_openmm(platform_name: str = "Reference", potentials: str = "algebr
                      number_steps: int = 100) -> None:
     parameters = benchmark_parameters()
 
-    types, positions, cell = read_xyz_file("colloids/tests/first_frame.xyz")
+    types, positions, cell = read_xyz_file("../colloids/tests/first_frame.xyz")
 
     topology = app.topology.Topology()
     chain = topology.addChain()

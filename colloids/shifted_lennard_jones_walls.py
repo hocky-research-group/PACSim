@@ -227,24 +227,6 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
 
         self._slj_potential.addParticle(index, per_particle_parameters)
 
-    def add_exclusion(self, particle_one: int, particle_two: int) -> None:
-        """
-        Exclude a particle pair from the interactions handled by this class.
-
-        The shifted Lennard-Jones walls do not support exclusions.
-
-        :param particle_one:
-            The index of the first particle.
-        :type particle_one: int
-        :param particle_two:
-            The index of the second particle.
-        :type particle_two: int
-
-        :raises NotImplementedError:
-            If this method is called.
-        """
-        raise NotImplementedError("The shifted Lennard-Jones walls do not support exclusions.")
-
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """
         Generate all potentials in the systems that are necessary to properly include the shifted Lennard-Jones walls.

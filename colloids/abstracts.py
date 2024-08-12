@@ -13,8 +13,8 @@ class OpenMMPotentialAbstract(ABC):
 
     This class is a convenience wrapper for interactions that are handled by several OpenMM potentials
 
-    The inheriting classes must implement the add_particle, add_exclusion, and yield_potentials methods so that they can
-    be conveniently added to an openmm system.
+    The inheriting classes must implement the add_particle and yield_potentials methods so that they can be conveniently
+    added to an openmm system.
 
     The add_particle method should be called for every particle in the system before the method yield_potentials is
     used in order to add the potential to the openmm system.
@@ -50,20 +50,6 @@ class OpenMMPotentialAbstract(ABC):
                                "yield_potentials is used")
         self._add_particle_called = True
 
-    @abstractmethod
-    def add_exclusion(self, particle_one: int, particle_two: int) -> None:
-        """
-        Exclude a particle pair from the interactions handled by this class.
-
-        :param particle_one:
-            The index of the first particle.
-        :type particle_one: int
-        :param particle_two:
-            The index of the second particle.
-        :type particle_two: int
-        """
-        raise NotImplementedError
-
     # noinspection PyTypeChecker
     @abstractmethod
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
@@ -89,7 +75,33 @@ class OpenMMPotentialAbstract(ABC):
         self._yield_potentials_called = True
 
 
-class ColloidPotentialsAbstract(OpenMMPotentialAbstract):
+class OpenMMNonbondedPotentialAbstract(OpenMMPotentialAbstract):
+    """
+    Abstract wrapper class for a non-bonded potential of OpenMM.
+
+    This class is a convenience wrapper for interactions that are handled by several OpenMM CustomNonbondedForce
+    potentials.
+
+    In addition to the add_particle and yield_potentials methods, the inheriting classes must implement the
+    add_exclusion method.
+    """
+
+    @abstractmethod
+    def add_exclusion(self, particle_one: int, particle_two: int) -> None:
+        """
+        Exclude a particle pair from the non-bonded interactions handled by this class.
+
+        :param particle_one:
+            The index of the first particle.
+        :type particle_one: int
+        :param particle_two:
+            The index of the second particle.
+        :type particle_two: int
+        """
+        raise NotImplementedError
+
+
+class ColloidPotentialsAbstract(OpenMMNonbondedPotentialAbstract):
     """
     Abstract class for the steric and electrostatic pair potentials between colloids in a solution with periodic
     boundary conditions using the CustomNonbondedForces class of openmm.

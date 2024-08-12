@@ -175,7 +175,7 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
 
     def add_exclusion(self, particle_one: int, particle_two: int) -> None:
         """
-        Exclude a particle pair from the interactions handled by this class.
+        Exclude a particle pair from the non-bonded interactions handled by this class.
 
         :param particle_one:
             The index of the first particle.

@@ -29,7 +29,7 @@ class StatusReporter(object):
         """Constructor of the StatusReporter class."""
         if not report_interval > 0:
             raise ValueError("The report interval must be greater than zero.")
-        if not total_number_steps > 0:
+        if not total_number_steps >= 0:
             raise ValueError("The total number of steps must be positive.")
         self._report_interval = report_interval
         self._status = tqdm.tqdm(miniters=1, total=total_number_steps, unit="steps")

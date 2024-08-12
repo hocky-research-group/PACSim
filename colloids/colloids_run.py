@@ -1,6 +1,7 @@
 import argparse
 import inspect
 import itertools
+import sys
 from typing import Sequence
 import numpy as np
 import numpy.random as npr
@@ -330,11 +331,11 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                                                        parameters.checkpoint_interval))
 
 
-def main():
+def colloids_run(argv: Sequence[str]) -> app.Simulation:
     parser = argparse.ArgumentParser(description="Run OpenMM for a colloids system.")
     parser.add_argument("yaml_file", help="YAML file with simulation parameters", type=str)
     parser.add_argument("--example", help="write an example YAML file and exit", action=ExampleAction)
-    args = parser.parse_args()
+    args = parser.parse_args(args=argv)
 
     if not args.yaml_file.endswith(".yaml"):
         raise ValueError("The YAML file must have the .yaml extension.")
@@ -373,6 +374,12 @@ def main():
 
     if parameters.final_configuration_xyz_filename is not None:
         write_xyz_file(parameters.final_configuration_xyz_filename, simulation, cell * (unit.nano * unit.meter))
+
+    return simulation
+
+
+def main():
+    colloids_run(sys.argv[1:])
 
 
 if __name__ == '__main__':

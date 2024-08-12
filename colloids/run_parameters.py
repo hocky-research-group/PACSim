@@ -360,8 +360,10 @@ class RunParameters(Parameters):
             raise ValueError("The Debye length must be greater than zero.")
         if self.dielectric_constant <= 0.0:
             raise ValueError("The dielectric constant must be greater than zero.")
-        if self.run_steps <= 0:
-            raise ValueError("The number of time steps must be greater than zero.")
+        if self.run_steps == 0:
+            warnings.warn("The number of time steps is zero.")
+        if self.run_steps < 0:
+            raise ValueError("The number of time steps must be greater than or equal to zero.")
         if self.state_data_interval <= 0:
             raise ValueError("The state data interval must be greater than zero.")
         if not self.state_data_filename.endswith(".csv"):

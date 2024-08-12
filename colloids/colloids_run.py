@@ -37,12 +37,10 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     # ----------------------------------- Set up system and parameters. ------------------------------------------------
     topology = app.topology.Topology()
     chain = topology.addChain()
+    residue = topology.addResidue("res", chain)
 
     atoms = []
-    residues = []
     for t in types:
-        residue = topology.addResidue(t, chain)
-        residues.append(residue)
         atoms.append(topology.addAtom(t, None, residue))
 
     system = openmm.System()
@@ -109,7 +107,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         for i, t in enumerate(types):
             if t in parameters.snowman_bond_types:
                 snowman_type = parameters.snowman_bond_types[t]
-                snowman_atom = topology.addAtom(snowman_type, None, residues[i])
+                snowman_atom = topology.addAtom(snowman_type, None, residue)
                 topology.addBond(atoms[i], snowman_atom)
                 offset = list(generate_fibonacci_sphere_grid_points(
                     1, parameters.snowman_distances[t].value_in_unit(nanometer),
@@ -125,7 +123,6 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         for _ in substrate_positions:
             # Setting the mass to zero tells the integrator that the particle is immobile.
             # See http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.System.html.
-            residue = topology.addResidue(parameters.substrate_type, chain)
             topology.addAtom(parameters.substrate_type, None, residue)
     else:
         substrate_positions = []

@@ -29,6 +29,7 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict
         openmm_simulation.context.getState(getPositions=True, enforcePeriodicBox=False).getPositions(asNumpy=True))
     topology = openmm_simulation.topology
     assert topology.getNumChains() == 1
+    assert topology.getNumResidues() == 1
     assert topology.getNumAtoms() == openmm_simulation.system.getNumParticles() == len(positions)
     assert len(cell) == 3
     assert cell[0][1].value_in_unit(nanometer) == 0.0

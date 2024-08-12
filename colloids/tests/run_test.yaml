@@ -80,6 +80,7 @@ potential_temperature: !Quantity
   value: 298.0
 trajectory_filename: test_run_and_resume/trajectory.gsd
 trajectory_interval: 10
+update_reporter: LinearMonotonicUpdateReporter
 update_reporter_parameters:
   filename: test_run_and_resume/update_reporter.csv
   update_interval: 10
@@ -95,7 +96,6 @@ use_depletion: true
 use_gravity: true
 use_log: false
 use_substrate: true
-use_update_reporter: true
 use_tabulated: false
 velocity_seed: 2
 wall_directions:

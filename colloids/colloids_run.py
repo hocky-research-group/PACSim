@@ -8,13 +8,11 @@ from openmm import unit
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
                       ShiftedLennardJonesWalls, DepletionPotential, Gravity)
 from colloids.gsd_reporter import GSDReporter
-from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
 import colloids.integrators as integrators
+import colloids.update_reporters as update_reporters
 from colloids.run_parameters import RunParameters
 from colloids.substrate import substrate_positions_hexagonal
 from colloids.status_reporter import StatusReporter
-from colloids.update_reporter import UpdateReporter
-
 
 class ExampleAction(argparse.Action):
     def __init__(self, option_strings, dest, **kwargs):
@@ -213,15 +211,19 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                                                       parameters.state_data_interval, time=True,
                                                       kineticEnergy=True, potentialEnergy=True, temperature=True,
                                                       speed=True, append=append_file))
-    if parameters.use_update_reporter:
+    
+    if parameters.update_reporter is not None:
         try:
-            simulation.reporters.append(UpdateReporter(simulation=simulation, append_file=append_file,
-                                                       **parameters.update_reporter_parameters))
+            update_reporter = getattr(update_reporters, parameters.update_reporter)(**parameters.update_reporter_parameters)
+            
+            simulation.reporters.append(update_reporter(simulation=simulation, append_file=append_file,
+                                                        **parameters.update_reporter_parameters))
         except TypeError:
             raise TypeError(
                 f"UpdateReporter does not accept the given arguments {parameters.update_reporter_parameters}. "
-                f"The expected signature is {inspect.signature(UpdateReporter)} (the simulation argument need not be "
+                f"The expected signature is {inspect.signature(update_reporter)} (the simulation argument need not be "
                 f"specified).")
+
     # The CheckpointReporter should always be last to ensure that all other reporters have been executed before it.
     simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
                                                        parameters.checkpoint_interval))

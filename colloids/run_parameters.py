@@ -4,6 +4,7 @@ from typing import Any, Optional
 from openmm import unit
 from colloids.abstracts import Parameters
 import colloids.integrators as integrators
+import colloids.update_reporters as update_reporters
 from colloids.helper_functions import read_xyz_file
 import warnings
 
@@ -216,12 +217,13 @@ class RunParameters(Parameters):
         cubed, and the value must be greater than zero.
         Defaults to None.
     :type particle_density: Optional[unit.Quantity]
-    :param use_update_reporter:
-        A boolean indicating whether the to use the update reporter to vary the value of a force-related global
-        parameter over time in a simulation.
-        If true, the update reporter parameters must be specified.
-        Defaults to False.
-    :type use_update_reporter: bool
+    :param update_reporter:
+        The name of the updatee reporter used to vary the value of a force-related global parameter over time 
+        in a simulation.
+        Possible choices are "LinearMonotonicUpdateReporter" and "LinearBimodalUpdateReporter".
+        If an update reporter is specified, reporter parameters must be specified.
+        Defaults to None.
+    :type update_reporter: Optional[str]
     :param update_reporter_parameters:
         The parameters that are forwarded to the initialization method of the UpdateReporter, if enabled for a
         simulation. Note that the initialization method of the UpdateReporter class expects an OpenMM simulation object
@@ -293,7 +295,7 @@ class RunParameters(Parameters):
     gravitational_acceleration: Optional[unit.Quantity] = None
     water_density: Optional[unit.Quantity] = None
     particle_density: Optional[unit.Quantity] = None
-    use_update_reporter: bool = False
+    update_reporter: Optional[str]
     update_reporter_parameters: Optional[dict[str, Any]] = None
     use_substrate: bool = False
     substrate_type: Optional[str] = None
@@ -455,7 +457,11 @@ class RunParameters(Parameters):
                 raise ValueError("Density of water must not be specified if gravity is not on.")
             if self.particle_density is not None:
                 raise ValueError("Density of particle must not be specified if gravity is not on.")
-        if self.use_update_reporter:
+        if self.update_reporter:
+            possible_update_reporters = [name for name, _ in inspect.getmembers(update_reporters, inspect.isfunction)]
+            if self.update_reporter not in possible_update_reporters:
+                raise ValueError(f"Update reporter {self.update_reporter} not available, the update reporter must be one of 
+                                 the " f"following: {', '.join(possible_update_reporters)}.")
             if self.update_reporter_parameters is None:
                 raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")
             if "simulation" in self.update_reporter_parameters or "append_file" in self.update_reporter_parameters:

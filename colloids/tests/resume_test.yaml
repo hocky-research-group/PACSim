@@ -80,6 +80,7 @@ surface_potentials:
     value: -47.94502672295134  # Tuned with colloids-tune so that potential depth is at -3 k_B T.
 trajectory_filename: test_run_and_resume/trajectory_resume.gsd
 trajectory_interval: 10
+update_reporter: LinearMonotonicUpdateReporter
 update_reporter_parameters:
   filename: test_run_and_resume/update_reporter_resume.csv
   update_interval: 10
@@ -94,7 +95,6 @@ use_depletion: true
 use_gravity: true
 use_log: false
 use_substrate: true
-use_update_reporter: true
 use_tabulated: false
 velocity_seed: 2
 wall_directions:

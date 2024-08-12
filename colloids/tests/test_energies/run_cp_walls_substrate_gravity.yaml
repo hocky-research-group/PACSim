@@ -63,6 +63,9 @@ radii:
     unit: nanometer
     value: 30.0
 run_steps: 0
+snowman_bond_types: null
+snowman_distances: null
+snowman_seed: null
 state_data_filename: state_data.csv
 state_data_interval: 5000
 substrate_type: S
@@ -81,6 +84,7 @@ trajectory_interval: 500000
 use_depletion: false
 use_gravity: true
 use_log: false
+use_snowman: false
 use_substrate: true
 use_tabulated: false
 velocity_seed: null

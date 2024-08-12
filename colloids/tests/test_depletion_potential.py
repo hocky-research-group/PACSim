@@ -193,6 +193,11 @@ class TestDepletionPotentialForTwoSubstrateParticles(TestParameters):
         depletion_potential.add_particle(radius=radius_one, substrate_flag=True)
         openmm_system.addParticle(mass=1.0)
         depletion_potential.add_particle(radius=radius_two, substrate_flag=True)
+        # Add another particle but exclude it from all interactions.
+        openmm_system.addParticle(mass=2.0)
+        depletion_potential.add_particle(radius=radius_two, substrate_flag=False)
+        depletion_potential.add_exclusion(0, 2)
+        depletion_potential.add_exclusion(1, 2)
         for potential in depletion_potential.yield_potentials():
             openmm_system.addForce(potential)
 
@@ -212,7 +217,8 @@ class TestDepletionPotentialForTwoSubstrateParticles(TestParameters):
 
         openmm_potentials = np.zeros(len(test_separations))  # use surface separation as test positions
         for index, sep in enumerate(test_separations):
-            openmm_context.setPositions([[sep.value_in_unit(unit.nano * unit.meter), 0.0, 0.0], [0.0, 0.0, 0.0]])
+            openmm_context.setPositions([[sep.value_in_unit(unit.nano * unit.meter), 0.0, 0.0], [0.0, 0.0, 0.0],
+                                         [1.0, 1.0, 1.0]])
             state = openmm_context.getState(getEnergy=True)
             openmm_potentials[index] = (state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole))
 

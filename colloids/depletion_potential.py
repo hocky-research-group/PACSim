@@ -95,7 +95,8 @@ class DepletionPotential(OpenMMPotentialAbstract):
         If the substrate flag is True, the colloid is considered to be a substrate particle. Substrate particles do
         not interact with each other. In this class, this is achieved by setting the flag per-particle parameter to 1
         for substrate particles and to 0 for non-substrate particles. This flag is used in the algebraic expression of
-        the steric and electrostatic potentials. Interaction groups would also work but are considerably slower.
+        the steric and electrostatic potentials. Interaction groups would also work but are considerably slower
+        (see https://github.com/openmm/openmm/issues/2698).
 
         This method has to be called for every particle in the system before the method yield_potentials is used.
 

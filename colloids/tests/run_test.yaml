@@ -46,6 +46,9 @@ masses:
   S: !Quantity
     unit: dalton
     value: 0.0
+  NN: !Quantity
+    unit: dalton
+    value: 0.1865889212827988
 minimize_energy_initially: false
 particle_density: !Quantity
   unit: gram/(centimeter**3)
@@ -61,20 +64,17 @@ radii:
   S: !Quantity
     unit: nanometer
     value: 30.0
+  NN: !Quantity
+    unit: nanometer
+    value: 60.0
 run_steps: 100
+snowman_bond_types:
+  N: NN
 snowman_distances:
-  NN: null
-  PP: null
-snowman_masses:
-  NN: null
-  PP: null
-snowman_radii:
-  NN: null
-  PP: null
+  N: !Quantity
+    unit: nanometer
+    value: 95.0
 snowman_seed: null
-snowman_surface_potentials:
-  NN: null
-  PP: null
 state_data_filename: test_run_and_resume/state_data.csv
 state_data_interval: 10
 substrate_type: S
@@ -88,6 +88,9 @@ surface_potentials:
   S: !Quantity
     unit: millivolt
     value: -47.94502672295134  # Tuned with colloids-tune so that potential depth is at -3 k_B T.
+  NN: !Quantity
+    unit: millivolt
+    value: -54.0
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0
@@ -107,6 +110,7 @@ update_reporter_parameters:
 use_depletion: true
 use_gravity: true
 use_log: false
+use_snowman: true
 use_substrate: true
 use_update_reporter: true
 use_tabulated: false

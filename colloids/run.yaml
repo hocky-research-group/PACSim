@@ -53,19 +53,9 @@ radii:
     unit: nanometer
     value: 105.0
 run_steps: 100000
-snowman_distances:
-  NN: null
-  PP: null
-snowman_masses:
-  NN: null
-  PP: null
-snowman_radii:
-  NN: null
-  PP: null
+snowman_bond_types: null
+snowman_distances: null
 snowman_seed: null
-snowman_surface_potentials:
-  NN: null
-  PP: null
 state_data_filename: state_data.csv
 state_data_interval: 1000
 substrate_type: null
@@ -82,6 +72,7 @@ update_reporter_parameters: null
 use_depletion: true
 use_gravity: false
 use_log: false
+use_snowman: false
 use_substrate: false
 use_tabulated: false
 use_update_reporter: false

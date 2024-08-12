@@ -1,4 +1,5 @@
 import argparse
+from openmm import unit
 from colloids.run_parameters import RunParameters
 from colloids.colloids_create.configuration_parameters import ConfigurationParameters
 from colloids.colloids_create.cubic_lattice_with_satellites_generator import (CubicLattice,
@@ -33,11 +34,13 @@ def main():
     run_parameters = RunParameters.from_yaml(args.simulation_parameters)
     configuration_parameters = ConfigurationParameters.from_yaml(args.configuration_parameters)
 
-    if not len(run_parameters.radii) == 2:
+    relevant_radii = {k: v for k, v in run_parameters.radii.items() if run_parameters.masses[k] != 0.0 * unit.amu}
+
+    if not len(relevant_radii) == 2:
         raise ValueError("This script can only generate an initial configuration for two types of particles.")
 
     # Sort entries in dictionary by value in descending order.
-    radii = sorted(run_parameters.radii.items(), key=lambda r: r[1], reverse=True)
+    radii = sorted(relevant_radii.items(), key=lambda r: r[1], reverse=True)
 
     lattice_spacing = 2.0 * radii[0][1] * configuration_parameters.lattice_spacing_factor
     orbit_distance = ((radii[0][1] + radii[1][1] + 2.0 * run_parameters.brush_length)

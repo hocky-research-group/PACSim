@@ -1,11 +1,11 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from typing import Any
 import warnings
 import openmm.app
 from openmm import unit
 
 
-class UpdateReporterAbstract(object):
+class UpdateReporterAbstract(ABC):
     """
     Abstract class for reporters for an OpenMM simulation of colloids that change the value of a global parameter over 
     the course of the simulation.
@@ -20,6 +20,18 @@ class UpdateReporterAbstract(object):
         The name of the file to write to.
         The filename must end with the .csv extension.
     :type filename: str
+    :param update_interval:
+        The interval (in time steps) at which to update the value of the global parameter in the OpenMM simulation.
+        The value must be greater than zero.
+    :type update_interval: int
+    :param final_update_step:
+        The final step at which the value of the global parameter will be updated.
+        The value must be greater than or equal to the update_interval.
+    :type final_update_step: int
+    :param global_parameter_name:
+        The name of the global parameter to be updated.
+        This must be one of the global parameters passed into any of the OpenMM Force objects.
+    :type global_parameter_name: str
     :param simulation:
         The OpenMM simulation that this reporter will be added to.
         The context of this OpenMM simulation must contain the parameter to be updated.
@@ -55,7 +67,6 @@ class UpdateReporterAbstract(object):
         self._file = open(filename, "a" if append_file else "w")
         if not append_file:
             print(f"timestep,{self._global_parameter_name}", file=self._file)
-        self._report_called = False
     
     # noinspection PyPep8Naming
     def describeNextReport(self, simulation: openmm.app.Simulation) -> tuple[int, bool, bool, bool, bool, bool]:
@@ -84,7 +95,7 @@ class UpdateReporterAbstract(object):
 
     # noinspection PyUnusedLocal
     @abstractmethod
-    def report(self, *args: Any, **kwargs: Any) -> None:
+    def report(self, simulation, update_value, *args: Any, **kwargs: Any) -> None:
                
         """
         Update the value of a global parameter during the simulation and store the parameter value in the output
@@ -99,7 +110,10 @@ class UpdateReporterAbstract(object):
 
         """
 
-        self._report_called = True
+        step = simulation.currentStep
+        simulation.context.setParameter(self._global_parameter_name, update_value)
+        print(f"{step},{update_value}", file=self._file)
+        super().report(simulation, update_value)
 
 
     def __del__(self) -> None:
@@ -186,6 +200,7 @@ class LinearMonotonicUpdateReporter(UpdateReporterAbstract):
         new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._final_update_step
         simulation.context.setParameter(self._global_parameter_name, new_value)
         print(f"{step},{new_value}", file=self._file)
+        super().report(simulation, new_value)
 
 class LinearUnimodalUpdateReporter(UpdateReporterAbstract):
     pass

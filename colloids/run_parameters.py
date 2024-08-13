@@ -249,6 +249,7 @@ class RunParameters(Parameters):
     :type use_snowman: bool
     :param snowman_seed:
         The seed for the random number generator that is used to sample the positions of the snowman heads.
+        If zero or smaller than zero, the positions of the snowman heads are not randomized.
         If None, a random seed is used.
         Defaults to None.
     :type snowman_seed: Optional[int]

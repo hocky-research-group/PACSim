@@ -102,7 +102,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     # ------------------------------------ Create additional particles. ------------------------------------------------
     snowman_positions = []
     if parameters.use_snowman:
-        if parameters.snowman_seed is not None:
+        if parameters.snowman_seed is not None and parameters.snowman_seed > 0:
             npr.seed(parameters.snowman_seed)
         nanometer = unit.nano * unit.meter
         for i, t in enumerate(types):
@@ -112,7 +112,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
                 topology.addBond(atoms[i], snowman_atom)
                 offset = list(generate_fibonacci_sphere_grid_points(
                     1, parameters.snowman_distances[t].value_in_unit(nanometer),
-                    True))[0]
+                    parameters.snowman_seed > 0))[0]
                 assert abs(np.linalg.norm(offset) - parameters.snowman_distances[t].value_in_unit(nanometer)) < 1.0e-12
                 snowman_positions.append(positions[i] + offset)
             else:

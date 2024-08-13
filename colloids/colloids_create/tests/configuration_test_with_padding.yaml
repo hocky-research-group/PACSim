@@ -1,4 +1,7 @@
-lattice_repeats: 15
+lattice_repeats:
+  - 15
+  - 15
+  - 15
 lattice_spacing_factor: 4.03
 lattice_type: sc
 orbit_factor: 1.3

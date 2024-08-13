@@ -1,4 +1,5 @@
 from enum import auto, Enum
+from typing import Union
 from ase import Atom, build
 import numpy as np
 from openmm import unit
@@ -24,16 +25,25 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
 
     _nanometer = unit.nano * unit.meter
 
-    def __init__(self, filename: str, lattice: CubicLattice, lattice_constant: unit.Quantity, lattice_repeats: int,
-                 orbit_distance: unit.Quantity, padding_distance: unit.Quantity, satellites_per_center: int,
-                 type_lattice: str, type_satellite: str) -> None:
+    def __init__(self, filename: str, lattice: CubicLattice, lattice_constant: unit.Quantity,
+                 lattice_repeats: Union[int, list[int]], orbit_distance: unit.Quantity,
+                 padding_distance: unit.Quantity, satellites_per_center: int, type_lattice: str,
+                 type_satellite: str) -> None:
         super().__init__(filename)
         if not lattice_constant.unit.is_compatible(self._nanometer):
             raise TypeError("The lattice constant must have a unit that is compatible with nanometers.")
         if not lattice_constant.value_in_unit(self._nanometer) > 0.0:
             raise ValueError("The lattice constant must have a value greater than zero.")
-        if not lattice_repeats > 0:
-            raise ValueError("The number of lattice repeats must be greater than zero.")
+        if isinstance(lattice_repeats, int):
+            if not lattice_repeats > 0:
+                raise ValueError("The number of lattice repeats must be greater than zero.")
+        else:
+            if not (isinstance(lattice_repeats, list)
+                    and all(isinstance(repeat, int) for repeat in lattice_repeats)
+                    and len(lattice_repeats) == 3):
+                raise TypeError("The lattice repeats must be an integer or a list of three integers.")
+            if not all(repeat > 0 for repeat in lattice_repeats):
+                raise ValueError("All lattice repeats must be positive.")
         if not orbit_distance.unit.is_compatible(self._nanometer):
             raise TypeError("The orbit distance must have a unit that is compatible with nanometers.")
         if not orbit_distance.value_in_unit(self._nanometer) > 0.0:
@@ -74,7 +84,10 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
             atoms.append(new_atom)
         atoms = atoms.repeat(self._lattice_repeats)
         # Shift all atoms so that the center atoms are centered around the origin again.
-        translation_vector = sum(-(self._lattice_repeats - 1) * cv / (2.0 * self._lattice_repeats) for cv in atoms.cell)
+        lattice_repeats = (self._lattice_repeats if isinstance(self._lattice_repeats, list)
+                           else [self._lattice_repeats, self._lattice_repeats, self._lattice_repeats])
+        assert len(lattice_repeats) == len(atoms.cell)
+        translation_vector = sum(-(lr - 1) * cv / (2.0 * lr) for cv, lr in zip(atoms.cell, lattice_repeats))
         atoms.translate(translation_vector)
         # Use the extended xyz file format.
         # See https://www.ovito.org/docs/current/reference/file_formats/input/xyz.html#extended-xyz-format

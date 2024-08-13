@@ -113,8 +113,6 @@ class UpdateReporterAbstract(ABC):
         step = simulation.currentStep
         simulation.context.setParameter(self._global_parameter_name, update_value)
         print(f"{step},{update_value}", file=self._file)
-        super().report(simulation, update_value)
-
 
     def __del__(self) -> None:
         """Destructor of the UpdateReporter class."""
@@ -168,6 +166,7 @@ class LinearMonotonicUpdateReporter(UpdateReporterAbstract):
     def __init__(self, update_interval: int, final_update_step, global_parameter_name: str,
                  start_value: unit.Quantity, end_value: unit.Quantity, simulation: openmm.app.Simulation,
                  append_file: bool = False):
+        """Constructor of the LinearMonotonicUpdateReporter class."""
 
         
         super.__init__()
@@ -188,8 +187,93 @@ class LinearMonotonicUpdateReporter(UpdateReporterAbstract):
     
     def report(self, simulation: openmm.app.Simulation) -> None:
         """
-        Generate a report by changing the value of the global parameter and by storing the updated value in the .csv
-        file.
+        Linearly, monotonically update the value of a global parameter in an OpenMM simulation.
+
+        :param simulation:
+            The OpenMM simulation to generate a report for.
+        :type simulation: openmm.app.Simulation
+        """
+        old_value = simulation.context.getParameter(self._global_parameter_name)
+        new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._final_update_step
+        super().report(simulation, new_value)
+
+class LinearUnimodalUpdateReporter(UpdateReporterAbstract):
+
+    '''
+    This class sets up a reporter to linearly, unimodally change the value of a force-related global parameter 
+    over the course of an OpenMM simulation.
+
+    The start value is determined by the current value of the global parameter in the OpenMM simulation. The end value
+    is specified on initialization. If the end value is greater than the start value, the global parameter value increases
+    until the switch step, then decreases back to the start value. Otherwise, the global parameter value decreases until 
+    the switch step, then increases back to the start value. 
+
+
+    :param update_interval:
+        The interval (in time steps) at which to update the value of the global parameter in the OpenMM simulation.
+        The value must be greater than zero.
+    :type update_interval: int
+    :param final_update_step:
+        The final step at which the value of the global parameter will be updated.
+        The value must be greater than or equal to the update_interval.
+    :type final_update_step: int
+    :param switch_step: 
+        The step at which to switch from increasing to decreasing (or decreasing to increasing) the value of the 
+        global parameter.
+        The value must be greater than or equal to the update_interval, and less than or equal to the final_update_step.
+    ;type switch_step: int
+    :param global_parameter_name:
+        The name of the global parameter to be updated.
+        This must be one of the global parameters passed into any of the OpenMM Force objects.
+    :type global_parameter_name: str
+    :param start_value:
+        The start value of the global parameter.
+        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
+        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type start_value: unit.Quantity
+    :param end_value:
+        The max or min value of the global parameter. This value will be reached at the switch step.
+        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
+        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type end_value: unit.Quantity
+
+    :raises ValueError:
+        If the filename does not end with the .csv extension.
+        If the update_interval is not greater than zero.
+        If the final_update_step is not greater than or equal to the update_interval.
+        If the switch_step is not greater than or equal to the update_interval and less than or equal to the 
+        final_update_step.
+        If the global_parameter_name is not in the simulation context.
+    '''
+
+    def __init__(self, update_interval: int, final_update_step, switch_step, global_parameter_name: str,
+                 start_value: unit.Quantity, end_value: unit.Quantity, simulation: openmm.app.Simulation,
+                 append_file: bool = False):
+
+        
+        super.__init__()
+        if not final_update_step >= switch_step >= update_interval:
+            raise ValueError("The switch  step must be greater than or equal to the update frequency,"
+                             "and less than or equal to the final update step.")
+        self._update_interval = update_interval
+        self._final_update_step = final_update_step
+        self._switch_step = switch_step
+        self._global_parameter_name = global_parameter_name
+        if not start_value.unit.is_compatible(end_value.unit):
+            raise ValueError(f"The start and end values have incompatible units.")
+        self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
+        # Check if the start value of the global parameter matches the value in the OpenMM simulation.
+        # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
+        # the start value is not necessarily the same as the value in the OpenMM simulation.
+        if (not append_file
+                and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
+            warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
+        self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
+    
+
+    def report(self, simulation: openmm.app.Simulation) -> None:
+        """
+         Linearly, unimodally update the value of a global parameter in an OpenMM simulation.
 
         :param simulation:
             The OpenMM simulation to generate a report for.
@@ -197,10 +281,9 @@ class LinearMonotonicUpdateReporter(UpdateReporterAbstract):
         """
         step = simulation.currentStep
         old_value = simulation.context.getParameter(self._global_parameter_name)
-        new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._final_update_step
-        simulation.context.setParameter(self._global_parameter_name, new_value)
-        print(f"{step},{new_value}", file=self._file)
+        if step < self._switch_step:
+            new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._switch_step
+        else: 
+            new_value = old_value - (self._end_value - self._start_value) * self._update_interval / (self._final_update_step - self._switch_step)
         super().report(simulation, new_value)
-
-class LinearUnimodalUpdateReporter(UpdateReporterAbstract):
-    pass
+    

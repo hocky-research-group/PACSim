@@ -61,6 +61,7 @@ surface_potentials:
     value: 50.0
 trajectory_filename: trajectory.gsd
 trajectory_interval: 10
+update_reporter: LinearMonotonicUpdateReporter
 update_reporter_parameters:
   filename: update_reporter.csv
   update_interval: 10
@@ -75,7 +76,6 @@ update_reporter_parameters:
 use_depletion: false
 use_log: false
 use_substrate: false
-use_update_reporter: true
 use_tabulated: false
 velocity_seed: 2
 wall_directions:

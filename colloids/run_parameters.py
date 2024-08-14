@@ -457,7 +457,7 @@ class RunParameters(Parameters):
                 raise ValueError("Density of water must not be specified if gravity is not on.")
             if self.particle_density is not None:
                 raise ValueError("Density of particle must not be specified if gravity is not on.")
-        if self.update_reporter:
+        if self.update_reporter is not None:
             possible_update_reporters = [name for name, _ in inspect.getmembers(update_reporters, inspect.isfunction)]
             if self.update_reporter not in possible_update_reporters:
                 raise ValueError(f"Update reporter {self.update_reporter} not available, the update reporter must be one of the following:",

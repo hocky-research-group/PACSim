@@ -497,14 +497,6 @@ class RunParameters(Parameters):
                 raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")
             if "simulation" in self.update_reporter_parameters or "append_file" in self.update_reporter_parameters:
                 raise ValueError("Update-reporter parameters should not contain simulation and append_file keys.")
-            update_reporter_class = getattr(update_reporters, self.update_reporter)
-            try:
-                update_reporter_class(**self.update_reporter_parameters)
-            except TypeError:
-                raise TypeError(f"Update reporter {self.update_reporter} does not accept the given arguments "
-                                f"{self.update_reporter_parameters}. The expected signature is "
-                                f"{inspect.signature(update_reporter_class)} (the simulation and append_file arguments "
-                                f"need not be specified).")
         else:
             if self.update_reporter_parameters is not None:
                 raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")

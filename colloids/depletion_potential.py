@@ -2,10 +2,10 @@ import math
 from typing import Iterator
 from openmm import unit
 from openmm import CustomNonbondedForce
-from colloids.abstracts import OpenMMPotentialAbstract
+from colloids.abstracts import OpenMMNonbondedPotentialAbstract
 
 
-class DepletionPotential(OpenMMPotentialAbstract):
+class DepletionPotential(OpenMMNonbondedPotentialAbstract):
     """
     This class sets up the depletion potential between colloids in a solution with a non-adsorbing polymer background.
     Since the attractive force arises from the fact that the polymer molecules are depleted at the surface of the
@@ -152,3 +152,16 @@ class DepletionPotential(OpenMMPotentialAbstract):
         self._depletion_potential.setUseSwitchingFunction(False)
 
         yield self._depletion_potential
+
+    def add_exclusion(self, particle_one: int, particle_two: int) -> None:
+        """
+        Exclude a particle pair from the non-bonded interactions handled by this class.
+
+        :param particle_one:
+            The index of the first particle.
+        :type particle_one: int
+        :param particle_two:
+            The index of the second particle.
+        :type particle_two: int
+        """
+        self._depletion_potential.addExclusion(particle_one, particle_two)

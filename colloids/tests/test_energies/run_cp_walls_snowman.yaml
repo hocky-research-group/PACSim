@@ -1,42 +1,49 @@
-alpha: null
+alpha: 1.0
 brush_density: !Quantity
   unit: /(nanometer**2)
   value: 0.09
 brush_length: !Quantity
   unit: nanometer
-  value: 6.5
+  value: 10.0
 checkpoint_filename: checkpoint.chk
-checkpoint_interval: 500
+checkpoint_interval: 500000000
 cutoff_factor: 21.0
 debye_length: !Quantity
   unit: nanometer
-  value: 3.675205
+  value: 5.3
 depletant_radius: null
 depletion_phi: null
 dielectric_constant: 80.0
-epsilon: null
+epsilon: !Quantity
+    unit: kilojoule/mole
+    value: 2.477709860209665  # 1 k_B T
 final_configuration_gsd_filename: final_frame.gsd
 final_configuration_xyz_filename: final_frame.xyz
-initial_configuration: first_frame.xyz
+gravitational_acceleration: null
+initial_configuration: initial_frame_snowman.xyz
 integrator: LangevinIntegrator
 integrator_parameters:
   frictionCoeff: !Quantity
     unit: /picosecond
-    value: 0.001574074286750681
-  randomNumberSeed: 3
+    value: 0.001574074286750681 # 1 hoomd time unit = 0.6352940318110861 ps so if collision_rate = 0.001 hoomd units, use 0.001/0.6352940318110861
+  randomNumberSeed: null
   stepSize: !Quantity
     unit: picosecond
-    value: 0.00317647015905543
+    value: 0.015
   temperature: !Copy
     key: potential_temperature
 masses:
   N: !Quantity
     unit: dalton
-    value:  1.885
+    value: 0.970876
   P: !Quantity
     unit: dalton
     value: 1.0
+  NN: !Quantity
+    unit: dalton
+    value: 0.230059
 minimize_energy_initially: false
+particle_density: null
 platform_name: Reference
 potential_temperature: !Quantity
   unit: kelvin
@@ -44,45 +51,47 @@ potential_temperature: !Quantity
 radii:
   N: !Quantity
     unit: nanometer
-    value: 105.0
+    value: 101.0
   P: !Quantity
     unit: nanometer
-    value: 85.0
-run_steps: 100
-snowman_bond_types: null
-snowman_distances: null
-snowman_seed: null
+    value: 102.0
+  NN: !Quantity
+    unit: nanometer
+    value: 62.5
+run_steps: 0
+snowman_bond_types:
+  N: NN
+snowman_distances:
+  N: !Quantity
+    unit: nanometer
+    value: 101.0
+snowman_seed: 3
 state_data_filename: state_data.csv
-state_data_interval: 10
+state_data_interval: 5000
 substrate_type: null
 surface_potentials:
   N: !Quantity
     unit: millivolt
-    value: -50.0
+    value: -40.0
   P: !Quantity
     unit: millivolt
     value: 50.0
+  NN: !Quantity
+    unit: millivolt
+    value: -40.0
 trajectory_filename: trajectory.gsd
-trajectory_interval: 10
-update_reporter: LinearMonotonicUpdateReporter
-update_reporter_parameters:
-  filename: update_reporter.csv
-  update_interval: 10
-  final_update_step: !Copy
-    key: run_steps
-  global_parameter_name: debye_length
-  start_value: !Copy
-    key: debye_length
-  end_value: !Quantity
-    unit: nanometer
-    value: 6.0
+trajectory_interval: 500000
 use_depletion: false
+use_gravity: false
 use_log: false
-use_snowman: false
+use_snowman: true
 use_substrate: false
 use_tabulated: false
-velocity_seed: 2
+velocity_seed: null
 wall_directions:
-  - false
-  - false
-  - false
+  - true
+  - true
+  - true
+water_density: null
+use_update_reporter: false
+update_reporter_parameters: null

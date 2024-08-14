@@ -34,7 +34,10 @@ def main():
     run_parameters = RunParameters.from_yaml(args.simulation_parameters)
     configuration_parameters = ConfigurationParameters.from_yaml(args.configuration_parameters)
 
-    relevant_radii = {k: v for k, v in run_parameters.radii.items() if run_parameters.masses[k] != 0.0 * unit.amu}
+    relevant_radii = {k: v for k, v in run_parameters.radii.items()
+                      if k != run_parameters.substrate_type
+                      and (k not in run_parameters.snowman_bond_types.values()
+                           if run_parameters.snowman_bond_types is not None else True)}
 
     if not len(relevant_radii) == 2:
         raise ValueError("This script can only generate an initial configuration for two types of particles.")

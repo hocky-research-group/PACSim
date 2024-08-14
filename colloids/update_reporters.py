@@ -96,11 +96,13 @@ class UpdateReporterAbstract(ABC):
 
     # noinspection PyUnusedLocal
     @abstractmethod
-    def report(self, simulation, update_value, *args: Any, **kwargs: Any) -> None:
+    def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
                
         """
         Update the value of a global parameter during the simulation and store the parameter value in the output
         .csv file.
+
+        One should set and print in the inherting class.
 
         :param args:
             Parameters of the report method as positional arguments.
@@ -110,10 +112,19 @@ class UpdateReporterAbstract(ABC):
         :type kwargs: Any
 
         """
+        raise NotImplementedError
 
+    def set_and_print(self, simulation, new_value) -> None:
+        """
+        Write docstring
+
+        :param simulation:
+        :param new_value:
+        :return:
+        """
         step = simulation.currentStep
-        simulation.context.setParameter(self._global_parameter_name, update_value)
-        print(f"{step},{update_value}", file=self._file)
+        simulation.context.setParameter(self._global_parameter_name, new_value)
+        print(f"{step},{new_value}", file=self._file)
 
     def __del__(self) -> None:
         """Destructor of the UpdateReporter class."""
@@ -164,16 +175,14 @@ class LinearMonotonicUpdateReporter(UpdateReporterAbstract):
         If the global_parameter_name is not in the simulation context.
     '''
 
-    def __init__(self, update_interval: int, final_update_step, global_parameter_name: str,
+    def __init__(self, filename: str, update_interval: int, final_update_step, global_parameter_name: str,
                  start_value: unit.Quantity, end_value: unit.Quantity, simulation: openmm.app.Simulation,
                  append_file: bool = False):
         """Constructor of the LinearMonotonicUpdateReporter class."""
 
         
-        super.__init__()
-        self._update_interval = update_interval
-        self._final_update_step = final_update_step
-        self._global_parameter_name = global_parameter_name
+        super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
+                         global_parameter_name=global_parameter_name, simulation=simulation, append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start and end values have incompatible units.")
         self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
@@ -186,7 +195,7 @@ class LinearMonotonicUpdateReporter(UpdateReporterAbstract):
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
     
     
-    def report(self, simulation: openmm.app.Simulation) -> None:
+    def report(self, simulation: openmm.app.Simulation, state) -> None:
         """
         Linearly, monotonically update the value of a global parameter in an OpenMM simulation.
 
@@ -196,7 +205,7 @@ class LinearMonotonicUpdateReporter(UpdateReporterAbstract):
         """
         old_value = simulation.context.getParameter(self._global_parameter_name)
         new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._final_update_step
-        super().report(simulation, new_value)
+        self.set_and_print(simulation, new_value)
 
 class LinearUnimodalUpdateReporter(UpdateReporterAbstract):
 

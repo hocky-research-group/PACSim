@@ -319,7 +319,7 @@ class RunParameters(Parameters):
     gravitational_acceleration: Optional[unit.Quantity] = None
     water_density: Optional[unit.Quantity] = None
     particle_density: Optional[unit.Quantity] = None
-    update_reporter: Optional[str]
+    update_reporter: Optional[str] = None
     update_reporter_parameters: Optional[dict[str, Any]] = None
     use_substrate: bool = False
     substrate_type: Optional[str] = None
@@ -488,7 +488,8 @@ class RunParameters(Parameters):
             if self.particle_density is not None:
                 raise ValueError("Density of particle must not be specified if gravity is not on.")
         if self.update_reporter is not None:
-            possible_update_reporters = [name for name, _ in inspect.getmembers(update_reporters, inspect.isfunction)]
+            possible_update_reporters = [name for name, _ in inspect.getmembers(update_reporters, inspect.isclass)
+                                         if name != "ABC" and "Abstract" not in name]
             if self.update_reporter not in possible_update_reporters:
                 raise ValueError(f"Update reporter {self.update_reporter} not available, the update reporter must be one of the following:",
                                  f"{', '.join(possible_update_reporters)}.")
@@ -496,6 +497,14 @@ class RunParameters(Parameters):
                 raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")
             if "simulation" in self.update_reporter_parameters or "append_file" in self.update_reporter_parameters:
                 raise ValueError("Update-reporter parameters should not contain simulation and append_file keys.")
+            update_reporter_class = getattr(update_reporters, self.update_reporter)
+            try:
+                update_reporter_class(**self.update_reporter_parameters)
+            except TypeError:
+                raise TypeError(f"Update reporter {self.update_reporter} does not accept the given arguments "
+                                f"{self.update_reporter_parameters}. The expected signature is "
+                                f"{inspect.signature(update_reporter_class)} (the simulation and append_file arguments "
+                                f"need not be specified).")
         else:
             if self.update_reporter_parameters is not None:
                 raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")

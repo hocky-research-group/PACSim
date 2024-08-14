@@ -57,7 +57,7 @@ class TestUpdateReporters(object):
                                                         3.8694534077894454,
                                                         4.969443269616876,
                                                         4.4699833180027895])])
-    def test_energies(self, yaml_file, expected_parameter_values):
+    def test_parameter_values(self, yaml_file, expected_parameter_values):
         simulation = colloids_run([yaml_file])
         f= np.loadtxt('update_reporter.csv', delimiter=",", dtype=float, unpack=True, skiprows=1)
         actual_parameter_values = f[1]

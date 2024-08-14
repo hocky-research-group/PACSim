@@ -1,3 +1,4 @@
+import math
 from abc import abstractmethod, ABC
 from typing import Any
 import warnings
@@ -221,7 +222,7 @@ class LinearUnimodalUpdateReporter(UpdateReporterAbstract):
         The step at which to switch from increasing to decreasing (or decreasing to increasing) the value of the 
         global parameter.
         The value must be greater than or equal to the update_interval, and less than or equal to the final_update_step.
-    ;type switch_step: int
+    :type switch_step: int
     :param global_parameter_name:
         The name of the global parameter to be updated.
         This must be one of the global parameters passed into any of the OpenMM Force objects.
@@ -286,4 +287,86 @@ class LinearUnimodalUpdateReporter(UpdateReporterAbstract):
         else: 
             new_value = old_value - (self._end_value - self._start_value) * self._update_interval / (self._final_update_step - self._switch_step)
         super().report(simulation, new_value)
+    
+
+class SinusoidalUpdateReporter(UpdateReporterAbstract):
+
+    '''
+    This class sets up a reporter to sinusoidally change the value of a force-related global parameter over the course 
+    of an OpenMM simulation. If the global parameter can take on negative values, the value will oscillate between the start
+    value and the negative of the start value. Otherwise, the value will oscillate between the start value and 0.The start 
+    value is determined by the current value of the global parameter in the OpenMM simulation. 
+
+
+    :param update_interval:
+        The interval (in time steps) at which to update the value of the global parameter in the OpenMM simulation.
+        The value must be greater than zero.
+    :type update_interval: int
+    :param final_update_step:
+        The final step at which the value of the global parameter will be updated.
+        The value must be greater than or equal to the update_interval.
+    :type final_update_step: int
+    :param global_parameter_name:
+        The name of the global parameter to be updated.
+        This must be one of the global parameters passed into any of the OpenMM Force objects.
+    :type global_parameter_name: str
+    :param start_value:
+        The start value of the global parameter.
+        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
+        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type start_value: unit.Quantity
+    :param allow_negatives:
+        If the global parameter being updated can take on negative values, this should be set to True. If the global
+        parameter must be greater than 0, this should be set to 0.
+    :type allow_negatives: bool
+
+
+    :raises ValueError:
+        If the filename does not end with the .csv extension.
+        If the update_interval is not greater than zero.
+        If the final_update_step is not greater than or equal to the update_interval.
+        If the switch_step is not greater than or equal to the update_interval and less than or equal to the 
+        final_update_step.
+        If the global_parameter_name is not in the simulation context.
+    '''
+
+    def __init__(self, update_interval: int, final_update_step, global_parameter_name: str,
+                 start_value: unit.Quantity, allow_negatives: bool, simulation: openmm.app.Simulation,
+                 append_file: bool = False):
+
+        
+        super.__init__()
+        self._update_interval = update_interval
+        self._final_update_step = final_update_step
+        self._global_parameter_name = global_parameter_name
+        self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
+        # Check if the start value of the global parameter matches the value in the OpenMM simulation.
+        # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
+        # the start value is not necessarily the same as the value in the OpenMM simulation.
+        self._allow_negatives = allow_negatives
+        if (not append_file
+                and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
+            warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
+
+    
+
+    def report(self, simulation: openmm.app.Simulation) -> None:
+        """
+        Sinusoidally update the value of a global parameter in an OpenMM simulation.
+
+        :param simulation:
+            The OpenMM simulation to generate a report for.
+        :type simulation: openmm.app.Simulation
+        """
+
+        step = simulation.currentStep
+
+        if self._allow_negatives:
+            current_value = self._start_value * math.sin(step)
+        else:
+            current_value = self._start_value * abs(math.sin(step))
+        super().report(simulation, current_value)
+
+
+
     

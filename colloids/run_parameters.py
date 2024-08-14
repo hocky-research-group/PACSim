@@ -460,8 +460,8 @@ class RunParameters(Parameters):
         if self.update_reporter:
             possible_update_reporters = [name for name, _ in inspect.getmembers(update_reporters, inspect.isfunction)]
             if self.update_reporter not in possible_update_reporters:
-                raise ValueError(f"Update reporter {self.update_reporter} not available, the update reporter must be one of 
-                                 the " f"following: {', '.join(possible_update_reporters)}.")
+                raise ValueError(f"Update reporter {self.update_reporter} not available, the update reporter must be one of the following:",
+                                 f"{', '.join(possible_update_reporters)}.")
             if self.update_reporter_parameters is None:
                 raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")
             if "simulation" in self.update_reporter_parameters or "append_file" in self.update_reporter_parameters:

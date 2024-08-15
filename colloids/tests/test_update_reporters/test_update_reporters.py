@@ -1,6 +1,5 @@
 import os
 import pytest
-from openmm import unit
 from colloids.colloids_run import colloids_run
 import numpy as np
 
@@ -147,7 +146,7 @@ class TestUpdateReporters(object):
                                                             3.9694631307311914,
                                                             4.522542485937367,
                                                             4.877641290737879])])
-    def test_parameter_valuesfi(self, yaml_file, expected_parameter_values):
+    def test_parameter_values(self, yaml_file, expected_parameter_values):
         simulation = colloids_run([yaml_file])
         f= np.loadtxt('update_reporter.csv', delimiter=",", dtype=float, unpack=True, skiprows=1)
         actual_parameter_values = f[1]

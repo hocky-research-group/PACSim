@@ -15,10 +15,11 @@ from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import (generate_fibonacci_sphere_grid_points, read_xyz_file, write_gsd_file,
                                        write_xyz_file)
 import colloids.integrators as integrators
-import colloids.update_reporters as update_reporters
 from colloids.run_parameters import RunParameters
 from colloids.substrate import substrate_positions_hexagonal
 from colloids.status_reporter import StatusReporter
+import colloids.update_reporters as update_reporters
+
 
 class ExampleAction(argparse.Action):
     def __init__(self, option_strings, dest, **kwargs):
@@ -318,8 +319,8 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                                                       speed=True, append=append_file))
 
     if parameters.update_reporter is not None:
+        update_reporter = getattr(update_reporters, parameters.update_reporter)
         try:
-            update_reporter = getattr(update_reporters, parameters.update_reporter)
             simulation.reporters.append(update_reporter(simulation=simulation, append_file=append_file,
                                                         **parameters.update_reporter_parameters))
         except TypeError:

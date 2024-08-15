@@ -80,7 +80,7 @@ potential_temperature: !Quantity
   value: 298.0
 trajectory_filename: trajectory.gsd
 trajectory_interval: 10
-update_reporter: LinearUnimodalUpdateReporter
+update_reporter: RampUpdateReporter
 update_reporter_parameters:
   filename: update_reporter.csv
   update_interval: 10
@@ -92,7 +92,6 @@ update_reporter_parameters:
   end_value: !Quantity
     unit: nanometer
     value: 6.0
-  switch_step: 30
 use_depletion: true
 use_gravity: true
 use_log: false

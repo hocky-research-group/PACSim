@@ -81,6 +81,8 @@ surface_potentials:
     value: -50.0
 trajectory_filename: trajectory.gsd
 trajectory_interval: 500000
+update_reporter: null
+update_reporter_parameters: null
 use_depletion: false
 use_gravity: true
 use_log: false
@@ -95,5 +97,3 @@ wall_directions:
 water_density: !Quantity
   unit: gram/(centimeter**3)
   value: 0.998
-use_update_reporter: false
-update_reporter_parameters: null

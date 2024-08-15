@@ -331,7 +331,7 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
         self.set_and_print(simulation, new_value)
 
 
-class SinusoidalUpdateReporter(UpdateReporterAbstract):
+class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
     """
     This class sets up a reporter to change the value of a force-related global parameter following a squared sinusoidal
     wave over the course of an OpenMM simulation.

@@ -116,7 +116,8 @@ class UpdateReporterAbstract(ABC):
 
     def set_and_print(self, simulation, new_value) -> None:
         """
-        Write docstring
+        Pass the updated value of the global parameter into the OpenMM simulation context to update it and print the 
+        parameter value in the ouput .csv file.
 
         :param simulation:
         :param new_value:
@@ -143,7 +144,6 @@ class LinearMonotonicUpdateReporter(UpdateReporterAbstract):
 
     The start value is determined by the current value of the global parameter in the OpenMM simulation. The end value
     is specified on initialization.
-
 
     :param update_interval:
         The interval (in time steps) at which to update the value of the global parameter in the OpenMM simulation.
@@ -256,19 +256,17 @@ class LinearUnimodalUpdateReporter(UpdateReporterAbstract):
         If the global_parameter_name is not in the simulation context.
     '''
 
-    def __init__(self, update_interval: int, final_update_step, switch_step, global_parameter_name: str,
+    def __init__(self, filename: str, update_interval: int, final_update_step, switch_step, global_parameter_name: str,
                  start_value: unit.Quantity, end_value: unit.Quantity, simulation: openmm.app.Simulation,
                  append_file: bool = False):
 
         
-        super.__init__()
+        super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
+                         global_parameter_name=global_parameter_name, simulation=simulation, append_file=append_file)
         if not final_update_step >= switch_step >= update_interval:
             raise ValueError("The switch  step must be greater than or equal to the update frequency,"
                              "and less than or equal to the final update step.")
-        self._update_interval = update_interval
-        self._final_update_step = final_update_step
         self._switch_step = switch_step
-        self._global_parameter_name = global_parameter_name
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start and end values have incompatible units.")
         self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
@@ -281,7 +279,7 @@ class LinearUnimodalUpdateReporter(UpdateReporterAbstract):
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
     
 
-    def report(self, simulation: openmm.app.Simulation) -> None:
+    def report(self, simulation: openmm.app.Simulation, state) -> None:
         """
          Linearly, unimodally update the value of a global parameter in an OpenMM simulation.
 
@@ -295,14 +293,17 @@ class LinearUnimodalUpdateReporter(UpdateReporterAbstract):
             new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._switch_step
         else: 
             new_value = old_value - (self._end_value - self._start_value) * self._update_interval / (self._final_update_step - self._switch_step)
-        super().report(simulation, new_value)
+        self.set_and_print(simulation, new_value)
     
 
 class SinusoidalUpdateReporter(UpdateReporterAbstract):
 
     '''
     This class sets up a reporter to sinusoidally change the value of a force-related global parameter over the course 
-    of an OpenMM simulation. If the global parameter can take on negative values, the value will oscillate between the start
+    of an OpenMM simulation. 
+    
+    
+    If the global parameter can take on negative values, the value will oscillate between the start
     value and the negative of the start value. Otherwise, the value will oscillate between the start value and 0.The start 
     value is determined by the current value of the global parameter in the OpenMM simulation. 
 
@@ -324,35 +325,50 @@ class SinusoidalUpdateReporter(UpdateReporterAbstract):
         OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
         sensible unit here. This quantity will only be converted to the unit system of OpenMM.
     :type start_value: unit.Quantity
-    :param allow_negatives:
-        If the global parameter being updated can take on negative values, this should be set to True. If the global
-        parameter must be greater than 0, this should be set to 0.
-    :type allow_negatives: bool
+    :param amplitude: 
+        The amplitude of the sinusoidal function. This will scale the values of the global parameter relative to the 
+        specified start value.
+    :type amplitude: float
+    :param oscillation_steps: 
+        The number of steps in which to complete a cycle of oscillation. 
+        The value must be greater than or equal to the update_interval.
+    :type oscillation_steps: int
+    :param phase_shift:
+        The horitzontal shift of the sinusoidal function. If phase_shift = 0, the global parameter will be equal to 0 at the 
+        start of the simulation. If phase_shift = pi/2, the global parameter will be equal to the amplitude * start_value + vertical_shift
+        at the start of the simulation.
+    :type phase_shift: float
+    :param vertical_shift
+        The vertical shift by which to offset the sinusoidal function.
+    :type vertical_shift: float
+
 
 
     :raises ValueError:
         If the filename does not end with the .csv extension.
         If the update_interval is not greater than zero.
         If the final_update_step is not greater than or equal to the update_interval.
-        If the switch_step is not greater than or equal to the update_interval and less than or equal to the 
-        final_update_step.
+        If  oscillation_steps is not greater than or equal to the update_interval.
         If the global_parameter_name is not in the simulation context.
     '''
 
-    def __init__(self, update_interval: int, final_update_step, global_parameter_name: str,
-                 start_value: unit.Quantity, allow_negatives: bool, simulation: openmm.app.Simulation,
-                 append_file: bool = False):
+    def __init__(self, filename: str, update_interval: int, final_update_step, global_parameter_name: str,
+                 start_value: unit.Quantity, amplitude: float, oscillation_steps: int, phase_shift: float,
+                 vertical_shift: float, simulation: openmm.app.Simulation, append_file: bool = False):
 
         
-        super.__init__()
-        self._update_interval = update_interval
-        self._final_update_step = final_update_step
-        self._global_parameter_name = global_parameter_name
+        super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
+                         global_parameter_name=global_parameter_name, simulation=simulation, append_file=append_file)
         self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
         # Check if the start value of the global parameter matches the value in the OpenMM simulation.
         # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
         # the start value is not necessarily the same as the value in the OpenMM simulation.
-        self._allow_negatives = allow_negatives
+        self._amplitude = amplitude
+        if not oscillation_steps  >= update_interval:
+            raise ValueError("The oscillation  steps must be greater than or equal to the update frequency.")
+        self._oscillation_steps = oscillation_steps
+        self._phase_shift = phase_shift
+        self._vertical_shift = vertical_shift
         if (not append_file
                 and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
             warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
@@ -369,12 +385,9 @@ class SinusoidalUpdateReporter(UpdateReporterAbstract):
         """
 
         step = simulation.currentStep
-
-        if self._allow_negatives:
-            current_value = self._start_value * math.sin(step)
-        else:
-            current_value = self._start_value * abs(math.sin(step))
-        super().report(simulation, current_value)
+        period = math.pi / self._oscillation_steps
+        current_value = self._amplitude * self._start_value * math.sin(period*step + self._phase_shift)**2 + self._vertical_shift
+        self.set_and_print(simulation, current_value)
 
 
 

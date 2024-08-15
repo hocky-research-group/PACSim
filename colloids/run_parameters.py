@@ -218,10 +218,10 @@ class RunParameters(Parameters):
         Defaults to None.
     :type particle_density: Optional[unit.Quantity]
     :param update_reporter:
-        The name of the updatee reporter used to vary the value of a force-related global parameter over time 
+        The name of the update reporter used to vary the value of a force-related global parameter over time
         in a simulation.
-        Possible choices are "LinearMonotonicUpdateReporter" and "LinearBimodalUpdateReporter".
-        If an update reporter is specified, reporter parameters must be specified.
+        Possible choices can be found in the update_reporters.py file.
+        If an update reporter is specified, its update reporter parameters must be specified.
         Defaults to None.
     :type update_reporter: Optional[str]
     :param update_reporter_parameters:

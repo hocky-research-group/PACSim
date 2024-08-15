@@ -151,7 +151,6 @@ class TestUpdateReporters(object):
         simulation = colloids_run([yaml_file])
         f= np.loadtxt('update_reporter.csv', delimiter=",", dtype=float, unpack=True, skiprows=1)
         actual_parameter_values = f[1]
-        print(expected_parameter_values)
         assert actual_parameter_values == pytest.approx(expected_parameter_values,rel=1.0e-12, abs=1.0e-12)
 
 

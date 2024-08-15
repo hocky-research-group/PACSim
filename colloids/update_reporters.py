@@ -375,7 +375,7 @@ class SinusoidalUpdateReporter(UpdateReporterAbstract):
 
     
 
-    def report(self, simulation: openmm.app.Simulation) -> None:
+    def report(self, simulation: openmm.app.Simulation, state) -> None:
         """
         Sinusoidally update the value of a global parameter in an OpenMM simulation.
 

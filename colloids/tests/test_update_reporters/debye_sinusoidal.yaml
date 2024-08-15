@@ -83,13 +83,16 @@ trajectory_interval: 10
 update_reporter: SinusoidalUpdateReporter
 update_reporter_parameters:
   filename: update_reporter.csv
-  update_interval: 10
+  update_interval: 1
   final_update_step: !Copy
     key: run_steps
   global_parameter_name: debye_length
   start_value: !Copy
     key: debye_length
-  allow_negatives: false
+  amplitude: 1
+  oscillation_steps: 20
+  phase_shift: math.pi/2
+  vertical_shift: 0
 use_depletion: true
 use_gravity: true
 use_log: false

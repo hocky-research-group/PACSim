@@ -326,8 +326,9 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
         """
         current_step = simulation.currentStep
         old_value = simulation.context.getParameter(self._global_parameter_name)
-        step_remainder = current_step % (2.0 * self._switch_step)
-        if step_remainder < self._switch_step:
+        assert current_step - self._update_interval >= 0
+        last_update_remainder = (current_step - self._update_interval) % (2.0 * self._switch_step)
+        if last_update_remainder < self._switch_step:
             new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._switch_step
         else:
             new_value = old_value - (self._end_value - self._start_value) * self._update_interval / self._switch_step

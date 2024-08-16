@@ -50,7 +50,7 @@ minimize_energy_initially: false
 particle_density: !Quantity
   unit: gram/(centimeter**3)
   value: 1.05
-platform_name: Reference
+platform_name: CPU
 radii:
   N: !Quantity
     unit: nanometer

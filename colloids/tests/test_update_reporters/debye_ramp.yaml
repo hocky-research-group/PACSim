@@ -11,19 +11,15 @@ cutoff_factor: 21.0
 debye_length: !Quantity
   unit: nanometer
   value: 5.0
-depletant_radius: !Quantity
-    unit: nanometer
-    value: 5.0
-depletion_phi: 0.5
+depletant_radius: null
+depletion_phi: null
 dielectric_constant: 80.0
 epsilon: !Quantity
     unit: kilojoule/mole
     value: 2.477709860209665  # 1 k_B T
 final_configuration_gsd_filename: final_frame.gsd
 final_configuration_xyz_filename: final_frame.xyz
-gravitational_acceleration: !Quantity
-    unit: meter/(second**2)
-    value: 9.8
+gravitational_acceleration: null
 initial_configuration: first_frame.xyz
 integrator: LangevinIntegrator
 integrator_parameters:
@@ -43,14 +39,9 @@ masses:
   P: !Quantity
     unit: dalton
     value: 1.0
-  S: !Quantity
-    unit: dalton
-    value: 0.0
 minimize_energy_initially: false
-particle_density: !Quantity
-  unit: gram/(centimeter**3)
-  value: 1.05
-platform_name: CPU
+particle_density: null
+platform_name: Reference
 radii:
   N: !Quantity
     unit: nanometer
@@ -58,13 +49,10 @@ radii:
   P: !Quantity
     unit: nanometer
     value: 105.0
-  S: !Quantity
-    unit: nanometer
-    value: 30.0
 run_steps: 100
 state_data_filename: state_data.csv
 state_data_interval: 10
-substrate_type: S
+substrate_type: null
 surface_potentials:
   N: !Quantity
     unit: millivolt
@@ -72,9 +60,6 @@ surface_potentials:
   P: !Quantity
     unit: millivolt
     value: 44.0
-  S: !Quantity
-    unit: millivolt
-    value: -47.94502672295134  # Tuned with colloids-tune so that potential depth is at -3 k_B T.
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0
@@ -92,16 +77,14 @@ update_reporter_parameters:
   end_value: !Quantity
     unit: nanometer
     value: 6.0
-use_depletion: true
-use_gravity: true
+use_depletion: false
+use_gravity: false
 use_log: false
-use_substrate: true
+use_substrate: false
 use_tabulated: false
 velocity_seed: 2
 wall_directions:
   - true
   - true
   - true
-water_density: !Quantity
-  unit: gram/(centimeter**3)
-  value: 0.998
+water_density: null

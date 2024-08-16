@@ -28,6 +28,11 @@ class UpdateReporterAbstract(ABC):
         The final step at which the value of the global parameter will be updated.
         The value must be greater than or equal to the update_interval.
     :type final_update_step: int
+    :param start_value:
+        The start value of the global parameter.
+        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
+        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type start_value: unit.Quantity
     :param global_parameter_name:
         The name of the global parameter to be updated.
         This must be one of the global parameters passed into any of the OpenMM Force objects.
@@ -50,7 +55,7 @@ class UpdateReporterAbstract(ABC):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step, global_parameter_name: str,
-                 simulation: openmm.app.Simulation, append_file: bool = False):
+                 start_value: unit.Quantity, simulation: openmm.app.Simulation, append_file: bool = False):
         """Constructor of the UpdateReporterAbstract class."""
         if not filename.endswith(".csv"):
             raise ValueError("The file must have the .csv extension.")
@@ -66,6 +71,16 @@ class UpdateReporterAbstract(ABC):
         self._file = open(filename, "a" if append_file else "w")
         if not append_file:
             print(f"timestep,{self._global_parameter_name}", file=self._file)
+        self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
+        # Check if the start value of the global parameter matches the value in the OpenMM simulation.
+        # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
+        # the start value is not necessarily the same as the value in the OpenMM simulation.
+        if (not append_file
+                and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
+            warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
+            simulation.context.setParameter(self._global_parameter_name, self._start_value)
+        if not append_file:
+            print(f"0,{self._start_value}", file=self._file)
 
     # noinspection PyPep8Naming
     def describeNextReport(self, simulation: openmm.app.Simulation) -> tuple[int, bool, bool, bool, bool, bool]:
@@ -194,16 +209,10 @@ class RampUpdateReporter(UpdateReporterAbstract):
                  append_file: bool = False):
         """Constructor of the LinearMonotonicUpdateReporter class."""
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
-                         global_parameter_name=global_parameter_name, simulation=simulation, append_file=append_file)
+                         global_parameter_name=global_parameter_name, start_value=start_value, simulation=simulation,
+                         append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start and end values have incompatible units.")
-        self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
-        # Check if the start value of the global parameter matches the value in the OpenMM simulation.
-        # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
-        # the start value is not necessarily the same as the value in the OpenMM simulation.
-        if (not append_file
-                and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
-            warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
 
     def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
@@ -290,16 +299,10 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
                  start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int,
                  simulation: openmm.app.Simulation, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
-                         global_parameter_name=global_parameter_name, simulation=simulation, append_file=append_file)
+                         global_parameter_name=global_parameter_name, start_value=start_value, simulation=simulation,
+                         append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start and end values have incompatible units.")
-        self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
-        # Check if the start value of the global parameter matches the value in the OpenMM simulation.
-        # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
-        # the start value is not necessarily the same as the value in the OpenMM simulation.
-        if (not append_file
-                and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
-            warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
         if not final_update_step >= switch_step >= update_interval:
             raise ValueError("The switch step must be greater than or equal to the update frequency,"
@@ -397,18 +400,12 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
                  start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int,
                  simulation: openmm.app.Simulation, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
-                         global_parameter_name=global_parameter_name, simulation=simulation, append_file=append_file)
+                         global_parameter_name=global_parameter_name, start_value=start_value, simulation=simulation,
+                         append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start value and amplitude have incompatible units.")
-        self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
         end_value_float = end_value.value_in_unit_system(unit.md_unit_system)
         self._amplitude = end_value_float - self._start_value
-        # Check if the start value of the global parameter matches the value in the OpenMM simulation.
-        # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
-        # the start value is not necessarily the same as the value in the OpenMM simulation.
-        if (not append_file
-                and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
-            warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
         if not final_update_step >= switch_step >= update_interval:
             raise ValueError("The switch step must be greater than or equal to the update frequency,"
                              "and less than or equal to the final update step.")

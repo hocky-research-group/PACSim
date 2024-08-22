@@ -37,6 +37,11 @@ class UpdateReporterAbstract(ABC):
         The name of the global parameter to be updated.
         This must be one of the global parameters passed into any of the OpenMM Force objects.
     :type global_parameter_name: str
+    :param print_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is printed
+        to the output .csv file.
+        The value must be greater than zero.
+    :type print_interval: int
     :param simulation:
         The OpenMM simulation that this reporter will be added to.
         The context of this OpenMM simulation must contain the parameter to be updated.
@@ -46,16 +51,19 @@ class UpdateReporterAbstract(ABC):
         existing file.
         Defaults to False.
     :type append_file: bool
+   
 
     :raises ValueError:
         If the filename does not end with the .csv extension.
         If the update_interval is not greater than zero.
         If the final_update_step is not greater than or equal to the update_interval.
-        If the global_parameter_name is not in the simulation context.
+        If the global_parameter_name is not in the simulation context.        
+        If the print_interval is not greater than zero.
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step, global_parameter_name: str,
-                 start_value: unit.Quantity, simulation: openmm.app.Simulation, append_file: bool = False):
+                 start_value: unit.Quantity, print_interval: int, simulation: openmm.app.Simulation,
+                 append_file: bool = False):
         """Constructor of the UpdateReporterAbstract class."""
         if not filename.endswith(".csv"):
             raise ValueError("The file must have the .csv extension.")
@@ -75,6 +83,9 @@ class UpdateReporterAbstract(ABC):
         # Check if the start value of the global parameter matches the value in the OpenMM simulation.
         # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
         # the start value is not necessarily the same as the value in the OpenMM simulation.
+        if not print_interval > 0:
+            raise ValueError("The print frequency must be greater than zero.")
+        self._print_interval = print_interval
         if (not append_file
                 and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
             warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
@@ -142,7 +153,8 @@ class UpdateReporterAbstract(ABC):
         """
         step = simulation.currentStep
         simulation.context.setParameter(self._global_parameter_name, new_value)
-        print(f"{step},{new_value}", file=self._file)
+        if step % self._print_interval == 0:
+            print(f"{step},{new_value}", file=self._file)
 
     def __del__(self) -> None:
         """Destructor of the UpdateReporter class."""
@@ -186,6 +198,11 @@ class RampUpdateReporter(UpdateReporterAbstract):
         OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
         sensible unit here. This quantity will only be converted to the unit system of OpenMM.
     :type end_value: unit.Quantity
+    :param print_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is printed
+        to the output .csv file.
+        The value must be greater than zero.
+    :type print_interval: int
     :param simulation:
         The OpenMM simulation that this reporter will be added to.
         The context of this OpenMM simulation must contain the parameter to be updated.
@@ -199,18 +216,19 @@ class RampUpdateReporter(UpdateReporterAbstract):
     :raises ValueError:
         If the filename does not end with the .csv extension (via the abstract base class).
         If the update_interval is not greater than zero (via the abstract base class).
+        If the print_interval is not greater than zero (via the abstract base class).
         If the final_update_step is not greater than or equal to the update_interval (via the abstract base class).
         If the global_parameter_name is not in the simulation context (via the abstract base class).
         If the start and end values have incompatible units.
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
-                 start_value: unit.Quantity, end_value: unit.Quantity, simulation: openmm.app.Simulation,
-                 append_file: bool = False):
+                 start_value: unit.Quantity, end_value: unit.Quantity, print_interval: int,
+                 simulation: openmm.app.Simulation, append_file: bool = False):
         """Constructor of the LinearMonotonicUpdateReporter class."""
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
-                         global_parameter_name=global_parameter_name, start_value=start_value, simulation=simulation,
-                         append_file=append_file)
+                         global_parameter_name=global_parameter_name, start_value=start_value,
+                         print_interval=print_interval, simulation=simulation, append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start and end values have incompatible units.")
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
@@ -275,6 +293,11 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
         increasing) the value of the global parameter.
         The value must be a multiple of the update_interval, and less than or equal to the final_update_step.
     :type switch_step: int
+    :param print_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is printed
+        to the output .csv file.
+        The value must be greater than zero.
+    :type print_interval: int
     :param simulation:
         The OpenMM simulation that this reporter will be added to.
         The context of this OpenMM simulation must contain the parameter to be updated.
@@ -288,6 +311,7 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
     :raises ValueError:
         If the filename does not end with the .csv extension (via the abstract base class).
         If the update_interval is not greater than zero (via the abstract base class).
+        If the print_interval is not greater than zero (via the abstract base class).
         If the final_update_step is not greater than or equal to the update_interval (via the abstract base class).
         If the global_parameter_name is not in the simulation context (via the abstract base class).
         If the start and end values have incompatible units.
@@ -296,11 +320,11 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
-                 start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int,
+                 start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int, print_interval: int,
                  simulation: openmm.app.Simulation, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
-                         global_parameter_name=global_parameter_name, start_value=start_value, simulation=simulation,
-                         append_file=append_file)
+                         global_parameter_name=global_parameter_name, start_value=start_value,
+                         print_interval=print_interval, simulation=simulation, append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start and end values have incompatible units.")
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
@@ -377,6 +401,11 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
         increasing) the value of the global parameter.
         The value must be a multiple of the update_interval, and less than or equal to the final_update_step.
     :type switch_step: int
+    :param print_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is printed
+        to the output .csv file.
+        The value must be greater than zero.
+    :type print_interval: int
     :param simulation:
         The OpenMM simulation that this reporter will be added to.
         The context of this OpenMM simulation must contain the parameter to be updated.
@@ -390,6 +419,7 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
     :raises ValueError:
         If the filename does not end with the .csv extension (via the abstract base class).
         If the update_interval is not greater than zero (via the abstract base class).
+        If the print_interval is not greater than zero (via the abstract base class).
         If the final_update_step is not greater than or equal to the update_interval (via the abstract base class).
         If the global_parameter_name is not in the simulation context (via the abstract base class).
         If the start and end values have incompatible units.
@@ -398,11 +428,11 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
-                 start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int,
+                 start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int, print_interval: int,
                  simulation: openmm.app.Simulation, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
-                         global_parameter_name=global_parameter_name, start_value=start_value, simulation=simulation,
-                         append_file=append_file)
+                         global_parameter_name=global_parameter_name, start_value=start_value,
+                         print_interval=print_interval, simulation=simulation, append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start value and amplitude have incompatible units.")
         end_value_float = end_value.value_in_unit_system(unit.md_unit_system)

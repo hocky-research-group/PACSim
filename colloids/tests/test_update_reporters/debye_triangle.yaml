@@ -68,7 +68,10 @@ trajectory_interval: 10
 update_reporter: TriangleUpdateReporter
 update_reporter_parameters:
   filename: update_reporter.csv
-  update_interval: 10
+  update_interval: !Copy
+    key: state_data_interval
+  print_interval: !Copy
+    key: state_data_interval
   final_update_step: !Copy
     key: run_steps
   global_parameter_name: debye_length

@@ -62,7 +62,7 @@ class UpdateReporterAbstract(ABC):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step, global_parameter_name: str,
-                 start_value: unit.Quantity, print_interval:int, simulation: openmm.app.Simulation, 
+                 start_value: unit.Quantity, print_interval: int, simulation: openmm.app.Simulation,
                  append_file: bool = False):
         """Constructor of the UpdateReporterAbstract class."""
         if not filename.endswith(".csv"):
@@ -85,14 +85,13 @@ class UpdateReporterAbstract(ABC):
         # the start value is not necessarily the same as the value in the OpenMM simulation.
         if not print_interval > 0:
             raise ValueError("The print frequency must be greater than zero.")
-        self._print_interval = print_interval 
+        self._print_interval = print_interval
         if (not append_file
                 and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
             warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
             simulation.context.setParameter(self._global_parameter_name, self._start_value)
         if not append_file:
             print(f"0,{self._start_value}", file=self._file)
-
 
     # noinspection PyPep8Naming
     def describeNextReport(self, simulation: openmm.app.Simulation) -> tuple[int, bool, bool, bool, bool, bool]:
@@ -224,12 +223,12 @@ class RampUpdateReporter(UpdateReporterAbstract):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
-                 start_value: unit.Quantity, end_value: unit.Quantity, simulation: openmm.app.Simulation, 
-                 print_interval: int, append_file: bool = False):
+                 start_value: unit.Quantity, end_value: unit.Quantity, print_interval: int,
+                 simulation: openmm.app.Simulation, append_file: bool = False):
         """Constructor of the LinearMonotonicUpdateReporter class."""
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
-                         global_parameter_name=global_parameter_name, start_value=start_value, print_interval=print_interval,
-                         simulation=simulation,append_file=append_file)
+                         global_parameter_name=global_parameter_name, start_value=start_value,
+                         print_interval=print_interval, simulation=simulation, append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start and end values have incompatible units.")
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
@@ -324,8 +323,8 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
                  start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int, print_interval: int,
                  simulation: openmm.app.Simulation, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
-                         global_parameter_name=global_parameter_name, start_value=start_value, simulation=simulation,
-                         print_interval=print_interval, append_file=append_file)
+                         global_parameter_name=global_parameter_name, start_value=start_value,
+                         print_interval=print_interval, simulation=simulation, append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start and end values have incompatible units.")
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
@@ -432,8 +431,8 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
                  start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int, print_interval: int,
                  simulation: openmm.app.Simulation, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
-                         global_parameter_name=global_parameter_name, start_value=start_value, print_interval=print_interval,
-                         simulation=simulation, append_file=append_file)
+                         global_parameter_name=global_parameter_name, start_value=start_value,
+                         print_interval=print_interval, simulation=simulation, append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start value and amplitude have incompatible units.")
         end_value_float = end_value.value_in_unit_system(unit.md_unit_system)

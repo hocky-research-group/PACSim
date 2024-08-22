@@ -100,6 +100,8 @@ update_reporter: RampUpdateReporter
 update_reporter_parameters:
   filename: test_run_and_resume/update_reporter_resume.csv
   update_interval: 10
+  print_interval: !Copy
+    key: state_data_interval
   final_update_step: 100
   global_parameter_name: debye_length
   start_value: !Copy

@@ -69,6 +69,7 @@ update_reporter: SquaredSinusoidalUpdateReporter
 update_reporter_parameters:
   filename: update_reporter.csv
   update_interval: 1
+  print_interval: 1
   final_update_step: !Copy
     key: run_steps
   global_parameter_name: debye_length

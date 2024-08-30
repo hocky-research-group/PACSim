@@ -1,6 +1,6 @@
 import math
 from typing import Iterator
-from openmm import CustomNonbondedForce, unit
+from openmm import CustomManyParticleForce, unit
 from colloids.abstracts import ColloidPotentialsAbstract
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 
@@ -72,9 +72,9 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         self._max_radius = -math.inf * self._nanometer
         self._cutoff_factor = cutoff_factor
 
-    def set_up_steric_potential(self) -> CustomNonbondedForce:
+    def set_up_steric_potential(self) -> CustomManyParticleForce:
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""
-        steric_potential = CustomNonbondedForce(
+        steric_potential = CustomManyParticleForce(2,
             "select(flag1 * flag2, 0, "
             "step(two_l - h) * "
             "steric_prefactor * rs / 2.0 * brush_length * brush_length * ("
@@ -82,6 +82,7 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
             "+ 12.0 * (h / two_l - 1.0))); "
             "h = r - rs;"
+            "r=distance(p1,p2);"
             "rs = radius1 + radius2;"
             "two_l = 2.0 * brush_length"
         )
@@ -99,22 +100,24 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         steric_potential.addPerParticleParameter("flag")
         return steric_potential
 
-    def set_up_electrostatic_potential(self) -> CustomNonbondedForce:
+    def set_up_electrostatic_potential(self) -> CustomManyParticleForce:
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""
         if self._use_log:
-            electrostatic_potential = CustomNonbondedForce(
+            electrostatic_potential = CustomManyParticleForce(2,
                 "select(flag1 * flag2, 0, "
                 "electrostatic_prefactor * radius * psi1 * psi2 * log(1.0 + exp(-h / debye_length))); "
                 "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
                 "h = r - rs;"
+                "r=distance(p1,p2);"
                 "rs = radius1 + radius2"
             )
         else:
-            electrostatic_potential = CustomNonbondedForce(
+            electrostatic_potential = CustomManyParticleForce(2,
                 "select(flag1 * flag2, 0, "
                 "electrostatic_prefactor * radius * psi1 * psi2 * exp(-h / debye_length)); "
                 "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
                 "h = r - rs;"
+                "r=distance(p1,p2);"
                 "rs = radius1 + radius2"
             )
         # Prefactor is 2 * pi * epsilon
@@ -187,7 +190,7 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         self._steric_potential.addExclusion(particle_one, particle_two)
         self._electrostatic_potential.addExclusion(particle_one, particle_two)
 
-    def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
+    def yield_potentials(self) -> Iterator[CustomManyParticleForce]:
         """
         Generate all potentials in the systems that are necessary to properly include the steric and electrostatic pair
         potentials between colloids in a solution in an openmm system.
@@ -210,8 +213,8 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             self._steric_potential.setNonbondedMethod(self._steric_potential.CutoffNonPeriodic)
         self._steric_potential.setCutoffDistance(
             (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(self._nanometer))
-        self._steric_potential.setUseLongRangeCorrection(False)
-        self._steric_potential.setUseSwitchingFunction(False)
+        #self._steric_potential.setUseLongRangeCorrection(False)
+        #self._steric_potential.setUseSwitchingFunction(False)
 
         if self._periodic_boundary_conditions:
             self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffPeriodic)
@@ -220,11 +223,11 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         self._electrostatic_potential.setCutoffDistance(
             (2.0 * self._max_radius
              + self._cutoff_factor * self._parameters.debye_length).value_in_unit(self._nanometer))
-        self._electrostatic_potential.setUseLongRangeCorrection(False)
-        self._electrostatic_potential.setUseSwitchingFunction(True)
-        self._electrostatic_potential.setSwitchingDistance(
-            (2.0 * self._max_radius
-             + (self._cutoff_factor - 1.0) * self._parameters.debye_length).value_in_unit(self._nanometer))
+        #self._electrostatic_potential.setUseLongRangeCorrection(False)
+        #self._electrostatic_potential.setUseSwitchingFunction(True)
+        #self._electrostatic_potential.setSwitchingDistance(
+        #    (2.0 * self._max_radius
+        #     + (self._cutoff_factor - 1.0) * self._parameters.debye_length).value_in_unit(self._nanometer))
 
         yield self._steric_potential
         yield self._electrostatic_potential

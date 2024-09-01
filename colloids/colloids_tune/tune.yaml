@@ -2,5 +2,7 @@ plot_filename: tuned_potential_energy.pdf
 tuned_potential_depth: !Quantity
     unit: kilojoule/mole
     value: -7.4331295806289965  # -3 k_B T
-tuned_type: S
-other_type: P
+tuned_parameter_name: debye_length
+tuned_parameter_type: Global
+tuned_type: null
+other_type: null

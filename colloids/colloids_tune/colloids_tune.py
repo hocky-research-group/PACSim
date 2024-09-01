@@ -6,7 +6,7 @@ import numpy as np
 import openmm
 from openmm import unit
 from scipy.optimize import minimize, root_scalar
-from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters
+from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters, DepletionPotential
 from colloids.run_parameters import RunParameters
 from colloids.colloids_tune.tune_parameters import TuneParameters
 
@@ -149,8 +149,129 @@ def tune_surface_potential(colloid_potentials: ColloidPotentialsAlgebraic, other
     return tuned_surface_potential
 
 
+def tune_global_parameter(colloid_potentials: ColloidPotentialsAlgebraic, depletion_potential,
+                          colloid_potential_parameters, tuned_parameter_name: str, tuned_potential_depth: unit.Quantity, 
+                          plot_filename: Optional[str]) -> unit.Quantity:
+    """
+    Tune a global parameter in the DLVO pair potential for a binary ionic colloid system so that the potential depth 
+    of the combined steric and electrostatic potentials is equal to a desired value. If depletion interactions are on,
+    the combined potential also considers depletion, and parameters for the depletion interaction can be tuned.
+
+    :param colloid_potentials:
+        The algebraic colloid potentials containing the steric and electrostatic potentials.
+    :type colloid_potentials: ColloidPotentialsAlgebraic
+    :param depletion_potential:
+        The depletion interactions for the system.
+    :type depletion_potential: DepletionPotential
+    :param colloid_potential_parameters:
+
+    :type colloid_potential_parameters: RunParameters
+    :param tuned_parameter_name:
+        The name of the global parameter being tuned.
+    :type tuned_parameter_name: str
+    :param tuned_potential_depth:
+        The desired potential depth of the combined steric and electrostatic potential.
+        The unit of the potential_depth must be compatible with kilojoules per mole and the value must be smaller
+        than zero.
+    :type tuned_potential_depth: unit.Quantity
+    :param plot_filename:
+        If not None, the filename of the plot with the pair potential for the system with tuned parameters.
+    :type plot_filename: Optional[str]
+
+    :return:
+        The tuned parameter, with appropriate units.
+    :rtype: unit.Quantity
+
+    :raises TypeError:
+        If tuned_potential_depth is not a Quantity with a proper unit (via the abstract base class).
+    :raises ValueError:
+        If the tuned_potential_depth is not smaller than zero.
+    """
+    if not tuned_potential_depth.unit.is_compatible(unit.kilojoule_per_mole):
+        raise TypeError("The potential_depth must be a Quantity with a unit compatible with kilojoule per mole.")
+    if not tuned_potential_depth.value_in_unit(unit.kilojoule_per_mole) < 0.0:
+        raise ValueError("The potential_depth must be less than zero.")
+
+    system = openmm.System()
+    platform = openmm.Platform.getPlatformByName("Reference")
+    dummy_integrator = openmm.LangevinIntegrator(0.0, 0.0, 0.0)
+    electrostatic_potential = colloid_potentials.set_up_electrostatic_potential()
+    steric_potential = colloid_potentials.set_up_steric_potential()
+    electrostatic_potential.setNonbondedMethod(electrostatic_potential.NoCutoff)
+    steric_potential.setNonbondedMethod(steric_potential.NoCutoff)
+    if depletion_potential:
+        depletion_potential._set_up_depletion_potential()
+    system.addParticle(1.0 * unit.amu)
+    system.addParticle(1.0 * unit.amu)
+    #assert len(colloid_potential_parameters.radii) == 2
+    for i, t in enumerate(colloid_potential_parameters.radii):
+
+        electrostatic_potential.addParticle([colloid_potential_parameters.radii[t].value_in_unit(unit.nano * unit.meter),
+                                         colloid_potential_parameters.surface_potentials[t].value_in_unit(unit.milli * unit.volt),
+                                         False])
+        steric_potential.addParticle([colloid_potential_parameters.radii[t].value_in_unit(unit.nano * unit.meter), False])
+   
+        if depletion_potential:
+            #depletion_q = (colloid_potential_parameters.radii[t] + colloid_potential_parameters.brush_length)/ colloid_potential_parameters.depletant_radius
+            depletion_potential.add_particle(colloid_potential_parameters.radii[t], False) 
+            
+    system.addForce(electrostatic_potential)
+    system.addForce(steric_potential)
+    if depletion_potential:
+        system.addForce(depletion_potential)
+
+    context = openmm.Context(system, dummy_integrator, platform)
+    #original_electrostatic_prefactor = context.getParameter("electrostatic_prefactor")
+    radius_sum = (colloid_potential_parameters.radii[0] + colloid_potential_parameters.radii[1]).value_in_unit(unit.nano * unit.meter)
+
+    def potential_energy(surface_separation: Sequence[float]) -> float:
+        # Surface separation must be a numpy array for the minimize function.
+        assert len(surface_separation) == 1
+
+        #context.setParameter("electrostatic_prefactor", original_electrostatic_prefactor * surface_potential)
+        context.setPositions([openmm.Vec3(0.0, 0.0, 0.0),
+                              openmm.Vec3(radius_sum + surface_separation[0], 0.0, 0.0)])
+        return context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+
+    def deviation_potential_energy(surface_potential: float) -> float:
+        minimum_energy_result = minimize(potential_energy, np.array([10.0]), args=(tuned_parameter_name,), tol=1.0e-3)
+        if not minimum_energy_result.success:
+            raise RuntimeError(minimum_energy_result.message + " Minimization failed.")
+        assert len(minimum_energy_result.x) == 1
+        return (potential_energy(minimum_energy_result.x, tuned_parameter_name)
+                - tuned_potential_depth.value_in_unit(unit.kilojoule_per_mole))
+
+    result = root_scalar(
+        deviation_potential_energy,
+       # bracket=[-10.0 * abs(other_surface_potential.value_in_unit(unit.milli * unit.volt)), 0.0],
+        method="brentq")
+    if not result.converged:
+        raise RuntimeError(result.flag)
+
+    tuned_global_parameter = result #-math.copysign(
+       #result.root, other_surface_potential.value_in_unit(unit.milli * unit.volt)) * (unit.milli * unit.volt)
+
+    if plot_filename is not None:
+        plt.figure()
+        surface_separations = np.linspace(0.0, 30.0, 1000)
+        potential_energies = np.zeros(len(surface_separations))
+        for index, surface_sep in enumerate(surface_separations):
+            # noinspection PyTypeChecker
+            potential_energies[index] = potential_energy([surface_sep],
+                                                         tuned_global_parameter)
+        plt.plot(surface_separations, potential_energies)
+        plt.xlabel("Surface separation (nm)")
+        plt.ylabel("Potential energy (kJ/mol)")
+        plt.axhline(tuned_potential_depth.value_in_unit(unit.kilojoule_per_mole), color="black", linestyle="--")
+        plt.ylim(1.1 * tuned_potential_depth.value_in_unit(unit.kilojoule_per_mole), 0.0)
+        plt.savefig(plot_filename)
+        plt.close()
+
+    return tuned_global_parameter
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Tune the surface potential of a colloid with a given radius so that "
+    parser = argparse.ArgumentParser(description="Tune a per-particle or global parameter for a binary colloid system so that "
                                                  "the potential depth of the combined steric and electrostatic "
                                                  "potentials is equal to a given potential depth.")
     parser.add_argument("simulation_parameters", help="YAML file with simulation parameters", type=str)
@@ -166,43 +287,79 @@ def main():
 
     parameters = RunParameters.from_yaml(args.simulation_parameters)
     tune_parameters = TuneParameters.from_yaml(args.tune_parameters)
-    if tune_parameters.tuned_type not in parameters.masses:
-        raise ValueError(f"The type of the tuned colloid {tune_parameters.tuned_type} is not present in the "
-                         "masses dictionary in the simulation parameters.")
-    if tune_parameters.tuned_type not in parameters.radii:
-        raise ValueError(f"The type of the tuned colloid {tune_parameters.tuned_type} is not present in the "
-                         "radii dictionary in the simulation parameters.")
-    if tune_parameters.tuned_type not in parameters.surface_potentials:
-        raise ValueError(f"The type of the tuned colloid {tune_parameters.tuned_type} is not present in the "
-                         "surface_potentials dictionary in the simulation parameters.")
-    if tune_parameters.other_type not in parameters.masses:
-        raise ValueError(f"The type of the other colloid {tune_parameters.other_type} is not present in the "
-                         "masses dictionary in the simulation parameters.")
-    if tune_parameters.other_type not in parameters.radii:
-        raise ValueError(f"The type of the other colloid {tune_parameters.other_type} is not present in the "
-                         "radii dictionary in the simulation parameters.")
-    if tune_parameters.other_type not in parameters.surface_potentials:
-        raise ValueError(f"The type of the other colloid {tune_parameters.other_type} is not present in the "
-                         "surface_potentials dictionary in the simulation parameters.")
+    if tune_parameters.tuned_parameter_type == "PerParticle":
+        if tune_parameters.tuned_type not in parameters.masses:
+            raise ValueError(f"The type of the tuned colloid {tune_parameters.tuned_type} is not present in the "
+                            "masses dictionary in the simulation parameters.")
+        if tune_parameters.tuned_type not in parameters.radii:
+            raise ValueError(f"The type of the tuned colloid {tune_parameters.tuned_type} is not present in the "
+                            "radii dictionary in the simulation parameters.")
+        if tune_parameters.tuned_type not in parameters.surface_potentials:
+            raise ValueError(f"The type of the tuned colloid {tune_parameters.tuned_type} is not present in the "
+                            "surface_potentials dictionary in the simulation parameters.")
+        if tune_parameters.other_type not in parameters.masses:
+            raise ValueError(f"The type of the other colloid {tune_parameters.other_type} is not present in the "
+                            "masses dictionary in the simulation parameters.")
+        if tune_parameters.other_type not in parameters.radii:
+            raise ValueError(f"The type of the other colloid {tune_parameters.other_type} is not present in the "
+                            "radii dictionary in the simulation parameters.")
+        if tune_parameters.other_type not in parameters.surface_potentials:
+            raise ValueError(f"The type of the other colloid {tune_parameters.other_type} is not present in the "
+                            "surface_potentials dictionary in the simulation parameters.")
 
-    potentials_parameters = ColloidPotentialsParameters(
-        brush_density=parameters.brush_density, brush_length=parameters.brush_length,
-        debye_length=parameters.debye_length, temperature=parameters.potential_temperature,
-        dielectric_constant=parameters.dielectric_constant
-    )
-    colloid_potentials = ColloidPotentialsAlgebraic(
-        colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
-        cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=False)
+        potentials_parameters = ColloidPotentialsParameters(
+            brush_density=parameters.brush_density, brush_length=parameters.brush_length,
+            debye_length=parameters.debye_length, temperature=parameters.potential_temperature,
+            dielectric_constant=parameters.dielectric_constant
+        )
+        colloid_potentials = ColloidPotentialsAlgebraic(
+            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
+            cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=False)
 
-    tuned_surface_potential = tune_surface_potential(colloid_potentials,
-                                                     parameters.radii[tune_parameters.other_type],
-                                                     parameters.surface_potentials[tune_parameters.other_type],
-                                                     parameters.radii[tune_parameters.tuned_type],
-                                                     tune_parameters.tuned_potential_depth,
-                                                     tune_parameters.plot_filename)
+        
+        if tune_parameters.tuned_parameter_name == "surface_potential":
+        
+            tuned_value = tune_surface_potential(colloid_potentials,
+                                                        parameters.radii[tune_parameters.other_type],
+                                                        parameters.surface_potentials[tune_parameters.other_type],
+                                                        parameters.radii[tune_parameters.tuned_type],
+                                                        tune_parameters.tuned_potential_depth,
+                                                        tune_parameters.plot_filename)
+        else:
+            print("Specified parameter is not currently supported.")
+            tuned_value = None
 
-    print(f"The tuned surface potential is {tuned_surface_potential}.")
+        
+    elif tune_parameters.tuned_parameter_type == "Global":
 
+        potentials_parameters = ColloidPotentialsParameters(
+            brush_density=parameters.brush_density, brush_length=parameters.brush_length,
+            debye_length=parameters.debye_length, temperature=parameters.potential_temperature,
+            dielectric_constant=parameters.dielectric_constant
+        )
+        colloid_potentials = ColloidPotentialsAlgebraic(
+            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
+            cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=False)
+        
+        if parameters.use_depletion:
+            depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,
+                                                    parameters.brush_length, 298.0*unit.kelvin,
+                                                    periodic_boundary_conditions=False)
+        else:
+            depletion_potential = None
+
+        tuned_value = tune_global_parameter(colloid_potentials, 
+                                            depletion_potential,
+                                            parameters, 
+                                            tune_parameters.tuned_parameter_name,
+                                            tune_parameters.tuned_potential_depth,
+                                            tune_parameters.plot_filename)
+
+    else:
+        tuned_value = None
+        raise ValueError("The specified parameter type to tune is not supported.")
+    
+    print(f"The tuned {tune_parameters.tuned_parameter_name} is {tuned_value}.")
 
 if __name__ == '__main__':
     main()

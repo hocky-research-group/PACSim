@@ -146,9 +146,23 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
             cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls)
     else:
+        set_of_types = list(dict.fromkeys(types))
+        if parameters.use_snowman:
+            snowman_types = parameters.snowman_bond_types
+            for t in snowman_types:
+                set_of_types.remove(t)
+        if parameters.use_substrate:
+            substrate_type = parameters.substrate_type
+            for t in substrate_type:
+                set_of_types.remove(t)
+        
+        if not len(set_of_types) == 2:
+            raise ValueError("Incorrect assignment of particle types for algebraic potential.")
+ 
         colloid_potentials = ColloidPotentialsAlgebraic(
             colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
             cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls)
+
 
     if include_walls:
         slj_walls = ShiftedLennardJonesWalls(wall_distances, parameters.epsilon, parameters.alpha,
@@ -260,6 +274,11 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     for force in colloid_potentials.yield_potentials():
         system.addForce(force)
 
+        print(set_of_types)
+
+        force.setTypeFilter(0, set_of_types[0])
+        force.setTypeFilter(1, set_of_types[1])
+
     if include_walls:
         for force in slj_walls.yield_potentials():
             system.addForce(force)
@@ -280,7 +299,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         # platforms.
         cutoffs = []
         for force in system.getForces():
-            if isinstance(force, (openmm.NonbondedForce, openmm.CustomNonbondedForce)):
+            if isinstance(force, (openmm.NonbondedForce, openmm.CustomNonbondedForce, openmm.CustomManyParticleForce)):
                 assert (force.getNonbondedMethod() == openmm.NonbondedForce.CutoffPeriodic
                         or force.getNonbondedMethod() == openmm.NonbondedForce.CutoffNonPeriodic)
                 cutoff_distance = force.getCutoffDistance()

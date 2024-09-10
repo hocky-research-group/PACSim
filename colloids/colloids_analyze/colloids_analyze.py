@@ -1,7 +1,10 @@
 import argparse
+import inspect
 import pathlib
 from colloids.run_parameters import RunParameters
+from colloids.colloids_analyze import LabeledRunParametersWithPath
 from colloids.colloids_analyze.analysis_parameters import AnalysisParameters
+from colloids.colloids_analyze.rdf_plotter import RDFPlotter
 from colloids.colloids_analyze.state_data_plotter import StateDataPlotter
 
 
@@ -32,16 +35,39 @@ def main():
     if not args.analysis_parameters.endswith(".yaml"):
         raise ValueError("The YAML file for the analysis parameters must have the .yaml extension.")
 
-    run_parameters = [{
-        "path": pathlib.Path(simulation_parameters).parent,
-        "parameters": RunParameters.from_yaml(simulation_parameters)}
-        for simulation_parameters in args.simulation_parameters]
     analysis_parameters = AnalysisParameters.from_yaml(args.analysis_parameters)
 
+    if analysis_parameters.labels is not None:
+        if not len(analysis_parameters.labels) == len(args.simulation_parameters):
+            raise ValueError("The number of labels must match the number of simulation parameters files.")
+
+    labels = (analysis_parameters.labels if analysis_parameters.labels is not None
+              else [sp for sp in args.simulation_parameters])
+
+    run_parameters = [LabeledRunParametersWithPath(path=pathlib.Path(simulation_parameters).parent, label=label,
+                                                    run_parameters=RunParameters.from_yaml(simulation_parameters))
+                      for label, simulation_parameters in zip(labels, args.simulation_parameters)]
+
     if analysis_parameters.plot_state_data:
-        plotter = StateDataPlotter(analysis_parameters.working_directory,
-                                   run_parameters, analysis_parameters.state_data_labels)
+        plotter = StateDataPlotter(analysis_parameters.working_directory, run_parameters)
         plotter.plot()
+
+    if analysis_parameters.plot_rdf:
+        if analysis_parameters.rdf_plotter_parameters is not None:
+            try:
+                plotter = RDFPlotter(analysis_parameters.working_directory, run_parameters,
+                                     **analysis_parameters.rdf_plotter_parameters)
+            except TypeError:
+                raise TypeError(
+                    f"RDFPlotter does not accept the given arguments {analysis_parameters.rdf_plotter_parameters}. "
+                    f"The expected signature is {inspect.signature(RDFPlotter)} (the working_directory and "
+                    f"run_parameters arguments need not be specified).")
+        else:
+            plotter = RDFPlotter(analysis_parameters.working_directory, run_parameters)
+        plotter.plot()
+    else:
+        if analysis_parameters.rdf_plotter_parameters is not None:
+            raise ValueError("The RDF plotter parameters are only valid if the RDF plot is to be plotted.")
 
 
 if __name__ == '__main__':

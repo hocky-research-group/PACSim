@@ -1,3 +1,5 @@
+labels: null
 plot_state_data: true
-state_data_labels: null
+plot_rdf: false
+rdf_plotter_parameters: null
 working_directory: ./output

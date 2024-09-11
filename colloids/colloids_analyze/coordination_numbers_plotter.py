@@ -29,6 +29,7 @@ class CoordinationNumbersPlotter(Plotter):
     def plot(self) -> None:
         figure = plt.figure()
         axes = figure.subplots()
+        legend_lines = []
         for index, rp in enumerate(self._run_parameters):
             # If run_parameters["parameters"].trajectory_filename is a complete path, the division operator of paths
             # only returns that complete path. Otherwise, this combines base_path and path.
@@ -62,8 +63,9 @@ class CoordinationNumbersPlotter(Plotter):
             # Coordination numbers should be symmetric if the same atom group is used.
             assert np.all(n_atoms_sum == np.sum(n_atoms, axis=0))
             bins = [-0.5 + 1.0 * i for i in range(int(max(n_atoms_sum)) + 2)]
-            axes.hist(n_atoms_sum, bins=bins, density=True, histtype="step", color=f"C{index}", linestyle="solid",
-                      label=rp.label)
+            _, _, l = axes.hist(n_atoms_sum, bins=bins, density=True, histtype="step", color=f"C{index}",
+                                linestyle="solid", label=rp.label)
+            legend_lines.append(l[0])
 
             rdf = MDAnalysis.analysis.rdf.InterRDF_s(universe, [[first_atom_group, second_atom_group]],
                                                      range=self._coordination_number_range, norm="none")
@@ -79,12 +81,15 @@ class CoordinationNumbersPlotter(Plotter):
             bins = [-0.5 + 1.0 * i for i in range(int(max(n_atoms_sum)) + 2)]
             axes.hist(n_atoms_sum, bins=bins, density=True, histtype="step", color=f"C{index}", linestyle="dotted")
 
-        axes.legend(frameon=False)
-        axes.plot([], [], color="k", linestyle="solid", label=f"{self._types} neighbors of {self._types}")
-        axes.plot([], [], color="k", linestyle="dashed", label=f"{self._types[1]} neighbors of {self._types[0]}")
-        axes.plot([], [], color="k", linestyle="dotted", label=f"{self._types[0]} neighbors of {self._types[1]}")
+        # Add two legends according to
+        # https://matplotlib.org/3.8.2/users/explain/axes/legend_guide.html#multiple-legends-on-the-same-axes
+        first_legend = axes.legend(handles=legend_lines, loc="upper right")
+        axes.add_artist(first_legend)
+        l1, = axes.plot([], [], color="k", linestyle="solid", label=f"{self._types} neighbors of {self._types}")
+        l2, = axes.plot([], [], color="k", linestyle="dashed", label=f"{self._types[1]} neighbors of {self._types[0]}")
+        l3, = axes.plot([], [], color="k", linestyle="dotted", label=f"{self._types[0]} neighbors of {self._types[1]}")
+        axes.legend(handles=[l1, l2, l3], loc="upper left")
         axes.set_xlabel(f"number of neighbors within range {self._coordination_number_range}")
         axes.set_ylabel(r"density")
-
         figure.savefig(self._working_directory / "coordination_numbers.pdf")
         figure.clear()

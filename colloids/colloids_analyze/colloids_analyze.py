@@ -4,6 +4,7 @@ import pathlib
 from colloids.run_parameters import RunParameters
 from colloids.colloids_analyze import LabeledRunParametersWithPath
 from colloids.colloids_analyze.analysis_parameters import AnalysisParameters
+from colloids.colloids_analyze.coordination_numbers_plotter import CoordinationNumbersPlotter
 from colloids.colloids_analyze.rdf_plotter import RDFPlotter
 from colloids.colloids_analyze.state_data_plotter import StateDataPlotter
 
@@ -45,7 +46,7 @@ def main():
               else [sp for sp in args.simulation_parameters])
 
     run_parameters = [LabeledRunParametersWithPath(path=pathlib.Path(simulation_parameters).parent, label=label,
-                                                    run_parameters=RunParameters.from_yaml(simulation_parameters))
+                                                   run_parameters=RunParameters.from_yaml(simulation_parameters))
                       for label, simulation_parameters in zip(labels, args.simulation_parameters)]
 
     if analysis_parameters.plot_state_data:
@@ -68,6 +69,21 @@ def main():
     else:
         if analysis_parameters.rdf_plotter_parameters is not None:
             raise ValueError("The RDF plotter parameters are only valid if the RDF plot is to be plotted.")
+
+    if analysis_parameters.plot_coordination_numbers:
+        if analysis_parameters.coordination_numbers_parameters is not None:
+            try:
+                plotter = CoordinationNumbersPlotter(analysis_parameters.working_directory, run_parameters,
+                                                     **analysis_parameters.coordination_numbers_parameters)
+            except TypeError:
+                raise TypeError(
+                    f"CoordinationNumbersPlotter does not accept the given arguments "
+                    f"{analysis_parameters.coordination_numbers_parameters}. The expected signature is "
+                    f"{inspect.signature(CoordinationNumbersPlotter)} (the working_directory and run_parameters "
+                    f"arguments need not be specified).")
+        else:
+            plotter = CoordinationNumbersPlotter(analysis_parameters.working_directory, run_parameters)
+        plotter.plot()
 
 
 if __name__ == '__main__':

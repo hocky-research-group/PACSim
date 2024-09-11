@@ -1,5 +1,7 @@
+coordination_numbers_parameters: null
 labels: null
-plot_state_data: true
+plot_coordination_numbers: false
 plot_rdf: false
+plot_state_data: true
 rdf_plotter_parameters: null
 working_directory: ./output

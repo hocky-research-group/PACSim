@@ -11,3 +11,5 @@ class AnalysisParameters(Parameters):
     plot_state_data: bool = True
     plot_rdf: bool = True
     rdf_plotter_parameters: Optional[dict[str, Any]] = None
+    plot_coordination_numbers: bool = True
+    coordination_numbers_parameters: Optional[dict[str, Any]] = None

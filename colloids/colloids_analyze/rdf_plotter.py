@@ -31,9 +31,10 @@ class RDFPlotter(Plotter):
         self._vertical_line = vertical_line
 
     def plot(self) -> None:
-        rdf_figure = plt.figure()
-        rdf_axes = rdf_figure.subplots()
-        legend_lines = []
+        rdf_figure_all = plt.figure()
+        rdf_axes_all = rdf_figure_all.subplots()
+        rdf_figure_types = plt.figure()
+        rdf_axes_types = rdf_figure_types.subplots()
         for index, rp in enumerate(self._run_parameters):
             # If run_parameters["parameters"].trajectory_filename is a complete path, the division operator of paths
             # only returns that complete path. Otherwise, this combines base_path and path.
@@ -53,24 +54,24 @@ class RDFPlotter(Plotter):
 
             rdf = MDAnalysis.analysis.rdf.InterRDF(atoms, atoms, exclusion_block=(1, 1), range=self._rdf_range)
             rdf.run(start=self._frame_start, stop=self._frame_stop, step=self._frame_step)
-            l, = rdf_axes.plot(rdf.results.bins, rdf.results.rdf, label=rp.label, color=f"C{index}", linestyle="solid")
-            legend_lines.append(l)
+            rdf_axes_all.plot(rdf.results.bins, rdf.results.rdf, label=rp.label, color=f"C{index}", linestyle="solid")
 
             rdf = MDAnalysis.analysis.rdf.InterRDF(first_atom_group, second_atom_group, range=self._rdf_range)
             rdf.run(start=self._frame_start, stop=self._frame_stop, step=self._frame_step)
-            rdf_axes.plot(rdf.results.bins, rdf.results.rdf, color=f"C{index}", linestyle="dashed")
+            rdf_axes_types.plot(rdf.results.bins, rdf.results.rdf, label=rp.label, color=f"C{index}", linestyle="solid")
 
             if self._vertical_line is not None:
-                rdf_axes.axvline(self._vertical_line, color="k", linestyle="dashed")
+                rdf_axes_all.axvline(self._vertical_line, color="k", linestyle="dashed")
+                rdf_axes_types.axvline(self._vertical_line, color="k", linestyle="dashed")
 
-        # Add two legends according to
-        # https://matplotlib.org/3.8.2/users/explain/axes/legend_guide.html#multiple-legends-on-the-same-axes
-        first_legend = rdf_axes.legend(handles=legend_lines, loc="upper right")
-        rdf_axes.add_artist(first_legend)
-        l1, = rdf_axes.plot([], [], color="k", linestyle="solid", label=f"types {self._types}")
-        l2, = rdf_axes.plot([], [], color="k", linestyle="dashed", label=f"{self._types[0]}--{self._types[1]}")
-        rdf_axes.legend(handles=[l1, l2], loc="upper center")
-        rdf_axes.set_xlabel(r"distance $r$ / nm")
-        rdf_axes.set_ylabel(r"radial distribution function $g(r)$")
-        rdf_figure.savefig(self._working_directory / "rdf.pdf")
-        rdf_figure.clear()
+        rdf_axes_all.set_xlabel(r"distance $r$ / nm")
+        rdf_axes_all.set_ylabel(r"radial distribution function $g(r)$")
+        rdf_axes_types.set_xlabel(r"distance $r$ / nm")
+        rdf_axes_types.set_ylabel(r"radial distribution function $g(r)$")
+        rdf_axes_all.legend()
+        rdf_axes_types.legend()
+        rdf_axes_all.set_title(f"RDF for types {self._types}")
+        rdf_axes_types.set_title(f"RDF between {self._types[0]}--{self._types[1]}")
+        rdf_figure_all.savefig(self._working_directory / "rdf_all.pdf")
+        rdf_figure_types.savefig(self._working_directory / "rdf_types.pdf")
+        rdf_figure_all.clear()

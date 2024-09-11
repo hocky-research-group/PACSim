@@ -54,20 +54,20 @@ def main():
         plotter.plot()
 
     if analysis_parameters.plot_rdf:
-        if analysis_parameters.rdf_plotter_parameters is not None:
+        if analysis_parameters.rdf_parameters is not None:
             try:
                 plotter = RDFPlotter(analysis_parameters.working_directory, run_parameters,
-                                     **analysis_parameters.rdf_plotter_parameters)
+                                     **analysis_parameters.rdf_parameters)
             except TypeError:
                 raise TypeError(
-                    f"RDFPlotter does not accept the given arguments {analysis_parameters.rdf_plotter_parameters}. "
+                    f"RDFPlotter does not accept the given arguments {analysis_parameters.rdf_parameters}. "
                     f"The expected signature is {inspect.signature(RDFPlotter)} (the working_directory and "
                     f"run_parameters arguments need not be specified).")
         else:
             plotter = RDFPlotter(analysis_parameters.working_directory, run_parameters)
         plotter.plot()
     else:
-        if analysis_parameters.rdf_plotter_parameters is not None:
+        if analysis_parameters.rdf_parameters is not None:
             raise ValueError("The RDF plotter parameters are only valid if the RDF plot is to be plotted.")
 
     if analysis_parameters.plot_coordination_numbers:

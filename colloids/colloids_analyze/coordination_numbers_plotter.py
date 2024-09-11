@@ -19,8 +19,8 @@ class CoordinationNumbersPlotter(Plotter):
             raise ValueError("The lower limit of the range for the coordination number must be less than the upper "
                              "limit.")
         if not len(types) == 2:
-            raise ValueError("The types must have exactly two elements.")
-        self._coordination_number_range = coordination_number_range
+            raise ValueError("The types sequence must have exactly two elements.")
+        self._coordination_number_range = list(coordination_number_range)
         self._frame_start = frame_start
         self._frame_stop = frame_stop
         self._frame_step = frame_step
@@ -47,7 +47,7 @@ class CoordinationNumbersPlotter(Plotter):
             second_atom_group = universe.select_atoms(f"name {self._types[1]}")
 
             rdf = MDAnalysis.analysis.rdf.InterRDF_s(universe, [[atoms, atoms]],
-                                                     range=list(self._coordination_number_range), norm="none")
+                                                     range=self._coordination_number_range, norm="none")
             rdf.run(start=self._frame_start, stop=self._frame_stop, step=self._frame_step)
             cdf = rdf.get_cdf()[0]
             # cdf is of shape (len(atoms), len(atoms), len(rdf.results.bins))
@@ -66,7 +66,7 @@ class CoordinationNumbersPlotter(Plotter):
                       label=rp.label)
 
             rdf = MDAnalysis.analysis.rdf.InterRDF_s(universe, [[first_atom_group, second_atom_group]],
-                                                     range=list(self._coordination_number_range), norm="none")
+                                                     range=self._coordination_number_range, norm="none")
             rdf.run(start=self._frame_start, stop=self._frame_stop, step=self._frame_step)
             cdf = rdf.get_cdf()[0]
             n_atoms = cdf[:, :, -1]
@@ -80,7 +80,7 @@ class CoordinationNumbersPlotter(Plotter):
             axes.hist(n_atoms_sum, bins=bins, density=True, histtype="step", color=f"C{index}", linestyle="dotted")
 
         axes.legend(frameon=False)
-        axes.plot([], [], color="k", linestyle="solid", label="all types")
+        axes.plot([], [], color="k", linestyle="solid", label=f"{self._types} neighbors of {self._types}")
         axes.plot([], [], color="k", linestyle="dashed", label=f"{self._types[1]} neighbors of {self._types[0]}")
         axes.plot([], [], color="k", linestyle="dotted", label=f"{self._types[0]} neighbors of {self._types[1]}")
         axes.set_xlabel(f"number of neighbors within range {self._coordination_number_range}")

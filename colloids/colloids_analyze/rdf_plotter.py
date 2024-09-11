@@ -7,21 +7,33 @@ from colloids.colloids_analyze import LabeledRunParametersWithPath, Plotter
 
 class RDFPlotter(Plotter):
     def __init__(self, working_directory: str, run_parameters: Sequence[LabeledRunParametersWithPath],
-                 rdf_range: tuple[int, int] = (0, 1500), frame_start: Optional[int] = -1,
-                 frame_stop: Optional[int] = None, frame_step: Optional[int] = None):
+                 rdf_range: Sequence[int] = (0, 1500), frame_start: Optional[int] = -1,
+                 frame_stop: Optional[int] = None, frame_step: Optional[int] = None, types: Sequence[str] = ("P", "N"),
+                 vertical_line: Optional[float] = None):
         super().__init__(working_directory, run_parameters)
+        if not len(rdf_range) == 2:
+            raise ValueError("The range for the coordination number must have exactly two elements.")
         if not all(r >= 0 for r in rdf_range):
             raise ValueError("The range of the radial distribution function must be non-negative.")
         if not rdf_range[0] < rdf_range[1]:
             raise ValueError("The lower limit of the radial distribution function must be less than the upper limit.")
-        self._rdf_range = rdf_range
+        if not len(types) == 2:
+            raise ValueError("The types sequence must have exactly two elements.")
+        if vertical_line is not None:
+            if not rdf_range[0] <= vertical_line <= rdf_range[1]:
+                raise ValueError("The coordinate of the vertical line must be within the range of the radial "
+                                 "distribution function.")
+        self._rdf_range = list(rdf_range)
         self._frame_start = frame_start
         self._frame_stop = frame_stop
         self._frame_step = frame_step
+        self._types = list(types)
+        self._vertical_line = vertical_line
 
     def plot(self) -> None:
         rdf_figure = plt.figure()
         rdf_axes = rdf_figure.subplots()
+        legend_lines = []
         for index, rp in enumerate(self._run_parameters):
             # If run_parameters["parameters"].trajectory_filename is a complete path, the division operator of paths
             # only returns that complete path. Otherwise, this combines base_path and path.
@@ -31,20 +43,34 @@ class RDFPlotter(Plotter):
             if not trajectory_path.suffix == ".gsd":
                 raise ValueError(f"The trajectory file {trajectory_path} does not have the .gsd extension.")
             universe = MDAnalysis.Universe(trajectory_path, in_memory=True)
-            types = set(k for k in rp.run_parameters.masses.keys())
-            if rp.run_parameters.substrate_type is not None:
-                assert rp.run_parameters.substrate_type in types
-                types.remove(rp.run_parameters.substrate_type)
-            if rp.run_parameters.snowman_bond_types is not None:
-                for t in rp.run_parameters.snowman_bond_types.values():
-                    assert t in types
-                    types.remove(t)
-            atoms = universe.select_atoms(" or ".join(f"name {t}" for t in types))
+            if not self._types[0] in rp.run_parameters.masses:
+                raise ValueError(f"The atom type {self._types[0]} is not in the masses of the run parameters.")
+            if not self._types[1] in rp.run_parameters.masses:
+                raise ValueError(f"The atom type {self._types[1]} is not in the masses of the run parameters.")
+            atoms = universe.select_atoms(" or ".join(f"name {t}" for t in self._types))
+            first_atom_group = universe.select_atoms(f"name {self._types[0]}")
+            second_atom_group = universe.select_atoms(f"name {self._types[1]}")
+
             rdf = MDAnalysis.analysis.rdf.InterRDF(atoms, atoms, exclusion_block=(1, 1), range=self._rdf_range)
             rdf.run(start=self._frame_start, stop=self._frame_stop, step=self._frame_step)
-            rdf_axes.plot(rdf.results.bins, rdf.results.rdf, label=rp.label, color=f"C{index}")
+            l, = rdf_axes.plot(rdf.results.bins, rdf.results.rdf, label=rp.label, color=f"C{index}", linestyle="solid")
+            legend_lines.append(l)
+
+            rdf = MDAnalysis.analysis.rdf.InterRDF(first_atom_group, second_atom_group, range=self._rdf_range)
+            rdf.run(start=self._frame_start, stop=self._frame_stop, step=self._frame_step)
+            rdf_axes.plot(rdf.results.bins, rdf.results.rdf, color=f"C{index}", linestyle="dashed")
+
+            if self._vertical_line is not None:
+                rdf_axes.axvline(self._vertical_line, color="k", linestyle="dashed")
+
+        # Add two legends according to
+        # https://matplotlib.org/3.8.2/users/explain/axes/legend_guide.html#multiple-legends-on-the-same-axes
+        first_legend = rdf_axes.legend(handles=legend_lines, loc="upper right")
+        rdf_axes.add_artist(first_legend)
+        l1, = rdf_axes.plot([], [], color="k", linestyle="solid", label=f"types {self._types}")
+        l2, = rdf_axes.plot([], [], color="k", linestyle="dashed", label=f"{self._types[0]}--{self._types[1]}")
+        rdf_axes.legend(handles=[l1, l2], loc="upper center")
         rdf_axes.set_xlabel(r"distance $r$ / nm")
         rdf_axes.set_ylabel(r"radial distribution function $g(r)$")
-        rdf_axes.legend()
         rdf_figure.savefig(self._working_directory / "rdf.pdf")
         rdf_figure.clear()

@@ -75,3 +75,4 @@ class RDFPlotter(Plotter):
         rdf_figure_all.savefig(self._working_directory / "rdf_all.pdf")
         rdf_figure_types.savefig(self._working_directory / "rdf_types.pdf")
         rdf_figure_all.clear()
+        rdf_figure_types.clear()

@@ -103,3 +103,6 @@ class CoordinationNumbersPlotter(Plotter):
         figure_all.clear()
         figure_type_one.clear()
         figure_type_two.clear()
+        plt.close(figure_all)
+        plt.close(figure_type_one)
+        plt.close(figure_type_two)

@@ -35,6 +35,10 @@ class RDFPlotter(Plotter):
         rdf_axes_all = rdf_figure_all.subplots()
         rdf_figure_types = plt.figure()
         rdf_axes_types = rdf_figure_types.subplots()
+        rdf_figure_types_one = plt.figure()
+        rdf_axes_types_one = rdf_figure_types_one.subplots()
+        rdf_figure_types_two = plt.figure()
+        rdf_axes_types_two = rdf_figure_types_two.subplots()
         for index, rp in enumerate(self._run_parameters):
             # If run_parameters["parameters"].trajectory_filename is a complete path, the division operator of paths
             # only returns that complete path. Otherwise, this combines base_path and path.
@@ -60,19 +64,49 @@ class RDFPlotter(Plotter):
             rdf.run(start=self._frame_start, stop=self._frame_stop, step=self._frame_step)
             rdf_axes_types.plot(rdf.results.bins, rdf.results.rdf, label=rp.label, color=f"C{index}", linestyle="solid")
 
+            rdf = MDAnalysis.analysis.rdf.InterRDF(first_atom_group, first_atom_group, exclusion_block=(1, 1),
+                                                   range=self._rdf_range)
+            rdf.run(start=self._frame_start, stop=self._frame_stop, step=self._frame_step)
+            rdf_axes_types_one.plot(rdf.results.bins, rdf.results.rdf, label=rp.label, color=f"C{index}",
+                                    linestyle="solid")
+
+            rdf = MDAnalysis.analysis.rdf.InterRDF(second_atom_group, second_atom_group, exclusion_block=(1, 1),
+                                                   range=self._rdf_range)
+            rdf.run(start=self._frame_start, stop=self._frame_stop, step=self._frame_step)
+            rdf_axes_types_two.plot(rdf.results.bins, rdf.results.rdf, label=rp.label, color=f"C{index}",
+                                    linestyle="solid")
+
             if self._vertical_line is not None:
                 rdf_axes_all.axvline(self._vertical_line, color="k", linestyle="dashed")
                 rdf_axes_types.axvline(self._vertical_line, color="k", linestyle="dashed")
+                rdf_axes_types_one.axvline(self._vertical_line, color="k", linestyle="dashed")
+                rdf_axes_types_two.axvline(self._vertical_line, color="k", linestyle="dashed")
 
         rdf_axes_all.set_xlabel(r"distance $r$ / nm")
         rdf_axes_all.set_ylabel(r"radial distribution function $g(r)$")
         rdf_axes_types.set_xlabel(r"distance $r$ / nm")
         rdf_axes_types.set_ylabel(r"radial distribution function $g(r)$")
+        rdf_axes_types_one.set_xlabel(r"distance $r$ / nm")
+        rdf_axes_types_one.set_ylabel(r"radial distribution function $g(r)$")
+        rdf_axes_types_two.set_xlabel(r"distance $r$ / nm")
+        rdf_axes_types_two.set_ylabel(r"radial distribution function $g(r)$")
         rdf_axes_all.legend()
         rdf_axes_types.legend()
+        rdf_axes_types_one.legend()
+        rdf_axes_types_two.legend()
         rdf_axes_all.set_title(f"RDF for types {self._types}")
         rdf_axes_types.set_title(f"RDF between {self._types[0]}--{self._types[1]}")
+        rdf_axes_types_one.set_title(f"RDF between {self._types[0]}--{self._types[0]}")
+        rdf_axes_types_two.set_title(f"RDF between {self._types[1]}--{self._types[1]}")
         rdf_figure_all.savefig(self._working_directory / "rdf_all.pdf")
         rdf_figure_types.savefig(self._working_directory / "rdf_types.pdf")
+        rdf_figure_types_one.savefig(self._working_directory / "rdf_types_one.pdf")
+        rdf_figure_types_two.savefig(self._working_directory / "rdf_types_two.pdf")
         rdf_figure_all.clear()
         rdf_figure_types.clear()
+        rdf_figure_types_one.clear()
+        rdf_figure_types_two.clear()
+        plt.close(rdf_figure_all)
+        plt.close(rdf_figure_types)
+        plt.close(rdf_figure_types_one)
+        plt.close(rdf_figure_types_two)

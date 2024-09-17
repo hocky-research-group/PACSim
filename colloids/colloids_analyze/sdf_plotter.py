@@ -149,6 +149,9 @@ class SDFPlotter(Plotter):
                 ax.set_xlabel("x / nm")
                 ax.set_ylabel("y / nm")
                 ax.set_zlabel("z / nm")
+                ax.set_xlim(*self._sdf_ranges[0])
+                ax.set_ylim(*self._sdf_ranges[1])
+                ax.set_zlim(*self._sdf_ranges[2])
                 ax.set_title(f"{rp.label}, SDF between {self._types[0]}--{self._types[1]}, "
                              f"align snowman {self._align_snowman}, \n"
                              f"threshold {self._sdf_threshold} (max value {np.max(sdf)}), "

@@ -63,6 +63,9 @@ class SnowmanOrientationDistributionPlotter(Plotter):
                     ax.scatter(x_coords, y_coords, z_coords, marker="o", alpha=0.1, color=f"C{i}")
                 ax.set_title(f"{rp.label}, orientation of snowmen")
                 ax.set_aspect("equal")
+                ax.set_xlim(-1.1, 1.1)
+                ax.set_ylim(-1.1, 1.1)
+                ax.set_zlim(-1.1, 1.1)
                 if self._open_interactive:
                     plt.show()
                 pdf.savefig(fig)

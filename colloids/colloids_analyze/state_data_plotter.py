@@ -54,3 +54,6 @@ class StateDataPlotter(Plotter):
         potential_energy_figure.clear()
         kinetic_energy_figure.clear()
         temperature_figure.clear()
+        plt.close(potential_energy_figure)
+        plt.close(kinetic_energy_figure)
+        plt.close(temperature_figure)

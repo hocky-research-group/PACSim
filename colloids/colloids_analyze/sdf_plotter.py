@@ -131,21 +131,18 @@ class SDFPlotter(Plotter):
                     z_bin_indices = z_bin_indices[valid_indices]
                     sdf[x_bin_indices, y_bin_indices, z_bin_indices] += 1
 
-                x_coords = []
-                y_coords = []
-                z_coords = []
-                for x_index in range(self._n_bins[0]):
-                    for y_index in range(self._n_bins[1]):
-                        for z_index in range(self._n_bins[2]):
-                            if sdf[x_index, y_index, z_index] > self._sdf_threshold:
-                                x_coord = (x_bin_edges[x_index] + x_bin_edges[x_index + 1]) / 2.0
-                                y_coord = (y_bin_edges[y_index] + y_bin_edges[y_index + 1]) / 2.0
-                                z_coord = (z_bin_edges[z_index] + z_bin_edges[z_index + 1]) / 2.0
-                                if (self._radius_cap is None
-                                    or np.linalg.norm([x_coord, y_coord, z_coord]) <= self._radius_cap):
-                                    x_coords.append(x_coord)
-                                    y_coords.append(y_coord)
-                                    z_coords.append(z_coord)
+                x_centers = (x_bin_edges[:-1] + x_bin_edges[1:]) / 2.0
+                y_centers = (y_bin_edges[:-1] + y_bin_edges[1:]) / 2.0
+                z_centers = (z_bin_edges[:-1] + z_bin_edges[1:]) / 2.0
+                x_grid, y_grid, z_grid = np.meshgrid(x_centers, y_centers, z_centers, indexing="ij")
+                mask = (sdf > self._sdf_threshold)
+                if self._radius_cap is not None:
+                    radii = np.sqrt(x_grid ** 2 + y_grid ** 2 + z_grid ** 2)
+                    mask &= (radii <= self._radius_cap)
+                x_coords = x_grid[mask]
+                y_coords = y_grid[mask]
+                z_coords = z_grid[mask]
+
                 fig = plt.figure()
                 ax = fig.add_subplot(111, projection="3d")
                 ax.scatter(x_coords, y_coords, z_coords, marker="o", alpha=0.1)

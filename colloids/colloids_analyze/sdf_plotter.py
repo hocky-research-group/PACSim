@@ -94,6 +94,19 @@ class SDFPlotter(Plotter):
                 z_bin_edges = np.linspace(start=self._sdf_ranges[2][0], stop=self._sdf_ranges[2][1],
                                           num=self._n_bins[2] + 1, endpoint=True)
                 sdf = np.zeros((self._n_bins[0], self._n_bins[1], self._n_bins[2]))
+
+                first_positions = first_atom_group.positions
+                second_positions = second_atom_group.positions
+                # This contains the distance vectors in a numpy array of shape
+                # (len(first_positions), len(second_positions), 3).
+                distance_vectors = second_positions[np.newaxis, :, :] - first_positions[:, np.newaxis, :]
+                if self._types[0] == self._types[1]:
+                    assert distance_vectors.shape[0] == distance_vectors.shape[1]
+                    # Matrix with diagonal elements False and all other positions True.
+                    filter_diagonal_mask = ~np.eye(len(first_positions), dtype=bool)
+                    distance_vectors = distance_vectors[filter_diagonal_mask].reshape(len(first_positions),
+                                                                                      len(second_positions) - 1,
+                                                                                      first_positions.shape[1])
                 for first_index, first_atom in enumerate(first_atom_group):
                     if self._align_snowman:
                         snowman_atom = snowman_atom_group[snowman_indices[first_index]]
@@ -105,19 +118,19 @@ class SDFPlotter(Plotter):
                     else:
                         # noinspection PyUnresolvedReferences
                         rot = scipy.spatial.transform.Rotation.identity()
-                    for second_index, second_atom in enumerate(second_atom_group):
-                        if self._types[0] == self._types[1] and first_index == second_index:
-                            continue
-                        distance_vector = second_atom.position - first_atom.position
-                        distance_vector = rot.apply(distance_vector)
-                        x_bin_index = np.argmax(x_bin_edges > distance_vector[0]) - 1
-                        assert 0 <= x_bin_index < self._n_bins[0] or x_bin_index == -1
-                        y_bin_index = np.argmax(y_bin_edges > distance_vector[1]) - 1
-                        assert 0 <= y_bin_index < self._n_bins[1] or y_bin_index == -1
-                        z_bin_index = np.argmax(z_bin_edges > distance_vector[2]) - 1
-                        assert 0 <= z_bin_index < self._n_bins[2] or z_bin_index == -1
-                        if x_bin_index != -1 and y_bin_index != -1 and z_bin_index != -1:
-                            sdf[x_bin_index, y_bin_index, z_bin_index] += 1
+                    rotated_distance_vectors = rot.apply(distance_vectors[first_index])
+                    x_bin_indices = np.argmax(x_bin_edges > rotated_distance_vectors[:, 0][:, np.newaxis], axis=1) - 1
+                    assert np.all(((0 <= x_bin_indices) & (x_bin_indices < self._n_bins[0])) | (x_bin_indices == -1))
+                    y_bin_indices = np.argmax(y_bin_edges > rotated_distance_vectors[:, 1][:, np.newaxis], axis=1) - 1
+                    assert np.all(((0 <= y_bin_indices) & (y_bin_indices < self._n_bins[1])) | (y_bin_indices == -1))
+                    z_bin_indices = np.argmax(z_bin_edges > rotated_distance_vectors[:, 2][:, np.newaxis], axis=1) - 1
+                    assert np.all(((0 <= z_bin_indices) & (z_bin_indices < self._n_bins[2])) | (z_bin_indices == -1))
+                    valid_indices = (x_bin_indices != -1) & (y_bin_indices != -1) & (z_bin_indices != -1)
+                    x_bin_indices = x_bin_indices[valid_indices]
+                    y_bin_indices = y_bin_indices[valid_indices]
+                    z_bin_indices = z_bin_indices[valid_indices]
+                    sdf[x_bin_indices, y_bin_indices, z_bin_indices] += 1
+
                 x_coords = []
                 y_coords = []
                 z_coords = []

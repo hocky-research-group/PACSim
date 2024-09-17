@@ -6,6 +6,7 @@ from colloids.colloids_analyze import LabeledRunParametersWithPath
 from colloids.colloids_analyze.analysis_parameters import AnalysisParameters
 from colloids.colloids_analyze.coordination_numbers_plotter import CoordinationNumbersPlotter
 from colloids.colloids_analyze.rdf_plotter import RDFPlotter
+from colloids.colloids_analyze.sdf_plotter import SDFPlotter
 from colloids.colloids_analyze.state_data_plotter import StateDataPlotter
 
 
@@ -69,6 +70,20 @@ def main():
     else:
         if analysis_parameters.rdf_parameters is not None:
             raise ValueError("The RDF plotter parameters are only valid if the RDF plot is to be plotted.")
+
+    if analysis_parameters.plot_sdf:
+        if analysis_parameters.sdf_parameters is not None:
+            try:
+                plotter = SDFPlotter(analysis_parameters.working_directory, run_parameters,
+                                     **analysis_parameters.sdf_parameters)
+            except TypeError:
+                raise TypeError(
+                    f"SDFPlotter does not accept the given arguments {analysis_parameters.sdf_parameters}. "
+                    f"The expected signature is {inspect.signature(SDFPlotter)} (the working_directory and "
+                    f"run_parameters arguments need not be specified).")
+        else:
+            plotter = SDFPlotter(analysis_parameters.working_directory, run_parameters)
+        plotter.plot()
 
     if analysis_parameters.plot_coordination_numbers:
         if analysis_parameters.coordination_numbers_parameters is not None:

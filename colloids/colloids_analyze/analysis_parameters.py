@@ -15,3 +15,5 @@ class AnalysisParameters(Parameters):
     sdf_parameters: Optional[dict[str, Any]] = None
     plot_coordination_numbers: bool = True
     coordination_numbers_parameters: Optional[dict[str, Any]] = None
+    plot_snowman_orientation_distribution: bool = True
+    snowman_orientation_distribution_parameters: Optional[dict[str, Any]] = None

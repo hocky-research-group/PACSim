@@ -1,79 +1,68 @@
 from typing import Iterator, Optional, Sequence
 from openmm import CustomExternalForce, unit
 from colloids.abstracts import OpenMMPotentialAbstract
+from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 import math
 import warnings
 
-class DLVOWalls(OpenMMPotentialAbstract):
+class SubstrateWall(OpenMMPotentialAbstract):
     """
-    This class sets up the DLVO walls for simulations with implicit substrate using the CustomExternalForce class 
-    of openmm. This is an alternative to explicitly modeling the substrate using a layer of fixed particles, and is
-    designed to reduce computational costs of modeling substrate. Either implicit substrate (DLVO walls) or explicit 
-    substrate may be used, but not both.
+    This class sets up a charged wall for simulations with implicit substrate using the CustomExternalForce class 
+    of OpenMM. This is an alternative to explicitly modeling the substrate using a layer of fixed particles, and is
+    designed to reduce computational costs of modeling substrate. Either implicit or explicit substrate may be used, 
+    but not both. 
+
+    A substrate wall can only be used when all SLJ walls are active. The bottom wall in the z direction will be replaced
+    by the substrate wall.
     
-    This class allows to independently switch on walls in the x, y, and z directions. The walls are placed at
-    +-wall_distance / 2 for every specified direction with its specified wall_distance.
+    The substrate wall is placed at the bottom of the simulation box in the z direction, at +-wall_distance / 2. 
 
-    :param wall_distances:
-        A list of three distances specifying the dimensions of the simulation box in the x, y, and z directions.
-        This is used to determine the location of the DLVO walls at +-wall_distance/2 for every active wall direction.
-        For any inactive wall direction (see wall_directions parameter), the corresponding wall distance must be None.
-        For any active wall direction, the corresponding wall distance must be specified.
+    :param wall_distance:
+        A distance specifying the dimensions of the simulation box in the z direction.
+        This is used to determine the location of the substrate wall at +-wall_distance/2 at the bottom of the simulation box.
         The unit of any wall distance must be compatible with nanometer and the value must be greater than zero.
-    :type wall_distances: Sequence[Optional[unit.Quantity]]
-    :param wall_directions:
-        A list of three booleans indicating whether the walls in the x, y, and z directions are active.
-        Defaults to [False, False, False].
-    :type wall_directions: list[bool]
-
+    :type wall_distance: Optional[unit.Quantity]
 
     :raises TypeError:
-        If  any wall distance for an active wall direction is not a Quantity with a proper unit.
+        If the wall distance for an active substrate wall is not a Quantity with a proper unit.
+        If the wall charge for an active substrate wall is not a Quantity with a proper unit (via abstract base class)
 
     :raises ValueError:
-        If any wall distance for an active wall direction is not greater than zero.
-        If no wall direction is active.
-        If not exactly three wall directions are specified.
-        If not exactly three wall distances are specified.
-        If a wall distance is specified for an inactive wall direction.
-        If a wall distance is not specified for an active wall direction.
-        If walls are active while an explicit substrate is also being used. 
+        If the wall distance for an active substrate wall is not greater than zero.
+        If the wall distance or wall charge is specified when the substrate wall is inactive.
+        If the wall distance or wall charge is not specified for an active substrate wall.
+        If a substrate wall is active while an explicit substrate is also being used. 
     """
 
     _nanometer = unit.nano * unit.meter
 
-    def __init__(self, wall_distances: Sequence[Optional[unit.Quantity]], 
-                 wall_directions: Sequence[bool] = (True, True, True), use_log: bool = False) -> None:
-        """Constructor of the DLVOWalls class."""
+    def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters, 
+                 substrate_type: Optional[str], wall_distance: Optional[unit.Quantity], 
+                 wall_charge: Optional[unit.Quantity], use_log: bool = False) -> None:
+        """Constructor of the DLVOWall class."""
         super().__init__()
-
-        if not any(wall_directions):
-            raise ValueError("at least one wall direction must be active")
-        if len(wall_directions) != 3:
-            raise ValueError("wall directions must be specified for three dimensions")
-        if len(wall_distances) != 3:
-            raise ValueError("wall distances must be specified for three dimensions")
-        for wdir, wdist in zip(wall_directions, wall_distances):
-            if wdir:
-                if wdist is None:
-                    raise ValueError("wall distance must be specified for any active wall direction")
-                if not wdist.unit.is_compatible(self._nanometer):
-                    raise TypeError("any wall distance must have a unit that is compatible with nanometers")
-                if not wdist.value_in_unit(self._nanometer) > 0.0:
-                    raise ValueError("any wall distance must have a value greater than zero")
-            else:
-                if wdist is not None:
-                    raise ValueError("wall distance must not be specified for inactive wall direction")
+    
+        if substrate_type == "wall":
+            if wall_distance is None:
+                raise ValueError("wall distance must be specified when substrate wall is on")
+            if not wall_distance.unit.is_compatible(self._nanometer):
+                raise TypeError("wall distance must have a unit that is compatible with nanometers")
+            if not wall_distance.value_in_unit(self._nanometer) > 0.0:
+                raise ValueError("wall distance must have a value greater than zero")
+        else:
+            if wall_distance is not None:
+                raise ValueError("wall distance must not be specified for when substrate wall is inactive")
        
 
-        self._wall_distances = wall_distances
-        self._wall_directions = wall_directions
+        self._parameters = colloid_potentials_parameters
+        self._wall_distance = wall_distance
+        self._wall_charge = wall_charge
         self._use_log = use_log
 
-        self._dlvo_wall_potential = self._set_up_dlvo_wall_potential()
+        self._substrate_wall_potential = self._set_up_substrate_wall_potential()
 
     def _set_up_dlvo_wall_potential(self) -> CustomExternalForce:
-        """Set up the basic functional form of the DLVO walls potential."""
+        """Set up the basic functional form of the substrate wall."""
         
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""
         steric_potential = (
@@ -83,59 +72,57 @@ class DLVOWalls(OpenMMPotentialAbstract):
             "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
             "+ 12.0 * (h / two_l - 1.0))); "
             "h = r - rs;"
-            "rs = radius + radius_substrate;"
+            "rs = radius + z;"
             "two_l = 2.0 * brush_length"
         )
 
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""
         if self._use_log:
             electrostatic_potential = (
-                "electrostatic_prefactor * radius_avg * psi * psi_substrate * log(1.0 + exp(-h / debye_length))); "
+                "electrostatic_prefactor * radius_avg * psi * wall_charge * log(1.0 + exp(-h / debye_length))); "
                 "radius_avg = 2.0 / (1.0 / radius + 1.0 / radius_substrate);"
                 "h = r - rs;"
-                "rs = radius + radius_substrate"
+                "rs = radius + z"
             )
         else:
             electrostatic_potential = (
-                "electrostatic_prefactor * radius_avg * psi * psi_substrate * exp(-h / debye_length)); "
-                "radius_avg = 2.0 / (1.0 / radius + 1.0 / radius_substrate);"
+                "electrostatic_prefactor * radius_avg * psi * wall_charge * exp(-h / debye_length)); "
+                "radius_avg = 2.0 / (1.0 / radius + 1.0 / z);"
                 "h = r - rs;"
-                "rs = radius + radius_substrate"
+                "rs = radius + z"
             )
 
-        dlvo_string = "+".join(pot for pot in zip([steric_potential, electrostatic_potential]))
-        assert dlvo_string
+        wall_string = "+".join(pot for pot in zip([steric_potential, electrostatic_potential]))
+        assert wall_string
 
-        dlvo_walls_potential = CustomExternalForce(dlvo_string)
+        substrate_wall_potential = CustomExternalForce(wall_string)
 
          # Steric prefactor is k_B * T * 16 * pi * sigma^(3/2) / 35 (see Hocky paper)
-        dlvo_walls_potential.addGlobalParameter(
+        substrate_wall_potential.addGlobalParameter(
             "steric_prefactor",
             (unit.BOLTZMANN_CONSTANT_kB * self._parameters.temperature
             * 16.0 * math.pi * (self._parameters.brush_density ** (3 / 2)) / 35.0
             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole / (self._nanometer ** 3))
         )
         # Brush length L (see Hocky paper)
-        dlvo_walls_potential.addGlobalParameter("brush_length",
+        substrate_wall_potential.addGlobalParameter("brush_length",
                                             self._parameters.brush_length.value_in_unit(self._nanometer))
        
        # Electrostatic prefactor is 2 * pi * epsilon 
-        dlvo_walls_potential.addGlobalParameter(
+        substrate_wall_potential.addGlobalParameter(
             "electrostatic_prefactor",
             (2.0 * math.pi * self._parameters.VACUUM_PERMITTIVITY * self._parameters.dielectric_constant
              * unit.AVOGADRO_CONSTANT_NA).value_in_unit(
                 unit.kilojoule_per_mole / (self._nanometer * self._millivolt ** 2)))
-        dlvo_walls_potential.addGlobalParameter("debye_length",
+        substrate_wall_potential.addGlobalParameter("debye_length",
                                                    self._parameters.debye_length.value_in_unit(self._nanometer))
         
-        dlvo_walls_potential.addGlobalParameter("radius_substrate")
-        dlvo_walls_potential.addGlobalParameter("psi_substrate")
+        #dlvo_walls_potential.addGlobalParameter("radius_substrate")
+        substrate_wall_potential.addGlobalParameter("wall_charge", self._wall_charge)
         
-        dlvo_walls_potential.addPerParticleParameter("radius")
-
+        substrate_wall_potential.addPerParticleParameter("radius")
         # Psi should be given in millivolts.
-        dlvo_walls_potential.addPerParticleParameter("psi")
-
+        substrate_wall_potential.addPerParticleParameter("psi")
 
 
     def add_particle(self, index: int, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:
@@ -151,76 +138,48 @@ class DLVOWalls(OpenMMPotentialAbstract):
             The radius of the colloid.
             The unit of the radius must be compatible with nanometers and the value must be greater than zero.
         :type radius: unit.Quantity
+        :param surface_potential:
+            The surface potential of the colloid.
+            The unit of the surface_potential must be compatible with millivolts.
+        :type surface_potential: unit.Quantity
 
         
         :raises TypeError:
-            If the radius is not a Quantity with a proper unit (via the abstract base class).
+            If the radius or surface potential is not a Quantity with a proper unit.
         :raises ValueError:
-            If the radius is not greater than zero (via the abstract base class).
+            If the radius is not greater than zero.
         :raises RuntimeError:
             If this method is called after the yield_potentials method (via the abstract base class).
         """
-        super().add_particle()
+        super().add_particle(radius, surface_potential)
         if not radius.unit.is_compatible(self._nanometer):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
         if not radius.value_in_unit(self._nanometer) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
-        for wall_distance in self._wall_distances:
-            if wall_distance is not None:
-                if not wall_distance / 2.0 > radius * 2 ** (1 / 6) + radius - 1.0 * self._nanometer:
-                    raise ValueError("The colloid radius leads to a cutoff radius * 2^(1/6) + radius - 1 in the "
-                                     "shifted Lennard-Jones wall that exceeds half of the wall distance.")
-        rcut = (2.0 ** (1.0 / 6.0)) * radius
-        per_particle_parameters = [
-            radius.value_in_unit(self._nanometer),  # radius
-            (-4.0 * self._epsilon * ((radius / rcut) ** 12 - self._alpha * (radius / rcut) ** 6)).value_in_unit(
-                unit.kilojoule_per_mole)  # shift
-        ]
-        if self._wall_directions[0]:
-            per_particle_parameters.append(
-                (self._wall_distances[0] / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # wall_distance_x_over_two_minus_delta
-            )
-            per_particle_parameters.append(
-                (self._wall_distances[0] / 2.0 - rcut - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # cutoff_x
-            )
-        if self._wall_directions[1]:
-            per_particle_parameters.append(
-                (self._wall_distances[1] / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # wall_distance_y_over_two_minus_delta
-            )
-            per_particle_parameters.append(
-                (self._wall_distances[1] / 2.0 - rcut - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # cutoff_y
-            )
-        if self._wall_directions[2]:
-            per_particle_parameters.append(
-                (self._wall_distances[2] / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # wall_distance_z_over_two_minus_delta
-            )
-            per_particle_parameters.append(
-                (self._wall_distances[2] / 2.0 - rcut - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # cutoff_z
-            )
+        if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
+            raise TypeError("argument surface_potential must have a unit that is compatible with volts") 
+        if self._wall_distance is not None:
+            if not self._wall_distance / 2.0 > radius * 2 ** (1 / 6) + radius - 1.0 * self._nanometer:
+                raise ValueError("The colloid radius leads to a cutoff radius * 2^(1/6) + radius - 1 in the "
+                                    "substrate wall that exceeds half of the wall distance.")
 
-        self._dlvo_wall_potential.addParticle(index, per_particle_parameters)
+        self._substrate_wall_potential.addParticle(index, radius, surface_potential)
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """
-        Generate all potentials in the systems that are necessary to properly include the DLVO walls.
+        Generate all potentials in the systems that are necessary to properly include the substrate wall.
 
         This method has to be called after the method add_particle was called for every particle in the system.
 
         :return:
-            A generator that yields DLVO walls handled by this class.
+            A generator that yields the substrate wall handled by this class.
         :rtype: Iterator[CustomExternalForce]
 
         :raises RuntimeError:
             If the method add_particle was not called before this method (via the abstract base class).
         """
         super().yield_potentials()
-        yield self._dlvo_wall_potential
+        yield self._substrate_wall_potential
 
 
 
@@ -395,9 +354,9 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         :type radius: unit.Quantity
         
         :raises TypeError:
-            If the radius is not a Quantity with a proper unit (via the abstract base class).
+            If the radius is not a Quantity with a proper unit.
         :raises ValueError:
-            If the radius is not greater than zero (via the abstract base class).
+            If the radius is not greater than zero.
         :raises RuntimeError:
             If this method is called after the yield_potentials method (via the abstract base class).
         """

@@ -233,14 +233,16 @@ class RunParameters(Parameters):
     :param use_substrate:
         A boolean indicating whether to use a substrate at the bottom of the simulation box.
         A substrate can only be used when all walls are active. The bottom wall is then replaced by the substrate.
-        If True, the substrate radius and the substrate potential depth must be specified.
+        If True, the substrate potential depth must be specified.
         A substrate can only be used with the algebraic colloid potentials (use_tabulated=False).
         Defaults to False.
     :type use_substrate: bool
     :param substrate_type:
         The type of the substrate that is used at the bottom of the simulation box.
-        If a substrate is used, the substrate type must not be None and it must appear in the radii, masses, and
-        surface_potentials dictionaries.
+        If a substrate is used, the substrate type must not be None. 
+        If the substrate_type is "wall," an implicit substrate will be implmented using a Custom Nonbonded Force.
+        Otherwise, substrate_type specifies the particle type of explicit substrate particles and this type 
+        must appear in the radii, masses, and surface_potentials dictionaries.
         Defaults to None.
     :type substrate_type: Optional[str]
     :param use_snowman:
@@ -505,14 +507,15 @@ class RunParameters(Parameters):
                 raise ValueError("A substrate can only be used if all walls are active.")
             if self.substrate_type is None:
                 raise ValueError("The substrate type must be specified if a substrate is used.")
-            if self.substrate_type not in self.radii:
-                raise ValueError("The substrate type must be in the radii dictionary.")
-            if self.substrate_type not in self.masses:
-                raise ValueError("The substrate type must be in the masses dictionary.")
+            if not self.substrate_type == "wall":
+                if self.substrate_type not in self.radii:
+                    raise ValueError("The substrate type must be in the radii dictionary.")
+                if self.substrate_type not in self.masses:
+                    raise ValueError("The substrate type must be in the masses dictionary.")
+                if self.masses[self.substrate_type] != 0.0 * unit.amu:
+                    warnings.warn("The mass of the substrate type is not zero. Substrate will move during the simulation.")
             if self.substrate_type not in self.surface_potentials:
                 raise ValueError("The substrate type must be in the surface potentials dictionary.")
-            if self.masses[self.substrate_type] != 0.0 * unit.amu:
-                warnings.warn("The mass of the substrate type is not zero. Substrate will move during the simulation.")
             if self.use_tabulated:
                 raise ValueError("A substrate can only be used with the algebraic colloid potentials.")
         else:

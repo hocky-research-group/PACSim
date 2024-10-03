@@ -39,7 +39,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters, 
                  substrate_type: Optional[str], wall_distance: Optional[unit.Quantity], 
                  wall_charge: Optional[unit.Quantity], use_log: bool = False) -> None:
-        """Constructor of the DLVOWall class."""
+        """Constructor of the SubstrateWall class."""
         super().__init__()
     
         if substrate_type == "wall":
@@ -61,7 +61,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
 
         self._substrate_wall_potential = self._set_up_substrate_wall_potential()
 
-    def _set_up_dlvo_wall_potential(self) -> CustomExternalForce:
+    def _set_up_substrate_wall_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the substrate wall."""
         
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""

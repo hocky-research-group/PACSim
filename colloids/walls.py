@@ -54,7 +54,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
         if self._use_log:
             electrostatic_potential = (
                 "electrostatic_prefactor * radius_avg * psi * wall_charge * log(1.0 + exp(-h / debye_length))); "
-                "radius_avg = 2.0 / (1.0 / radius + 1.0 / radius_substrate);"
+                "radius_avg = 2.0 / (1.0 / radius + 1.0 / z);"
                 "h = r - rs;"
                 "rs = radius + z"
             )
@@ -66,7 +66,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
                 "rs = radius + z"
             )
 
-        wall_string = "+".join(pot for pot in zip([steric_potential, electrostatic_potential]))
+        wall_string = "+".join(pot for pot in [steric_potential, electrostatic_potential])
         assert wall_string
 
         substrate_wall_potential = CustomExternalForce(wall_string)

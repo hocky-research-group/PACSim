@@ -25,8 +25,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
     _nanometer = unit.nano * unit.meter
 
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters, 
-                 substrate_type: Optional[str], wall_charge: Optional[unit.Quantity], 
-                 use_log: bool = False) -> None:
+                 wall_charge: Optional[unit.Quantity], use_log: bool = False) -> None:
         """Constructor of the SubstrateWall class."""
         super().__init__()
 

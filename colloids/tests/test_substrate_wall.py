@@ -64,7 +64,7 @@ class TestSubstrateWallParameters(object):
 
     @pytest.fixture
     def substrate_wall_potential(self, colloid_potentials_parameters, wall_charge):
-        return SubstrateWall(colloid_potentials_parameters, "wall", wall_charge, False)
+        return SubstrateWall(colloid_potentials_parameters, wall_charge, False)
 
 
 class TestSubstrateWallExceptions(TestSubstrateWallParameters):

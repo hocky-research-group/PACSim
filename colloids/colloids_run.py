@@ -160,8 +160,8 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
 
     if add_implicit_substrate:
         substrate_wall = SubstrateWall(colloid_potentials_parameters=potentials_parameters, 
-                 substrate_type="wall", wall_charge=parameters.surface_potentials[parameters.substrate_type], 
-                 use_log=parameters.use_log)
+                                       wall_charge=parameters.surface_potentials[parameters.substrate_type], 
+                                       use_log=parameters.use_log)
     
     
     if parameters.use_depletion:

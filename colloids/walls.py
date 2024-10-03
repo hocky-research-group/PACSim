@@ -14,48 +14,23 @@ class SubstrateWall(OpenMMPotentialAbstract):
 
     A substrate wall can only be used when all SLJ walls are active. The bottom wall in the z direction will be replaced
     by the substrate wall.
-    
-    The substrate wall is placed at the bottom of the simulation box in the z direction, at +-wall_distance / 2. 
-
-    :param wall_distance:
-        A distance specifying the dimensions of the simulation box in the z direction.
-        This is used to determine the location of the substrate wall at +-wall_distance/2 at the bottom of the simulation box.
-        The unit of any wall distance must be compatible with nanometer and the value must be greater than zero.
-    :type wall_distance: Optional[unit.Quantity]
 
     :raises TypeError:
-        If the wall distance for an active substrate wall is not a Quantity with a proper unit.
         If the wall charge for an active substrate wall is not a Quantity with a proper unit (via abstract base class)
 
     :raises ValueError:
-        If the wall distance for an active substrate wall is not greater than zero.
-        If the wall distance or wall charge is specified when the substrate wall is inactive.
-        If the wall distance or wall charge is not specified for an active substrate wall.
         If a substrate wall is active while an explicit substrate is also being used. 
     """
 
     _nanometer = unit.nano * unit.meter
 
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters, 
-                 substrate_type: Optional[str], wall_distance: Optional[unit.Quantity], 
-                 wall_charge: Optional[unit.Quantity], use_log: bool = False) -> None:
+                 substrate_type: Optional[str], wall_charge: Optional[unit.Quantity], 
+                 use_log: bool = False) -> None:
         """Constructor of the SubstrateWall class."""
         super().__init__()
-    
-        if substrate_type == "wall":
-            if wall_distance is None:
-                raise ValueError("wall distance must be specified when substrate wall is on")
-            if not wall_distance.unit.is_compatible(self._nanometer):
-                raise TypeError("wall distance must have a unit that is compatible with nanometers")
-            if not wall_distance.value_in_unit(self._nanometer) > 0.0:
-                raise ValueError("wall distance must have a value greater than zero")
-        else:
-            if wall_distance is not None:
-                raise ValueError("wall distance must not be specified for when substrate wall is inactive")
-       
 
         self._parameters = colloid_potentials_parameters
-        self._wall_distance = wall_distance
         self._wall_charge = wall_charge
         self._use_log = use_log
 
@@ -158,10 +133,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
             raise ValueError("argument radius must have a value greater than zero")
         if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts") 
-        if self._wall_distance is not None:
-            if not self._wall_distance / 2.0 > radius * 2 ** (1 / 6) + radius - 1.0 * self._nanometer:
-                raise ValueError("The colloid radius leads to a cutoff radius * 2^(1/6) + radius - 1 in the "
-                                    "substrate wall that exceeds half of the wall distance.")
+
 
         self._substrate_wall_potential.addParticle(index, radius, surface_potential)
 

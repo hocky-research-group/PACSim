@@ -118,7 +118,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             else:
                 snowman_positions.append(None)
 
-    if parameters.use_substrate:
+    if parameters.use_substrate and parameters.substrate_type != "wall":
         assert all_walls
         substrate_positions = substrate_positions_hexagonal(parameters.radii[parameters.substrate_type], cell)
         for _ in substrate_positions:

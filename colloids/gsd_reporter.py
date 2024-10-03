@@ -99,13 +99,13 @@ class GSDReporter(object):
         assert simulation.topology.getNumResidues() == 1
         assert simulation.topology.getNumAtoms() == simulation.system.getNumParticles()
         types = list(dict.fromkeys(atom.name for atom in simulation.topology.atoms()))
-        if not all(t in radii for t in types):
+        if not all(t in radii for t in types if t!='wall'):
             raise ValueError("All types of the simulation must have a radius.")
-        if not all(rt in types for rt in radii):
+        if not all(rt in types for rt in radii if rt!='wall'):
             raise ValueError("All types with a radius must appear in the simulation.")
-        if not all(t in surface_potentials for t in types):
+        if not all(t in surface_potentials for t in types if t!='wall'):
             raise ValueError("All types of the simulation must have a surface potential.")
-        if not all(st in types for st in surface_potentials):
+        if not all(st in types for st in surface_potentials if st!='wall'):
             raise ValueError("All types with a surface potential must appear in the simulation.")
         for r in radii.values():
             if not r.unit.is_compatible(self._nanometer):

@@ -10,7 +10,7 @@ import openmm
 from openmm import app
 from openmm import unit
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
-                      ShiftedLennardJonesWalls, DepletionPotential, Gravity)
+                      ShiftedLennardJonesWalls, SubstrateWall, DepletionPotential, Gravity)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import (generate_fibonacci_sphere_grid_points, read_xyz_file, write_gsd_file,
                                        write_xyz_file)
@@ -48,6 +48,8 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
 
     include_walls = any(parameters.wall_directions)
     all_walls = all(parameters.wall_directions)
+    add_implicit_substrate = parameters.use_substrate and parameters.substrate_type == "wall"
+
     if include_walls:
         box_vector_one = cell[0]
         box_vector_two = cell[1]
@@ -118,7 +120,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             else:
                 snowman_positions.append(None)
 
-    if parameters.use_substrate and parameters.substrate_type != "wall":
+    if parameters.use_substrate and not add_implicit_substrate:
         assert all_walls
         substrate_positions = substrate_positions_hexagonal(parameters.radii[parameters.substrate_type], cell)
         for _ in substrate_positions:
@@ -156,6 +158,12 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     else:
         slj_walls = None
 
+    if add_implicit_substrate:
+        substrate_wall = SubstrateWall(colloid_potentials_parameters=potentials_parameters, 
+                 substrate_type="wall", wall_charge=parameters.surface_potentials[parameters.substrate_type], 
+                 use_log=parameters.use_log)
+    
+    
     if parameters.use_depletion:
         depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,
                                                  brush_length=parameters.brush_length,
@@ -187,7 +195,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             else:
                 snowman_indices.append(None)
 
-    if parameters.use_substrate:
+    if parameters.use_substrate and not add_implicit_substrate:
         for _ in substrate_positions:
             system.addParticle(parameters.masses[parameters.substrate_type])
 
@@ -199,6 +207,9 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
                                         substrate_flag=False)
         if include_walls:
             slj_walls.add_particle(index=i, radius=parameters.radii[t])
+        if add_implicit_substrate:
+            substrate_wall.add_particle(index=i, radius=parameters.radii[t],
+                                        surface_potential=parameters.surface_potentials[t])
         if parameters.use_depletion:
             depletion_potential.add_particle(radius=parameters.radii[t], substrate_flag=False)
         if parameters.use_gravity:
@@ -245,7 +256,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
                 else:
                     assert snowman_index is None
 
-    if parameters.use_substrate:
+    if parameters.use_substrate and not add_implicit_substrate:
         # No need to add the substrate particles to the wall and gravitational potential as they are immobile.
         for _ in substrate_positions:
             colloid_potentials.add_particle(radius=parameters.radii[parameters.substrate_type],

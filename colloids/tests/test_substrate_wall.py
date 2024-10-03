@@ -45,35 +45,17 @@ class TestSubstrateWallParameters(object):
     def wall_charge(self):
         return -47.0 * (unit.milli * unit.volt)
     
-    @pytest.fixture
-    def wall_distance(self):
-        return 1000.0 * (unit.nano * unit.meter)
 
     @pytest.fixture
     def num_test_values(self):
         return 1000
-    
-    @pytest.fixture
-    def test_positions(self, wall_distances, num_test_values):
-        # noinspection PyUnresolvedReferences
-        return [np.linspace(-wall_distance.value_in_unit(unit.nanometer) / 2.0 + 200.0,
-                            wall_distance.value_in_unit(unit.nanometer) / 2.0 - 200.0, num=num_test_values)
-                for wall_distance in wall_distances]
 
     @pytest.fixture
-    def all_wall_directions(self):
-        return [True, True, True]
-
-    @pytest.fixture
-    def some_wall_directions(self):
-        return [False, True, False]
-
-    @pytest.fixture
-    def openmm_system(self, wall_distances):
+    def openmm_system(self):
         system = System()
-        system.setDefaultPeriodicBoxVectors(Vec3(wall_distances[0], 0.0, 0.0),
-                                            Vec3(0.0, wall_distances[1], 0.0),
-                                            Vec3(0.0, 0.0, wall_distances[2]))
+        system.setDefaultPeriodicBoxVectors(Vec3(1000.0, 0.0, 0.0),
+                                            Vec3(0.0, 1000.0, 0.0),
+                                            Vec3(0.0, 0.0, 1000.0))
         return system
 
     @pytest.fixture
@@ -81,8 +63,8 @@ class TestSubstrateWallParameters(object):
         return LangevinIntegrator(0.0, 0.0, 0.0)
 
     @pytest.fixture
-    def substrate_wall_potential(self, colloid_potentials_parameters, wall_distance, wall_charge):
-        return SubstrateWall(colloid_potentials_parameters, "wall", wall_distance, wall_charge, False)
+    def substrate_wall_potential(self, colloid_potentials_parameters, wall_charge):
+        return SubstrateWall(colloid_potentials_parameters, "wall", wall_charge, False)
 
 
 class TestSubstrateWallExceptions(TestSubstrateWallParameters):
@@ -119,18 +101,6 @@ class TestSubstrateWallExceptions(TestSubstrateWallParameters):
             pass
         with pytest.raises(RuntimeError):
             substrate_wall_potential.add_particle(index=1, radius=radius, surface_potential=surface_potential)
-
-
-    def test_exception_wall_distance(self, colloid_potentials_parameters, wall_charge):
-        # Test exception on wrong unit 
-        with pytest.raises(TypeError):
-            SubstrateWall(colloid_potentials_parameters, "wall", wall_distance=1000.0 * ((unit.nano * unit.meter) ** 2), 
-                          wall_charge=wall_charge, use_log= False)
-                
-        # Test exception wall distance negative.
-        with pytest.raises(ValueError):
-            SubstrateWall(colloid_potentials_parameters, "wall", wall_distance=-1000.0 * (unit.nano * unit.meter), 
-                          wall_charge=wall_charge, use_log= False)
 
 
 if __name__ == '__main__':

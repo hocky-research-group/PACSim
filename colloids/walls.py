@@ -44,30 +44,23 @@ class SubstrateWall(OpenMMPotentialAbstract):
             "steric_prefactor * radius * brush_length * brush_length * ("
             "28.0 * ((two_l / h)^0.25 - 1.0) "
             "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
-            "+ 12.0 * (h / two_l - 1.0)); "
-            "h = z - radius;" #"- 2*radius;"
-            #"rs = radius + z;"
-            "two_l = 2.0 * brush_length"
+            "+ 12.0 * (h / two_l - 1.0)) "
         )
     
     
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""
         if self.use_log:
             electrostatic_potential = (
-                "electrostatic_prefactor * radius * psi * wall_charge * log(1.0 + exp(-h / debye_length);"
-                #"radius_avg = 2.0 / (1.0 / radius + 1.0 / z);"
-                "h = z - radius ;" #- 2*radius;"
-                #"rs = radius + z;"
-            )
+                "electrostatic_prefactor * radius * psi * wall_charge * log(1.0 + exp(-h / debye_length);")
+
         else:
             electrostatic_potential = (
-                "electrostatic_prefactor * radius * psi * wall_charge * exp(-h / debye_length);"
-                #"radius_avg = 2.0 / (1.0 / radius + 1.0 / z);"
-                "h = z-radius;" # - 2*radius;"
-                #"rs = radius + z;"
-            )
+                "electrostatic_prefactor * radius * psi * wall_charge * exp(-h / debye_length);")
+
 
         wall_string = "+".join(pot for pot in [steric_potential, electrostatic_potential])
+        wall_string+=  "h = z - radius ; two_l = 2.0 * brush_length;"
+
         assert wall_string
 
         substrate_wall_potential = CustomExternalForce(wall_string)
@@ -98,6 +91,8 @@ class SubstrateWall(OpenMMPotentialAbstract):
         substrate_wall_potential.addPerParticleParameter("radius")
         # Psi should be given in millivolts.
         substrate_wall_potential.addPerParticleParameter("psi")
+
+        return substrate_wall_potential
 
 
     def add_particle(self, index: int, radius: unit.Quantity, surface_potential: unit.Quantity) -> None:

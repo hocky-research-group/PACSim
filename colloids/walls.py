@@ -41,29 +41,30 @@ class SubstrateWall(OpenMMPotentialAbstract):
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""
         steric_potential = (
             "step(two_l - h) * "
-            "steric_prefactor * rs / 2.0 * brush_length * brush_length * ("
+            "steric_prefactor * radius * brush_length * brush_length * ("
             "28.0 * ((two_l / h)^0.25 - 1.0) "
             "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
-            "+ 12.0 * (h / two_l - 1.0))); "
-            "h = r - rs;"
-            "rs = radius + z;"
+            "+ 12.0 * (h / two_l - 1.0)); "
+            "h = z - radius;" #"- 2*radius;"
+            #"rs = radius + z;"
             "two_l = 2.0 * brush_length"
         )
-
+    
+    
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""
-        if self._use_log:
+        if self.use_log:
             electrostatic_potential = (
-                "electrostatic_prefactor * radius_avg * psi * wall_charge * log(1.0 + exp(-h / debye_length))); "
-                "radius_avg = 2.0 / (1.0 / radius + 1.0 / z);"
-                "h = r - rs;"
-                "rs = radius + z"
+                "electrostatic_prefactor * radius * psi * wall_charge * log(1.0 + exp(-h / debye_length);"
+                #"radius_avg = 2.0 / (1.0 / radius + 1.0 / z);"
+                "h = z - radius ;" #- 2*radius;"
+                #"rs = radius + z;"
             )
         else:
             electrostatic_potential = (
-                "electrostatic_prefactor * radius_avg * psi * wall_charge * exp(-h / debye_length)); "
-                "radius_avg = 2.0 / (1.0 / radius + 1.0 / z);"
-                "h = r - rs;"
-                "rs = radius + z"
+                "electrostatic_prefactor * radius * psi * wall_charge * exp(-h / debye_length);"
+                #"radius_avg = 2.0 / (1.0 / radius + 1.0 / z);"
+                "h = z-radius;" # - 2*radius;"
+                #"rs = radius + z;"
             )
 
         wall_string = "+".join(pot for pot in [steric_potential, electrostatic_potential])

@@ -51,11 +51,11 @@ class SubstrateWall(OpenMMPotentialAbstract):
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""
         if self.use_log:
             electrostatic_potential = (
-                "electrostatic_prefactor * radius * psi * wall_charge * log(1.0 + exp(-h / debye_length);")
+                "electrostatic_prefactor * 2*radius * psi * wall_charge * log(1.0 + exp(-h / debye_length);")
 
         else:
             electrostatic_potential = (
-                "electrostatic_prefactor * radius * psi * wall_charge * exp(-h / debye_length);")
+                "electrostatic_prefactor * 2* radius * psi * wall_charge * exp(-h / debye_length);")
 
 
         wall_string = "+".join(pot for pot in [steric_potential, electrostatic_potential])

@@ -276,6 +276,10 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         for force in slj_walls.yield_potentials():
             system.addForce(force)
 
+    if add_implicit_substrate:
+        for force in substrate_wall.yield_potentials():
+            system.addForce(force)
+
     if parameters.use_depletion:
         for force in depletion_potential.yield_potentials():
             system.addForce(force)

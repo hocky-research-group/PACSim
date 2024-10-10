@@ -88,8 +88,9 @@ class SubstrateWall(OpenMMPotentialAbstract):
                 "electrostatic_prefactor * 2* radius * psi * wall_charge * exp(-h / debye_length);")
 
 
-        wall_string = "+".join(pot for pot in [steric_potential, electrostatic_potential])
-        wall_string+=  "h = substrate_wall_distance ; two_l = 2.0 * brush_length;"
+        wall_string = "+".join([steric_potential, electrostatic_potential])
+        # +z so that close to zero when z~-L/2
+        wall_string+=  "h = substrate_wall_distance+z; two_l = 2.0 * brush_length;"
 
         assert wall_string
 

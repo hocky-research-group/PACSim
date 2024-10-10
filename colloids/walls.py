@@ -15,22 +15,52 @@ class SubstrateWall(OpenMMPotentialAbstract):
     A substrate wall can only be used when all SLJ walls are active. The bottom wall in the z direction will be replaced
     by the substrate wall.
 
+    :param colloid_potentials_parameters:
+        The parameters of the steric and electrostatic pair potentials between colloidal particles.
+        Defaults to the default parameters of the ColloidPotentialsParameters class.
+    :type colloid_potentials_parameters: ColloidPotentialsParameters
+    :param wall_distance:
+        A distance specifying the dimensions of the simulation box in the z direction.
+        This is used to determine the location of the substrate wall at +-wall_distance/2.
+        The unit must be compatible with nanometer and the value must be greater than zero.
+    :type wall_distance: Optional[unit.Quantity]
+    :param wall_charge:
+    :type wall_charge: Optional[unit.Quantity]
+    :param use_log:
+        If True, the electrostatic force uses the more accurate equation involving a logarithm [i.e., eq. (12.5.2) in
+        Hunter, Foundations of Colloid Science (Oxford University Press, 2001), 2nd edition] instead of the simpler
+        equation that only involves an exponential [i.e., eq. (12.5.5) in Hunter, Foundations of Colloid Science
+        (Oxford University Press, 2001), 2nd edition].
+        Defaults to True.
+    :type use_log: bool
+
     :raises TypeError:
-        If the wall charge for an active substrate wall is not a Quantity with a proper unit (via abstract base class)
+        If the wall charge for an active substrate wall is not a Quantity with a proper unit (via abstract base class).
+        If the wall distance for an active substrate wall is not a Quantity with a proper unit.
 
     :raises ValueError:
-        If a substrate wall is active while an explicit substrate is also being used. 
+        If a substrate wall is active while an explicit substrate is also being used.
+        If the wall distance for an active substrate wall is not greater than zero.
     """
+
 
     _nanometer = unit.nano * unit.meter
 
-    def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters, 
+    def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters, wall_distance: Optional[unit.Quantity],
                  wall_charge: Optional[unit.Quantity], use_log: bool = False) -> None:
         """Constructor of the SubstrateWall class."""
         super().__init__()
 
+
+        if wall_distance:
+            if not wall_distance.unit.is_compatible(self._nanometer):
+                raise TypeError("wall distance must have a unit that is compatible with nanometers")
+            if not wall_distance.value_in_unit(self._nanometer) > 0.0:
+                raise ValueError("wall distance must have a value greater than zero")
+
         self._parameters = colloid_potentials_parameters
         self._wall_charge = wall_charge
+        self._wall_distance = wall_distance
         self._use_log = use_log
 
         self._substrate_wall_potential = self._set_up_substrate_wall_potential()
@@ -59,7 +89,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
 
 
         wall_string = "+".join(pot for pot in [steric_potential, electrostatic_potential])
-        wall_string+=  "h = z - radius ; two_l = 2.0 * brush_length;"
+        wall_string+=  "h = substrate_wall_distance ; two_l = 2.0 * brush_length;"
 
         assert wall_string
 
@@ -92,6 +122,8 @@ class SubstrateWall(OpenMMPotentialAbstract):
         # Psi should be given in millivolts.
         substrate_wall_potential.addPerParticleParameter("psi")
 
+        substrate_wall_potential.addPerParticleParameter("substrate_wall_distance")
+
         return substrate_wall_potential
 
 
@@ -121,16 +153,19 @@ class SubstrateWall(OpenMMPotentialAbstract):
         :raises RuntimeError:
             If this method is called after the yield_potentials method (via the abstract base class).
         """
-        super().add_particle(radius, surface_potential)
+        super().add_particle()
         if not radius.unit.is_compatible(self._nanometer):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
         if not radius.value_in_unit(self._nanometer) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
         if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts") 
+        
+        substrate_wall_distance = (self._wall_distance / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
+                    self._nanometer)
 
 
-        self._substrate_wall_potential.addParticle(index, [radius, surface_potential])
+        self._substrate_wall_potential.addParticle(index, [radius, surface_potential, substrate_wall_distance])
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """

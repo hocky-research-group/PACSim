@@ -49,7 +49,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
     
     
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""
-        if self.use_log:
+        if self._use_log:
             electrostatic_potential = (
                 "electrostatic_prefactor * 2*radius * psi * wall_charge * log(1.0 + exp(-h / debye_length);")
 
@@ -81,7 +81,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
             "electrostatic_prefactor",
             (2.0 * math.pi * self._parameters.VACUUM_PERMITTIVITY * self._parameters.dielectric_constant
              * unit.AVOGADRO_CONSTANT_NA).value_in_unit(
-                unit.kilojoule_per_mole / (self._nanometer * self._millivolt ** 2)))
+                unit.kilojoule_per_mole / (unit.nanometer * (unit.milli*unit.volt)**2)) )
         substrate_wall_potential.addGlobalParameter("debye_length",
                                                    self._parameters.debye_length.value_in_unit(self._nanometer))
         
@@ -130,7 +130,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts") 
 
 
-        self._substrate_wall_potential.addParticle(index, radius, surface_potential)
+        self._substrate_wall_potential.addParticle(index, [radius, surface_potential])
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """

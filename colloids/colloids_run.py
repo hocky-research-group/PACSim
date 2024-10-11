@@ -121,7 +121,6 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
                 snowman_positions.append(None)
 
     if parameters.use_substrate and not add_implicit_substrate:
-        assert all_walls
         substrate_positions = substrate_positions_hexagonal(parameters.radii[parameters.substrate_type], cell)
         for _ in substrate_positions:
             # Setting the mass to zero tells the integrator that the particle is immobile.
@@ -174,7 +173,6 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         depletion_potential = None
 
     if parameters.use_gravity:
-        assert all_walls
         gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density,
                                           parameters.particle_density)
     else:
@@ -285,7 +283,6 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             system.addForce(force)
 
     if parameters.use_gravity:
-        assert all_walls
         for force in gravitational_potential.yield_potentials():
             system.addForce(force)
         assert not system.usesPeriodicBoundaryConditions()

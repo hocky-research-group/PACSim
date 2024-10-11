@@ -117,7 +117,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
                                                    self._parameters.debye_length.value_in_unit(self._nanometer))
         
         #dlvo_walls_potential.addGlobalParameter("radius_substrate")
-        substrate_wall_potential.addGlobalParameter("wall_charge", self._wall_charge)
+        substrate_wall_potential.addGlobalParameter("wall_charge", self._wall_charge.value_in_unit((unit.milli*unit.volt)) )
         
         substrate_wall_potential.addPerParticleParameter("radius")
         # Psi should be given in millivolts.
@@ -165,8 +165,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
         substrate_wall_distance = (self._wall_distance / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
                     self._nanometer)
 
-
-        self._substrate_wall_potential.addParticle(index, [radius, surface_potential, substrate_wall_distance])
+        self._substrate_wall_potential.addParticle(index, [radius.value_in_unit(unit.nanometer), surface_potential.value_in_unit(unit.milli*unit.volt), substrate_wall_distance])
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """

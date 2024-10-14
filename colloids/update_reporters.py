@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABC
 import math
 import warnings
+import openmm
 import openmm.app
 from openmm import unit
 
@@ -62,7 +63,7 @@ class UpdateReporterAbstract(ABC):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step, global_parameter_name: str,
-                 start_value: unit.Quantity, print_interval: int, simulation: openmm.app.Simulation,
+                 start_value: unit.Quantity, print_interval: int, simulation: openmm.app.Simulation, cell: openmm.Vec3,
                  append_file: bool = False):
         """Constructor of the UpdateReporterAbstract class."""
         if not filename.endswith(".csv"):
@@ -139,7 +140,7 @@ class UpdateReporterAbstract(ABC):
         """
         raise NotImplementedError
 
-    def set_and_print(self, simulation: openmm.app.Simulation, new_value: float) -> None:
+    def set_and_print(self, simulation: openmm.app.Simulation, cell: openmm.Vec3, new_value: float) -> None:
         """
         Update the value of the global parameter in the OpenMM simulation context and print the new parameter value in
         the ouput .csv file.
@@ -152,7 +153,15 @@ class UpdateReporterAbstract(ABC):
         :type new_value: float
         """
         step = simulation.currentStep
-        simulation.context.setParameter(self._global_parameter_name, new_value)
+        if "wall_position" not in self._global_parameter_name:
+            simulation.context.setParameter(self._global_parameter_name, new_value)
+        else: 
+            if self._global_parameter_name == "wall_position_x":
+                simulation.context.setPeriodicBoxVectors(openmm.Vec3(*[new_value, 0.0, 0.0]), openmm.Vec3(*cell[1]), openmm.Vec3(*cell[2]))
+            elif self._global_parameter_name == "wall_position_y":
+                simulation.context.setPeriodicBoxVectors(cell[0], openmm.Vec3(*new_value), cell[2])
+            elif self._global_parameter_name == "wall_position_z":
+                simulation.context.setPeriodicBoxVectors(cell[0], cell[1], openmm.Vec3(*new_value))
         if step % self._print_interval == 0:
             print(f"{step},{new_value}", file=self._file)
 

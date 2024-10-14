@@ -10,7 +10,7 @@ import openmm
 from openmm import app
 from openmm import unit
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
-                      ShiftedLennardJonesWalls, DepletionPotential, Gravity)
+                      ShiftedLennardJonesWalls, EmptyWalls, DepletionPotential, Gravity)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import (generate_fibonacci_sphere_grid_points, read_xyz_file, write_gsd_file,
                                        write_xyz_file)
@@ -87,6 +87,8 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         topology.setPeriodicBoxVectors(final_cell)
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
+        
+    
 
     # TODO: Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
@@ -171,6 +173,8 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     else:
         gravitational_potential = None
 
+    empty_walls = EmptyWalls(wall_distances)
+
     # ------------------------------------- Add all particles to the system. -------------------------------------------
     for t in types:
         system.addParticle(parameters.masses[t])
@@ -203,6 +207,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             depletion_potential.add_particle(radius=parameters.radii[t], substrate_flag=False)
         if parameters.use_gravity:
             gravitational_potential.add_particle(index=i, radius=parameters.radii[t])
+        empty_walls.add_particle(index=i)
 
     if parameters.use_snowman:
         assert len(types) == len(snowman_positions) == len(snowman_indices)
@@ -273,6 +278,9 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         for force in gravitational_potential.yield_potentials():
             system.addForce(force)
         assert not system.usesPeriodicBoundaryConditions()
+    
+    for force in empty_walls.yield_potentials():
+        system.addForce(force)
 
     # -------------------------------------- Set up the simulation. ----------------------------------------------------
     if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":
@@ -321,7 +329,7 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
     if parameters.update_reporter is not None:
         update_reporter = getattr(update_reporters, parameters.update_reporter)
         try:
-            simulation.reporters.append(update_reporter(simulation=simulation, append_file=append_file,
+            simulation.reporters.append(update_reporter(simulation=simulation, cell=cell, append_file=append_file,
                                                         **parameters.update_reporter_parameters))
         except TypeError:
             raise TypeError(

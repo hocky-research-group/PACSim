@@ -1,5 +1,5 @@
 from typing import Iterator, Optional, Sequence
-from openmm import CustomExternalForce, unit
+from openmm import CustomExternalForce, CustomNonbondedForce, unit
 from colloids.abstracts import OpenMMPotentialAbstract
 import warnings
 
@@ -242,3 +242,29 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         """
         super().yield_potentials()
         yield self._slj_potential
+
+
+class EmptyWalls(OpenMMPotentialAbstract):
+
+    _nanometer = unit.nano * unit.meter
+
+    def __init__(self, wall_positions) -> None:
+        """Constructor of the ShiftedLennardJonesWalls class."""
+        super().__init__()
+
+        self._wall_positions = wall_positions
+        self._empty_walls_potential = self.set_up_empty_walls_potential()
+
+    def set_up_empty_walls_potential(self) -> CustomExternalForce:
+        empty_walls_potential = CustomExternalForce("0*wall_position_x + 0*wall_position_y + 0*wall_position_z")
+        empty_walls_potential.addGlobalParameter("wall_position_x", self._wall_positions[0])
+        empty_walls_potential.addGlobalParameter("wall_position_y", self._wall_positions[1])
+        empty_walls_potential.addGlobalParameter("wall_position_z", self._wall_positions[2])
+        return empty_walls_potential
+
+    def add_particle(self, *args, **kwargs) -> None:
+        return super().add_particle(*args, **kwargs)
+    
+    def yield_potentials(self) -> Iterator[CustomExternalForce]:
+        super().yield_potentials()
+        yield self._empty_walls_potential

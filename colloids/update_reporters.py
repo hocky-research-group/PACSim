@@ -87,6 +87,7 @@ class UpdateReporterAbstract(ABC):
         if not print_interval > 0:
             raise ValueError("The print frequency must be greater than zero.")
         self._print_interval = print_interval
+        self._cell = cell
         if (not append_file
                 and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
             warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
@@ -233,16 +234,16 @@ class RampUpdateReporter(UpdateReporterAbstract):
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
                  start_value: unit.Quantity, end_value: unit.Quantity, print_interval: int,
-                 simulation: openmm.app.Simulation, append_file: bool = False):
+                 simulation: openmm.app.Simulation, cell: openmm.Vec3, append_file: bool = False):
         """Constructor of the LinearMonotonicUpdateReporter class."""
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
-                         print_interval=print_interval, simulation=simulation, append_file=append_file)
+                         print_interval=print_interval, simulation=simulation, cell=cell, append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start and end values have incompatible units.")
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
 
-    def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
+    def report(self, simulation: openmm.app.Simulation, state: openmm.State, cell: openmm.Vec3) -> None:
         """
         Linearly change the value of a global parameter during the simulation.
 
@@ -257,7 +258,7 @@ class RampUpdateReporter(UpdateReporterAbstract):
         """
         old_value = simulation.context.getParameter(self._global_parameter_name)
         new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._final_update_step
-        self.set_and_print(simulation, new_value)
+        self.set_and_print(simulation, cell, new_value)
 
 
 class TriangleUpdateReporter(UpdateReporterAbstract):
@@ -330,10 +331,10 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
                  start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int, print_interval: int,
-                 simulation: openmm.app.Simulation, append_file: bool = False):
+                 simulation: openmm.app.Simulation, cell: openmm.Vec3, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
-                         print_interval=print_interval, simulation=simulation, append_file=append_file)
+                         print_interval=print_interval, simulation=simulation, cell=cell, append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start and end values have incompatible units.")
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
@@ -344,7 +345,7 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
             raise ValueError("The switch step must be a multiple of the update frequency.")
         self._switch_step = switch_step
 
-    def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
+    def report(self, simulation: openmm.app.Simulation, state: openmm.State, cell: openmm.Vec3) -> None:
         """
         Change the value of a global parameter during the simulation according to a triangular wave.
 
@@ -365,7 +366,7 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
             new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._switch_step
         else:
             new_value = old_value - (self._end_value - self._start_value) * self._update_interval / self._switch_step
-        self.set_and_print(simulation, new_value)
+        self.set_and_print(simulation, cell, new_value)
 
 
 class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
@@ -438,10 +439,10 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
                  start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int, print_interval: int,
-                 simulation: openmm.app.Simulation, append_file: bool = False):
+                 simulation: openmm.app.Simulation, cell: openmm.Vec3, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
-                         print_interval=print_interval, simulation=simulation, append_file=append_file)
+                         print_interval=print_interval, simulation=simulation, cell=cell, append_file=append_file)
         if not start_value.unit.is_compatible(end_value.unit):
             raise ValueError(f"The start value and amplitude have incompatible units.")
         end_value_float = end_value.value_in_unit_system(unit.md_unit_system)
@@ -453,7 +454,7 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
             raise ValueError("The switch step must be a multiple of the update frequency.")
         self._period = math.pi / (2.0 * switch_step)
 
-    def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
+    def report(self, simulation: openmm.app.Simulation, state: openmm.State, cell: openmm.Vec3) -> None:
         """
         Change the value of a global parameter during the simulation according to a squared sinusoidal wave.
 
@@ -468,4 +469,4 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
         """
         step = simulation.currentStep
         current_value = self._amplitude * (math.sin(self._period * step) ** 2) + self._start_value
-        self.set_and_print(simulation, current_value)
+        self.set_and_print(simulation, cell, current_value)

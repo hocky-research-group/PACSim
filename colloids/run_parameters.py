@@ -226,8 +226,8 @@ class RunParameters(Parameters):
     :type update_reporter: Optional[str]
     :param update_reporter_parameters:
         The parameters that are forwarded to the initialization method of the UpdateReporter, if enabled for a
-        simulation. Note that the initialization method of the UpdateReporter class expects an OpenMM simulation object
-        and an append_file boolean that should not appear in this dictionary.
+        simulation. Note that the initialization method of the UpdateReporter class expects an OpenMM simulation object, a 
+        simulation cell vector, and an append_file boolean that should not appear in this dictionary.
         Defaults to None.
     :type update_reporter_parameters: Optional[dict[str, Any]]
     :param use_substrate:
@@ -446,12 +446,12 @@ class RunParameters(Parameters):
                 raise TypeError("Depletant radius must have a unit compatible with nanometers.")
             if self.depletant_radius <= 0.0 * (unit.nano * unit.meter):
                 raise ValueError("Depletant radius must be greater than zero.")
-            for t in self.radii:
-                if self.depletant_radius / self.radii[t] > 0.1547:
-                    warnings.warn("Size ratio of depletant to colloid particles is too large. "
-                                  "Analytical computation of depletion potential may be invalid."
-                                  "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
-                                  "pp 10079 - 10106.")
+            #for t in self.radii:
+            #    if self.depletant_radius / self.radii[t] > 0.1547:
+            #        warnings.warn("Size ratio of depletant to colloid particles is too large. "
+            #                      "Analytical computation of depletion potential may be invalid."
+            #                      "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
+            #                      "pp 10079 - 10106.")
         else:
             if self.depletion_phi is not None:
                 raise ValueError("Depletion phi must not be specified if depletion potential is not on.")
@@ -495,8 +495,8 @@ class RunParameters(Parameters):
                                  f"{', '.join(possible_update_reporters)}.")
             if self.update_reporter_parameters is None:
                 raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")
-            if "simulation" in self.update_reporter_parameters or "append_file" in self.update_reporter_parameters:
-                raise ValueError("Update-reporter parameters should not contain simulation and append_file keys.")
+            if "simulation" in self.update_reporter_parameters or "append_file" in self.update_reporter_parameters or "cell" in self.update_reporter_parameters:
+                raise ValueError("Update-reporter parameters should not contain simulation, cell, or append_file keys.")
         else:
             if self.update_reporter_parameters is not None:
                 raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")

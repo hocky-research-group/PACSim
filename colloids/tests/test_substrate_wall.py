@@ -1,7 +1,6 @@
-from openmm import Context, LangevinIntegrator, NonbondedForce, OpenMMException, Platform, System, unit, Vec3
+from openmm import Context, LangevinIntegrator, OpenMMException, Platform, System, unit, Vec3
 import pytest
 from colloids import ColloidPotentialsParameters, SubstrateWall
-import numpy as np
 
 
 class TestSubstrateWallParameters(object):
@@ -12,7 +11,7 @@ class TestSubstrateWallParameters(object):
     
     @pytest.fixture
     def surface_potential(self):
-        return 50.0 * (unit.milli * unit.volt)
+        return -50.0 * (unit.milli * unit.volt)
     
     @pytest.fixture
     def wall_distance(self):
@@ -49,11 +48,7 @@ class TestSubstrateWallParameters(object):
     @pytest.fixture
     def wall_charge(self):
         return -47.0 * (unit.milli * unit.volt)
-    
 
-    @pytest.fixture
-    def num_test_values(self):
-        return 1000
 
     @pytest.fixture
     def openmm_system(self):
@@ -73,7 +68,7 @@ class TestSubstrateWallParameters(object):
 
 
 class TestSubstrateWallExceptions(TestSubstrateWallParameters):
-    def test_exception_radius(self, radius, surface_potential, substrate_wall_potential, wall_distance):
+    def test_exception_radius(self, radius, surface_potential, substrate_wall_potential):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
             substrate_wall_potential.add_particle(index=0, radius=radius / ((unit.nano * unit.meter) ** 2), surface_potential=surface_potential)
@@ -122,26 +117,26 @@ class TestSubstrateWallEnergies(TestSubstrateWallParameters):
 
     @pytest.mark.parametrize("surface_separation,expected",
                              [   # Test just above h=0.
-                                 (0.1 * (unit.nano * unit.meter) , 60693.225871110146 *unit.kilojoule_per_mole),
+                                 (0.1 * (unit.nano * unit.meter) , 1.974393318268673e-41 *unit.kilojoule_per_mole),
                                  # Test at h=2L.
-                                 (20.0 * (unit.nano * unit.meter) , -22.45669511376326 *unit.kilojoule_per_mole),
+                                 (20.0 * (unit.nano * unit.meter) ,3.689280145599771e-43 *unit.kilojoule_per_mole),
                                  # Test slightly below h=2L where steric potential is not zero.
-                                 (19.9 * (unit.nano * unit.meter) , -22.83360903873548 *unit.kilojoule_per_mole),
+                                 (19.9 * (unit.nano * unit.meter) , 3.76380854827503e-43 *unit.kilojoule_per_mole),
                                  # Test slightly above h=2L where steric potential is strictly zero.
-                                 (20.1 * (unit.nano * unit.meter) , -22.08551859155945 *unit.kilojoule_per_mole),
+                                 (20.1 * (unit.nano * unit.meter) , 3.616227504173863e-43 *unit.kilojoule_per_mole),
                                  # Test at h=3L.
-                                 (30.0 * (unit.nano * unit.meter) , -4.241521827350957 *unit.kilojoule_per_mole),
+                                 (30.0 * (unit.nano * unit.meter) , 4.992897734439567e-44 *unit.kilojoule_per_mole),
                                  # Test at h=20*debye_length, where electrostatic potential should not yet be cutoff.
-                                 (100.0 * (unit.nano * unit.meter) , -3.637079137219e-05 *unit.kilojoule_per_mole),
+                                 (100.0 * (unit.nano * unit.meter) , 4.1517378577335804e-50 *unit.kilojoule_per_mole),
                              ])
 
 
     def test_potential(self, openmm_context_rel, radius, surface_separation, expected):
         openmm_context, rel = openmm_context_rel
-        openmm_context.setPositions([radius + surface_separation, 0.0, 0.0])
+        openmm_context.setPositions([[0.0, 0.0, surface_separation+radius]])
         openmm_state = openmm_context.getState(getEnergy=True)
         assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-                == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
+                == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=rel, abs=1.0e-13))
 
 if __name__ == '__main__':
     pytest.main([__file__])

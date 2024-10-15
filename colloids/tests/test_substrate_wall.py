@@ -76,46 +76,72 @@ class TestSubstrateWallExceptions(TestSubstrateWallParameters):
     def test_exception_radius(self, radius, surface_potential, substrate_wall_potential, wall_distance):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
-            substrate_wall_potential.add_particle(index=0, radius=radius / ((unit.nano * unit.meter) ** 2), surface_potential=surface_potential, wall_distance=wall_distance)
+            substrate_wall_potential.add_particle(index=0, radius=radius / ((unit.nano * unit.meter) ** 2), surface_potential=surface_potential)
         # Test exception on negative radius.
         with pytest.raises(ValueError):
             # noinspection PyTypeChecker
-            substrate_wall_potential.add_particle(index=0, radius=-radius, surface_potential=surface_potential, wall_distance=wall_distance)
-
-    def test_exception_wall_distance(self, radius, surface_potential, substrate_wall_potential, wall_distance):
+            substrate_wall_potential.add_particle(index=0, radius=-radius, surface_potential=surface_potential)
+    
+    def test_exception_surface_potential(self, radius, surface_potential, substrate_wall_potential):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
-            substrate_wall_potential.add_particle(index=0, radius=radius, surface_potential=surface_potential, wall_distance=wall_distance/ ((unit.nano * unit.meter) ** 2))
-        # Test exception on negative wall distance.
-        with pytest.raises(ValueError):
-            # noinspection PyTypeChecker
-            substrate_wall_potential.add_particle(index=0, radius=-radius, surface_potential=surface_potential, wall_distance=-wall_distance)
-    
-    def test_exception_surface_potential(self, radius, surface_potential, substrate_wall_potential, wall_distance):
-        # Test exception on wrong unit.
-        with pytest.raises(TypeError):
-            substrate_wall_potential.add_particle(index=0, radius=radius, surface_potential=surface_potential/ (unit.milli * unit.volt) ** 2, wall_distance=wall_distance)
-    
-    
-    def test_exception_radius_too_large(self, substrate_wall_potential, surface_potential, wall_distance):
-        # This is fine for a wall distance of 1000 nm.
-        substrate_wall_potential.add_particle(index=0, radius=236.0 * (unit.nano * unit.meter), surface_potential=surface_potential, wall_distance=wall_distance)
-        # This is not fine for a wall distance of 1000 nm.
-        with pytest.raises(ValueError):
-            substrate_wall_potential.add_particle(index=1, radius=237.0 * (unit.nano * unit.meter), surface_potential=surface_potential, wall_distance=wall_distance)
+            substrate_wall_potential.add_particle(index=0, radius=radius, surface_potential=surface_potential/ (unit.milli * unit.volt) ** 2)
       
     def test_exception_no_particles_added(self, substrate_wall_potential):
         with pytest.raises(RuntimeError):
             for _ in substrate_wall_potential.yield_potentials():
                 pass
 
-    def test_exception_add_particle_after_yield_potentials(self, radius, surface_potential, substrate_wall_potential, wall_distance):
-        substrate_wall_potential.add_particle(index=0, radius=radius, surface_potential=surface_potential, wall_distance=wall_distance)
+    def test_exception_add_particle_after_yield_potentials(self, radius, surface_potential, substrate_wall_potential):
+        substrate_wall_potential.add_particle(index=0, radius=radius, surface_potential=surface_potential)
         for _ in substrate_wall_potential.yield_potentials():
             pass
         with pytest.raises(RuntimeError):
-            substrate_wall_potential.add_particle(index=1, radius=radius, surface_potential=surface_potential, wall_distance=wall_distance)
+            substrate_wall_potential.add_particle(index=0, radius=radius, surface_potential=surface_potential)
 
+
+class TestSubstrateWallEnergies(TestSubstrateWallParameters):
+    @pytest.fixture(autouse=True)
+    def add_particle(self, openmm_system, substrate_wall_potential, radius, surface_potential):
+        openmm_system.addParticle(mass=1.0)
+        substrate_wall_potential.add_particle(index=0, radius=radius, surface_potential=surface_potential)
+
+        for potential in substrate_wall_potential.yield_potentials():
+            openmm_system.addForce(potential)
+
+    # This function cannot be moved to TestSubstrateParameters class because add_particle fixture should be called before
+    # the context is created (see http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.Context.html).
+    @pytest.fixture(params=[("Reference", 1.0e-7), ("CPU", 1.0e-7), ("CUDA", 1.0e-3), ("OpenCL", 1.0e-3)])
+    def openmm_context_rel(self, openmm_system, openmm_dummy_integrator, request):
+        try:
+            platform = Platform.getPlatformByName(request.param[0])
+        except OpenMMException:
+            pytest.skip("Platform {} not available.".format(request.param[0]))
+        return Context(openmm_system, openmm_dummy_integrator, platform), request.param[1]
+
+
+    @pytest.mark.parametrize("surface_separation,expected",
+                             [   # Test just above h=0.
+                                 (0.1 * (unit.nano * unit.meter) , 60693.225871110146 *unit.kilojoule_per_mole),
+                                 # Test at h=2L.
+                                 (20.0 * (unit.nano * unit.meter) , -22.45669511376326 *unit.kilojoule_per_mole),
+                                 # Test slightly below h=2L where steric potential is not zero.
+                                 (19.9 * (unit.nano * unit.meter) , -22.83360903873548 *unit.kilojoule_per_mole),
+                                 # Test slightly above h=2L where steric potential is strictly zero.
+                                 (20.1 * (unit.nano * unit.meter) , -22.08551859155945 *unit.kilojoule_per_mole),
+                                 # Test at h=3L.
+                                 (30.0 * (unit.nano * unit.meter) , -4.241521827350957 *unit.kilojoule_per_mole),
+                                 # Test at h=20*debye_length, where electrostatic potential should not yet be cutoff.
+                                 (100.0 * (unit.nano * unit.meter) , -3.637079137219e-05 *unit.kilojoule_per_mole),
+                             ])
+
+
+    def test_potential(self, openmm_context_rel, radius, surface_separation, expected):
+        openmm_context, rel = openmm_context_rel
+        openmm_context.setPositions([radius + surface_separation, 0.0, 0.0])
+        openmm_state = openmm_context.getState(getEnergy=True)
+        assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+                == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=1.0e-7, abs=1.0e-13))
 
 if __name__ == '__main__':
     pytest.main([__file__])

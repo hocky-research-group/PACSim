@@ -112,10 +112,10 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     def _set_up_slj_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the shifted Lennard Jones potential."""
 
-        slj_x = ("step(periodicdistance(x, 0, 0, 0, 0, 0) - cutoff_x) * ("
+        slj_x = ("step(periodicdistance(x, 0, 0, 0, 0, 0) - cutoff_x - delta_x) * ("
                  "four_epsilon * "
-                 "((radius / (wall_distance_x_over_two_minus_delta - periodicdistance(x, 0, 0, 0, 0, 0)))^12 "
-                 "- alpha * (radius / (wall_distance_x_over_two_minus_delta - periodicdistance(x, 0, 0, 0, 0, 0)))^6)"
+                 "((radius / (wall_distance_x_over_two - delta_x - periodicdistance(x, 0, 0, 0, 0, 0)))^12 "
+                 "- alpha * (radius / (wall_distance_x_over_two - delta_x - periodicdistance(x, 0, 0, 0, 0, 0)))^6)"
                  "+ shift)")
         slj_y = ("step(periodicdistance(0, y, 0, 0, 0, 0) - cutoff_y) * ("
                  "four_epsilon * "
@@ -149,7 +149,8 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         slj_potential.addPerParticleParameter("shift")
 
         if self._wall_directions[0]:
-            slj_potential.addPerParticleParameter("wall_distance_x_over_two_minus_delta")
+            slj_potential.addGlobalParameter("delta_x", 1.0 * self._nanometer)
+            slj_potential.addPerParticleParameter("wall_distance_x_over_two")
             slj_potential.addPerParticleParameter("cutoff_x")
         if self._wall_directions[1]:
             slj_potential.addPerParticleParameter("wall_distance_y_over_two_minus_delta")
@@ -199,11 +200,11 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         ]
         if self._wall_directions[0]:
             per_particle_parameters.append(
-                (self._wall_distances[0] / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # wall_distance_x_over_two_minus_delta
+                (self._wall_distances[0] / 2.0 - radius).value_in_unit(
+                    self._nanometer)  # wall_distance_x_over_two
             )
             per_particle_parameters.append(
-                (self._wall_distances[0] / 2.0 - rcut - radius + 1.0 * self._nanometer).value_in_unit(
+                (self._wall_distances[0] / 2.0 - rcut - radius).value_in_unit(
                     self._nanometer)  # cutoff_x
             )
         if self._wall_directions[1]:

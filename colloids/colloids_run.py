@@ -318,16 +318,18 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                                                       kineticEnergy=True, potentialEnergy=True, temperature=True,
                                                       speed=True, append=append_file))
 
-    if parameters.update_reporter is not None:
-        update_reporter = getattr(update_reporters, parameters.update_reporter)
-        try:
-            simulation.reporters.append(update_reporter(simulation=simulation, append_file=append_file,
-                                                        **parameters.update_reporter_parameters))
-        except TypeError:
-            raise TypeError(
-                f"UpdateReporter does not accept the given arguments {parameters.update_reporter_parameters}. "
-                f"The expected signature is {inspect.signature(update_reporter)} (the simulation argument need not be "
-                f"specified).")
+    if parameters.update_reporters is not None:
+        for num, reporter in enumerate(parameters.update_reporters):
+            update_reporter = getattr(update_reporters, reporter)
+            try:
+                reporter_index = num +1
+                simulation.reporters.append(update_reporter(simulation=simulation, append_file=append_file,
+                                                            **parameters.update_reporter_parameters[reporter_index]))
+            except TypeError:
+                raise TypeError(
+                    f"UpdateReporter does not accept the given arguments {parameters.update_reporter_parameters[reporter_index]}. "
+                    f"The expected signature is {inspect.signature(update_reporter)} (the simulation argument need not be "
+                    f"specified).")
     # The CheckpointReporter should always be last to ensure that all other reporters have been executed before it.
     simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
                                                        parameters.checkpoint_interval))

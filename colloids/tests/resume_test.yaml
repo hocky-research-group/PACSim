@@ -96,20 +96,22 @@ surface_potentials:
     value: -54.0
 trajectory_filename: test_run_and_resume/trajectory_resume.gsd
 trajectory_interval: 10
-update_reporter: RampUpdateReporter
+update_reporters: 
+  - RampUpdateReporter
 update_reporter_parameters:
-  filename: test_run_and_resume/update_reporter_resume.csv
-  update_interval: !Copy
-    key: state_data_interval
-  print_interval: !Copy
-    key: state_data_interval
-  final_update_step: 100
-  global_parameter_name: debye_length
-  start_value: !Copy
-    key: debye_length
-  end_value: !Quantity
-    unit: nanometer
-    value: 6.0
+  1: 
+    filename: test_run_and_resume/update_reporter_resume.csv
+    update_interval: !Copy
+      key: state_data_interval
+    print_interval: !Copy
+      key: state_data_interval
+    final_update_step: 100
+    global_parameter_name: debye_length
+    start_value: !Copy
+      key: debye_length
+    end_value: !Quantity
+      unit: nanometer
+      value: 6.0
 use_depletion: true
 use_gravity: true
 use_log: false

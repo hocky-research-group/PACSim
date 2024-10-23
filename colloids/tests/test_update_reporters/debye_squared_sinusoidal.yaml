@@ -65,20 +65,22 @@ potential_temperature: !Quantity
   value: 298.0
 trajectory_filename: trajectory.gsd
 trajectory_interval: 10
-update_reporter: SquaredSinusoidalUpdateReporter
+update_reporters: 
+  - SquaredSinusoidalUpdateReporter
 update_reporter_parameters:
-  filename: update_reporter.csv
-  update_interval: 1
-  print_interval: 1
-  final_update_step: !Copy
-    key: run_steps
-  global_parameter_name: debye_length
-  start_value: !Copy
-    key: debye_length
-  end_value: !Quantity
-    unit: nanometer
-    value: 6.0
-  switch_step: 10
+  1:
+    filename: update_reporter.csv
+    update_interval: 1
+    print_interval: 1
+    final_update_step: !Copy
+      key: run_steps
+    global_parameter_name: debye_length
+    start_value: !Copy
+      key: debye_length
+    end_value: !Quantity
+      unit: nanometer
+      value: 6.0
+    switch_step: 10
 use_depletion: false
 use_gravity: false
 use_log: false

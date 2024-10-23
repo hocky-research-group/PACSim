@@ -79,7 +79,7 @@ surface_potentials:
     value: -50.0
 trajectory_filename: trajectory.gsd
 trajectory_interval: 500000
-update_reporter: null
+update_reporters: null
 update_reporter_parameters: null
 use_depletion: true
 use_gravity: false

@@ -1,6 +1,41 @@
+from enum import auto, Enum
+import math
+from typing import Iterator
 import numpy as np
-from openmm import unit
 import numpy.typing as npt
+from openmm import CustomExternalForce, unit
+from colloids import ColloidPotentialsParameters
+from colloids.abstracts import OpenMMPotentialAbstract
+
+
+class SubstrateType(Enum):
+    """
+    The possible types of the substrate at the bottom of the simulation box.
+    """
+
+    EXPLICIT = auto()
+    """
+    Substrate particles are explicitly modeled at the bottom of the simulation box.
+    """
+    IMPLICIT = auto()
+    """
+    Substrate particles are implicitly modeled at the bottom of the simulation box.
+    """
+
+    @staticmethod
+    def from_string(string: str) -> "SubstrateType":
+        """
+        Convert a string to a SubstrateType.
+
+        :param string:
+            The string to convert to a SubstrateType.
+        :type string: str
+
+        :return:
+            The SubstrateType corresponding to the string.
+        :rtype: SubstrateType
+        """
+        return SubstrateType[string.upper()]
 
 
 def substrate_positions_hexagonal(substrate_radius: unit.Quantity,
@@ -81,20 +116,26 @@ class ImplicitSubstrate(OpenMMPotentialAbstract):
     fixed particles, and is designed to reduce computational costs. Either implicit or explicit substrate may be used,
     but not both.
 
-    A substrate wall can only be used when all SLJ walls are active. The bottom wall in the z direction will be replaced
-    by the substrate wall.
+    A substrate can only be used when all SLJ walls are active. The bottom wall in the z direction will be replaced by
+    the substrate wall.
+
+    The implicit substrate is modeled as a single substrate particle with a flat surface (that is, with an infinite
+    radius) at the bottom of the simulation box. The substrate particle is charged and interacts with the colloidal
+    particles via the same steric and electrostatic pair potentials as, e.g., defined in the ColloidPotentialsAlgebraic
+    class. An infinite substrate radius implies a value of 2 * radius for the prefactors in the steric and electrostatic
+    potentials, where radius is the radius of the colloidal particles.
 
     :param colloid_potentials_parameters:
         The parameters of the steric and electrostatic pair potentials between colloidal particles.
-        Defaults to the default parameters of the ColloidPotentialsParameters class.
     :type colloid_potentials_parameters: ColloidPotentialsParameters
-    :param wall_distance:
+    :param wall_distance_z:
         A distance specifying the dimensions of the simulation box in the z direction.
-        This is used to determine the location of the substrate wall at +-wall_distance/2.
+        This is used to determine the location of the substrate wall at -wall_distance/2.
         The unit must be compatible with nanometer and the value must be greater than zero.
-    :type wall_distance: Optional[unit.Quantity]
-    :param wall_charge:
-    :type wall_charge: Optional[unit.Quantity]
+    :type wall_distance_z: unit.Quantity
+    :param substrate_charge:
+        The charge of the implicit substrate particles.
+    :type substrate_charge: unit.Quantity
     :param use_log:
         If True, the electrostatic force uses the more accurate equation involving a logarithm [i.e., eq. (12.5.2) in
         Hunter, Foundations of Colloid Science (Oxford University Press, 2001), 2nd edition] instead of the simpler
@@ -104,42 +145,40 @@ class ImplicitSubstrate(OpenMMPotentialAbstract):
     :type use_log: bool
 
     :raises TypeError:
-        If the wall charge for an active substrate wall is not a Quantity with a proper unit (via abstract base class).
+        If the substrate charge for an active substrate wall is not a Quantity with a proper unit.
         If the wall distance for an active substrate wall is not a Quantity with a proper unit.
-
     :raises ValueError:
-        If a substrate wall is active while an explicit substrate is also being used.
         If the wall distance for an active substrate wall is not greater than zero.
     """
 
     _nanometer = unit.nano * unit.meter
 
-    def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters,
-                 wall_distance: Optional[unit.Quantity],
-                 wall_charge: Optional[unit.Quantity], use_log: bool = False) -> None:
-        """Constructor of the SubstrateWall class."""
+    def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters, wall_distance_z: unit.Quantity,
+                 substrate_charge: unit.Quantity, use_log: bool = False) -> None:
+        """Constructor of the ImplicitSubstrate class."""
         super().__init__()
 
-        if wall_distance:
-            if not wall_distance.unit.is_compatible(self._nanometer):
-                raise TypeError("wall distance must have a unit that is compatible with nanometers")
-            if not wall_distance.value_in_unit(self._nanometer) > 0.0:
-                raise ValueError("wall distance must have a value greater than zero")
+        if not wall_distance_z.unit.is_compatible(self._nanometer):
+            raise TypeError("wall distance must have a unit that is compatible with nanometers")
+        if not wall_distance_z.value_in_unit(self._nanometer) > 0.0:
+            raise ValueError("wall distance must have a value greater than zero")
+        if not substrate_charge.unit.is_compatible(unit.milli * unit.volt):
+            raise TypeError("substrate charge must have a unit that is compatible with volts")
 
         self._parameters = colloid_potentials_parameters
-        self._wall_charge = wall_charge
-        self._wall_distance = wall_distance
+        self._substrate_charge = substrate_charge
+        self._wall_distance = wall_distance_z
         self._use_log = use_log
-
         self._substrate_wall_potential = self._set_up_substrate_wall_potential()
 
     def _set_up_substrate_wall_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the substrate wall."""
 
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""
+        # 2 / (1 / radius1 + 1 / radius2) = 2 * radius1 if radius2 = infinity.
         steric_potential = (
             "step(two_l - h) * "
-            "steric_prefactor * radius * brush_length * brush_length * ("
+            "steric_prefactor * 2 * radius * brush_length * brush_length * ("
             "28.0 * ((two_l / h)^0.25 - 1.0) "
             "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
             "+ 12.0 * (h / two_l - 1.0)) "
@@ -147,20 +186,22 @@ class ImplicitSubstrate(OpenMMPotentialAbstract):
 
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""
         if self._use_log:
+            # 2 / (1 / radius1 + 1 / radius2) = 2 * radius1 if radius2 = infinity.
             electrostatic_potential = (
-                "electrostatic_prefactor * 2*radius * psi * wall_charge * log(1.0 + exp(-h / debye_length);")
+                "electrostatic_prefactor * 2 * radius * psi * substrate_psi * log(1.0 + exp(-h / debye_length));")
 
         else:
+            # 2 / (1 / radius1 + 1 / radius2) = 2 * radius1 if radius2 = infinity.
             electrostatic_potential = (
-                "electrostatic_prefactor * 2* radius * psi * wall_charge * exp(-h / debye_length);")
+                "electrostatic_prefactor * 2 * radius * psi * substrate_psi * exp(-h / debye_length);")
 
-        wall_string = "+".join([steric_potential, electrostatic_potential])
-        # +z so that close to zero when z~-L/2
-        wall_string += "h = substrate_wall_distance+z; two_l = 2.0 * brush_length;"
+        substrate_string = steric_potential + electrostatic_potential
+        # +z so that close to zero when z~-L/2.
+        # substrate_wall_distance is L / 2 - radius.
+        substrate_string += ("h = substrate_wall_distance + z;"
+                             "two_l = 2.0 * brush_length;")
 
-        assert wall_string
-
-        substrate_wall_potential = CustomExternalForce(wall_string)
+        substrate_wall_potential = CustomExternalForce(substrate_string)
 
         # Steric prefactor is k_B * T * 16 * pi * sigma^(3/2) / 35 (see Hocky paper)
         substrate_wall_potential.addGlobalParameter(
@@ -178,18 +219,15 @@ class ImplicitSubstrate(OpenMMPotentialAbstract):
             "electrostatic_prefactor",
             (2.0 * math.pi * self._parameters.VACUUM_PERMITTIVITY * self._parameters.dielectric_constant
              * unit.AVOGADRO_CONSTANT_NA).value_in_unit(
-                unit.kilojoule_per_mole / (unit.nanometer * (unit.milli * unit.volt) ** 2)))
+                unit.kilojoule_per_mole / (self._nanometer * (unit.milli * unit.volt) ** 2)))
         substrate_wall_potential.addGlobalParameter("debye_length",
                                                     self._parameters.debye_length.value_in_unit(self._nanometer))
-
-        # dlvo_walls_potential.addGlobalParameter("radius_substrate")
-        substrate_wall_potential.addGlobalParameter("wall_charge",
-                                                    self._wall_charge.value_in_unit((unit.milli * unit.volt)))
+        substrate_wall_potential.addGlobalParameter("substrate_psi",
+                                                    self._substrate_charge.value_in_unit((unit.milli * unit.volt)))
 
         substrate_wall_potential.addPerParticleParameter("radius")
         # Psi should be given in millivolts.
         substrate_wall_potential.addPerParticleParameter("psi")
-
         substrate_wall_potential.addPerParticleParameter("substrate_wall_distance")
 
         return substrate_wall_potential
@@ -212,7 +250,6 @@ class ImplicitSubstrate(OpenMMPotentialAbstract):
             The unit of the surface_potential must be compatible with millivolts.
         :type surface_potential: unit.Quantity
 
-
         :raises TypeError:
             If the radius or surface potential is not a Quantity with a proper unit.
         :raises ValueError:
@@ -229,9 +266,9 @@ class ImplicitSubstrate(OpenMMPotentialAbstract):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts")
 
         substrate_wall_distance = (self._wall_distance / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
-            self._nanometer)
+            self._nanometer)  # TODO: Why shift 1 nm?
 
-        self._substrate_wall_potential.addParticle(index, [radius.value_in_unit(unit.nanometer),
+        self._substrate_wall_potential.addParticle(index, [radius.value_in_unit(self._nanometer),
                                                            surface_potential.value_in_unit(unit.milli * unit.volt),
                                                            substrate_wall_distance])
 

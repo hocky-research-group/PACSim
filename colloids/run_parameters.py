@@ -3,9 +3,10 @@ import inspect
 from typing import Any, Optional
 from openmm import unit
 from colloids.abstracts import Parameters
-import colloids.integrators as integrators
-import colloids.update_reporters as update_reporters
 from colloids.helper_functions import read_xyz_file
+import colloids.integrators as integrators
+from colloids.substrate import SubstrateType
+import colloids.update_reporters as update_reporters
 import warnings
 
 
@@ -230,21 +231,21 @@ class RunParameters(Parameters):
         and an append_file boolean that should not appear in this dictionary.
         Defaults to None.
     :type update_reporter_parameters: Optional[dict[str, Any]]
-    :param use_substrate:
-        A boolean indicating whether to use a substrate at the bottom of the simulation box.
-        A substrate can only be used when all walls are active. The bottom wall is then replaced by the substrate.
-        If True, the substrate potential depth must be specified.
-        A substrate can only be used with the algebraic colloid potentials (use_tabulated=False).
-        Defaults to False.
-    :type use_substrate: bool
     :param substrate_type:
-        The type of the substrate that is used at the bottom of the simulation box.
-        If a substrate is used, the substrate type must not be None. 
-        If the substrate_type is "wall," an implicit substrate will be implmented using a Custom Nonbonded Force.
-        Otherwise, substrate_type specifies the particle type of explicit substrate particles and this type 
-        must appear in the radii, masses, and surface_potentials dictionaries.
-        Defaults to None.
+        If not None, the type of the substrate that is used at the bottom of the simulation box.
+        The possible choices are "implicit" or "explicit".
+        A substrate can only be used when all walls are active. The bottom wall is then replaced by the substrate.
+        Defaults to None (no substrate).
     :type substrate_type: Optional[str]
+    :param substrate_particle_type:
+        If a substrate is used, the substrate particle type must not be None.
+        For an implicit substrate, this type must appear in the surface_potentials dictionary to specify the surface
+        potential of the implicit substrate.
+        For an explicit substrate, this type must appear in the radii, masses, and surface_potentials dictionaries to
+        specify the properties of the explicit substrate particles. An explicit substrate can only be used with the
+        algebraic colloid potentials (use_tabulated=False).
+        Defaults to None.
+    :type substrate_particle_type: Optional[str]
     :param use_snowman:
         A boolean indicating whether to use the snowman colloids in the simulation.
         In a snowman colloid, a colloidal head particle is attached to a colloidal base particle at a fixed distance.
@@ -325,6 +326,7 @@ class RunParameters(Parameters):
     update_reporter_parameters: Optional[dict[str, Any]] = None
     use_substrate: bool = False
     substrate_type: Optional[str] = None
+    substrate_particle_type: Optional[str] = None
     use_snowman: bool = False
     snowman_seed: Optional[int] = None
     snowman_bond_types: Optional[dict[str, str]] = None
@@ -339,8 +341,9 @@ class RunParameters(Parameters):
                 raise TypeError(f"Mass of type {t} must have a unit compatible with atomic mass units.")
             if self.masses[t] < 0.0 * unit.amu:
                 raise ValueError(f"Mass of type {t} must be greater than zero.")
-            if t != self.substrate_type and self.masses[t] == 0.0 * unit.amu:
-                raise ValueError(f"Mass of type {t} must be greater than zero unless it is the substrate.")
+            if t != self.substrate_particle_type and self.masses[t] == 0.0 * unit.amu:
+                raise ValueError(f"Mass of type {t} must be greater than zero unless it is the substrate particle "
+                                 f"type.")
             if t not in self.radii:
                 raise ValueError(f"Type {t} of the masses dictionary is not in radii dictionary.")
             if t not in self.surface_potentials:
@@ -502,25 +505,38 @@ class RunParameters(Parameters):
         else:
             if self.update_reporter_parameters is not None:
                 raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")
-        if self.use_substrate:
+        if self.substrate_type is not None:
+            try:
+                SubstrateType.from_string(self.substrate_type)
+            except KeyError:
+                raise ValueError(f"The substrate type must be in {[s.name.lower() for s in SubstrateType]}.")
             if not all(self.wall_directions):
                 raise ValueError("A substrate can only be used if all walls are active.")
-            if self.substrate_type is None:
-                raise ValueError("The substrate type must be specified if a substrate is used.")
-            if not self.substrate_type == "wall":
-                if self.substrate_type not in self.radii:
-                    raise ValueError("The substrate type must be in the radii dictionary.")
-                if self.substrate_type not in self.masses:
-                    raise ValueError("The substrate type must be in the masses dictionary.")
-                if self.masses[self.substrate_type] != 0.0 * unit.amu:
-                    warnings.warn("The mass of the substrate type is not zero. Substrate will move during the simulation.")
+            if self.substrate_particle_type is None:
+                raise ValueError("The substrate particle type must be specified if a substrate is used.")
+            if SubstrateType.from_string(self.substrate_type) == SubstrateType.IMPLICIT:
+                if self.substrate_particle_type in self.radii:
+                    raise ValueError("The substrate type must not be in the radii dictionary for an implicit "
+                                     "substrate.")
+                if self.substrate_particle_type in self.masses:
+                    raise ValueError("The substrate type must not be in the masses dictionary for an implicit "
+                                     "substrate.")
+            else:
+                assert SubstrateType.from_string(self.substrate_type) == SubstrateType.EXPLICIT
+                if self.substrate_particle_type not in self.radii:
+                    raise ValueError("The substrate type must be in the radii dictionary for an explicit substrate.")
+                if self.substrate_particle_type not in self.masses:
+                    raise ValueError("The substrate type must be in the masses dictionary for an explicit substrate.")
+                if self.masses[self.substrate_particle_type] != 0.0 * unit.amu:
+                    warnings.warn("The mass of the substrate type is not zero. Explicit substrate particles will move "
+                                  "during the simulation.")
+                if self.use_tabulated:
+                    raise ValueError("An explicit substrate can only be used with the algebraic colloid potentials.")
             if self.substrate_type not in self.surface_potentials:
                 raise ValueError("The substrate type must be in the surface potentials dictionary.")
-            if self.use_tabulated:
-                raise ValueError("A substrate can only be used with the algebraic colloid potentials.")
         else:
-            if self.substrate_type is not None:
-                raise ValueError("The substrate type must not be specified if a substrate is not used.")
+            if self.substrate_particle_type is not None:
+                raise ValueError("The substrate particle type must not be specified if a substrate is not used.")
         if self.use_snowman:
             if self.snowman_bond_types is None:
                 raise ValueError("Snowman bond types must be specified if snowman is on.")
@@ -572,29 +588,29 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the initial configuration is not in radii dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
-            if t == self.substrate_type:
-                raise ValueError(f"Type {t} of the initial configuration cannot be the substrate type. Use "
+            if t == self.substrate_particle_type:
+                raise ValueError(f"Type {t} of the initial configuration cannot be the substrate particle type. Use "
                                  f"checkpoints to restart simulations with a substrate.")
             if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
                 raise ValueError(f"Type {t} of the initial configuration cannot be a snowman head type. Use "
                                  f"checkpoints to restart simulations with snowman colloids.")
         for t in self.masses:
             if t not in types:
-                if t == self.substrate_type:
+                if t == self.substrate_particle_type:
                     continue
                 if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
                     continue
                 raise ValueError(f"Type {t} of the masses dictionary is not in the initial configuration.")
         for t in self.radii:
             if t not in types:
-                if t == self.substrate_type:
+                if t == self.substrate_particle_type:
                     continue
                 if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
                     continue
                 raise ValueError(f"Type {t} of the radii dictionary is not in the initial configuration.")
         for t in self.surface_potentials:
             if t not in types:
-                if t == self.substrate_type:
+                if t == self.substrate_particle_type:
                     continue
                 if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
                     continue

@@ -52,6 +52,7 @@ radii:
 run_steps: 100
 state_data_filename: state_data.csv
 state_data_interval: 10
+substrate_particle_type: null
 substrate_type: null
 surface_potentials:
   N: !Quantity
@@ -83,7 +84,6 @@ update_reporter_parameters:
 use_depletion: false
 use_gravity: false
 use_log: false
-use_substrate: false
 use_tabulated: false
 velocity_seed: 2
 wall_directions:

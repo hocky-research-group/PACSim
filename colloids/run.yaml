@@ -58,6 +58,7 @@ snowman_distances: null
 snowman_seed: null
 state_data_filename: state_data.csv
 state_data_interval: 1000
+substrate_particle_type: null
 substrate_type: null
 surface_potentials:
   N: !Quantity
@@ -74,7 +75,6 @@ use_depletion: true
 use_gravity: false
 use_log: false
 use_snowman: false
-use_substrate: false
 use_tabulated: false
 velocity_seed: null
 wall_directions:

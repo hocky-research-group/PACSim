@@ -1,1 +1,1 @@
-from .abstracts import Plotter, LabeledRunParametersWithPath
+from .abstracts import Plotter, PlotterWithClusterIndex, LabeledRunParametersWithPath

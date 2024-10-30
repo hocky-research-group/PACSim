@@ -1,7 +1,13 @@
+cluster_analysis_parameters: null
 coordination_numbers_parameters: null
 labels: null
 plot_coordination_numbers: false
 plot_rdf: false
+plot_sdf: false
+plot_snowman_orientation_distribution: false
 plot_state_data: true
 rdf_parameters: null
+run_cluster_analysis: false
+sdf_parameters: null
+snowman_orientation_distribution_parameters: null
 working_directory: ./output

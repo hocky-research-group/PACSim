@@ -4,6 +4,7 @@ import pathlib
 from colloids.run_parameters import RunParameters
 from colloids.colloids_analyze import LabeledRunParametersWithPath
 from colloids.colloids_analyze.analysis_parameters import AnalysisParameters
+from colloids.colloids_analyze.cluster_analyzer import ClusterAnalyzer
 from colloids.colloids_analyze.coordination_numbers_plotter import CoordinationNumbersPlotter
 from colloids.colloids_analyze.rdf_plotter import RDFPlotter
 from colloids.colloids_analyze.sdf_plotter import SDFPlotter
@@ -50,6 +51,21 @@ def main():
     run_parameters = [LabeledRunParametersWithPath(path=pathlib.Path(simulation_parameters).parent, label=label,
                                                    run_parameters=RunParameters.from_yaml(simulation_parameters))
                       for label, simulation_parameters in zip(labels, args.simulation_parameters)]
+
+    if analysis_parameters.run_cluster_analysis:
+        if analysis_parameters.cluster_analysis_parameters is not None:
+            try:
+                plotter = ClusterAnalyzer(analysis_parameters.working_directory, run_parameters,
+                                          **analysis_parameters.cluster_analysis_parameters)
+            except TypeError:
+                raise TypeError(
+                    f"ClusterAnalyser does not accept the given arguments "
+                    f"{analysis_parameters.cluster_analysis_parameters}. The expected signature is "
+                    f"{inspect.signature(ClusterAnalyzer)} (the working_directory and run_parameters arguments need "
+                    f"not be specified).")
+        else:
+            plotter = ClusterAnalyzer(analysis_parameters.working_directory, run_parameters)
+        plotter.plot()
 
     if analysis_parameters.plot_state_data:
         plotter = StateDataPlotter(analysis_parameters.working_directory, run_parameters)

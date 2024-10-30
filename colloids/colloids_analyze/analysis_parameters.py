@@ -17,3 +17,5 @@ class AnalysisParameters(Parameters):
     coordination_numbers_parameters: Optional[dict[str, Any]] = None
     plot_snowman_orientation_distribution: bool = True
     snowman_orientation_distribution_parameters: Optional[dict[str, Any]] = None
+    run_cluster_analysis: bool = True
+    cluster_analysis_parameters: Optional[dict[str, Any]] = None

@@ -4,8 +4,8 @@ import numpy as np
 import ovito.data
 
 
-def modify(_: int, data: ovito.data.DataCollection, l: int = 6, q_threshold: float = 0.7, solid_threshold: int = 7,
-           normalize_q: bool = True, r_max: float = 100.0, color_map: str = "Set3") -> None:
+def modify(_: int, data: ovito.data.DataCollection, l: int = 6, q_threshold: float = 0.7, solid_threshold: int = 4,
+           normalize_q: bool = True, r_max: float = 250.0, color_map: str = "Set3") -> None:
     # See https://www.ovito.org/docs/current/python/introduction/custom_modifiers.html
     selection_mask = (data.particles["Selection"] == 1)
     # Reset selection so that selection coloring is removed.

@@ -6,6 +6,7 @@ from colloids.colloids_analyze import LabeledRunParametersWithPath
 from colloids.colloids_analyze.analysis_parameters import AnalysisParameters
 from colloids.colloids_analyze.cluster_analyzer import ClusterAnalyzer
 from colloids.colloids_analyze.coordination_numbers_plotter import CoordinationNumbersPlotter
+from colloids.colloids_analyze.cubic_cluster_rotator import CubicClusterRotator
 from colloids.colloids_analyze.rdf_plotter import RDFPlotter
 from colloids.colloids_analyze.sdf_plotter import SDFPlotter
 from colloids.colloids_analyze.snowman_orientation_distribution_plotter import SnowmanOrientationDistributionPlotter
@@ -65,6 +66,21 @@ def main():
                     f"not be specified).")
         else:
             plotter = ClusterAnalyzer(analysis_parameters.working_directory, run_parameters)
+        plotter.plot()
+
+    if analysis_parameters.run_cubic_cluster_rotator:
+        if analysis_parameters.cubic_cluster_rotator_parameters is not None:
+            try:
+                plotter = CubicClusterRotator(analysis_parameters.working_directory, run_parameters,
+                                              **analysis_parameters.cubic_cluster_rotator_parameters)
+            except TypeError:
+                raise TypeError(
+                    f"CubicClusterRotator does not accept the given arguments "
+                    f"{analysis_parameters.cubic_cluster_rotator_parameters}. The expected signature is "
+                    f"{inspect.signature(CubicClusterRotator)} (the working_directory and run_parameters arguments "
+                    f"need not be specified).")
+        else:
+            plotter = CubicClusterRotator(analysis_parameters.working_directory, run_parameters)
         plotter.plot()
 
     if analysis_parameters.plot_state_data:

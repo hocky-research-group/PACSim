@@ -25,52 +25,64 @@ class CubicClusterRotator(PlotterWithClusterIndex):
         distances = MDAnalysis.analysis.distances.distance_array(cubic_type_positions, cubic_type_positions)
         assert np.all(np.diagonal(distances) == 0.0)
 
-        for index, first_position in enumerate(cubic_type_positions):
-            relevant_distances = distances[index]
-            # Find seven closest surrounding particles because particle itself is included.
-            closest_indices = np.argsort(relevant_distances)[:7]
-            closest_distances = relevant_distances[closest_indices]
-            assert closest_distances[0] == 0.0  # Distance of particle to itself.
-            # Check if particle well within cluster.
-            if np.allclose(closest_distances[1:], closest_distances[1], rtol=0.0, atol=30):
-                # Find the closest index with the smallest difference along the z-axis.
-                close_positions = cubic_type_positions[closest_indices]
-                close_z_values = close_positions[:, 2]
-                ref_z_value = first_position[2]
-                z_diff = np.abs(close_z_values - ref_z_value)
-                assert z_diff[0] == 0.0
-                min_indices = np.argsort(z_diff)
-                assert min_indices[0] == 0
-                # This position will be rotated on the x-axis.
-                second_position = cubic_type_positions[closest_indices[min_indices[1]]]
+        for tolerance in range(10, 110, 10):
+            for index, first_position in enumerate(cubic_type_positions):
+                relevant_distances = distances[index]
+                # Find seven closest surrounding particles because particle itself is included.
+                closest_indices = np.argsort(relevant_distances)[:7]
+                closest_distances = relevant_distances[closest_indices]
+                assert closest_distances[0] == 0.0  # Distance of particle to itself.
+                # Check if particle well within cluster.
+                if np.allclose(closest_distances[1:], closest_distances[1], rtol=0.0, atol=tolerance):
+                    # Find the closest index with the smallest difference along the z-axis.
+                    close_positions = cubic_type_positions[closest_indices]
+                    close_z_values = close_positions[:, 2]
+                    ref_z_value = first_position[2]
+                    z_diff = np.abs(close_z_values - ref_z_value)
+                    assert z_diff[0] == 0.0
+                    min_indices = np.argsort(z_diff)
+                    assert min_indices[0] == 0
+                    # This position will be rotated on the x-axis.
+                    second_position = cubic_type_positions[closest_indices[min_indices[1]]]
 
-                diff_vector = second_position - first_position
-                # Find and exclude the position on that will be rotated on the x-axis together with the second position.
-                second_position_prime = first_position - diff_vector
-                distances = np.array([np.linalg.norm(second_position_prime - close_position)
-                                      for close_position in close_positions])
-                excluded_index = np.argmin(distances)
-                third_index = min_indices[2] if excluded_index != min_indices[2] else min_indices[3]
-                third_position = cubic_type_positions[closest_indices[third_index]]
+                    diff_vector = second_position - first_position
+                    # Find and exclude the position on that will be rotated on the x-axis together with the second position.
+                    second_position_prime = first_position - diff_vector
+                    distances = np.array([np.linalg.norm(second_position_prime - close_position)
+                                          for close_position in close_positions])
+                    excluded_index = np.argmin(distances)
+                    # Average the two vectors pointing in opposite directions.
+                    other_diff_vector = -(close_positions[excluded_index] - first_position)
+                    new_x_vector = (diff_vector + other_diff_vector) / 2.0
 
-                # Apply the rotation.
-                rot = scipy.spatial.transform.Rotation.align_vectors(
-                    np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
-                    np.row_stack((second_position - first_position, third_position - first_position)),
-                    weights=[np.inf, 1])[0]
-                rot_matrix = rot.as_matrix()
-                translation_vector = -first_position
-                full_matrix = np.column_stack((rot_matrix, translation_vector))
-                data.apply(ovito.modifiers.AffineTransformationModifier(transformation=full_matrix))
+                    third_index = min_indices[2] if excluded_index != min_indices[2] else min_indices[3]
+                    third_position = cubic_type_positions[closest_indices[third_index]]
+                    # Repeat averaging for the y-axis.
+                    diff_vector = third_position - first_position
+                    third_position_prime = first_position - diff_vector
+                    distances = np.array([np.linalg.norm(third_position_prime - close_position)
+                                            for close_position in close_positions])
+                    excluded_index = np.argmin(distances)
+                    other_diff_vector = -(close_positions[excluded_index] - first_position)
+                    new_y_vector = (diff_vector + other_diff_vector) / 2.0
 
-                # If z-axis is pointing downwards, rotate the system by 180 degrees around the y-axis.
-                if data.cell[2, 2] <= 0.0:
-                    new_rot_matrix = scipy.spatial.transform.Rotation.from_euler("y", np.pi).as_matrix()
-                    new_translation_vector = np.array([0.0, 0.0, 0.0])
-                    new_full_matrix = np.column_stack((new_rot_matrix, new_translation_vector))
-                    data.apply(ovito.modifiers.AffineTransformationModifier(transformation=new_full_matrix))
+                    # Apply the rotation.
+                    rot = scipy.spatial.transform.Rotation.align_vectors(
+                        np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+                        np.row_stack((new_x_vector, new_y_vector)),
+                        weights=[np.inf, 1])[0]
+                    rot_matrix = rot.as_matrix()
+                    translation_vector = -first_position
+                    full_matrix = np.column_stack((rot_matrix, translation_vector))
+                    data.apply(ovito.modifiers.AffineTransformationModifier(transformation=full_matrix))
 
-                return
+                    # If z-axis is pointing downwards, rotate the system by 180 degrees around the y-axis.
+                    if data.cell[2, 2] <= 0.0:
+                        new_rot_matrix = scipy.spatial.transform.Rotation.from_euler("y", np.pi).as_matrix()
+                        new_translation_vector = np.array([0.0, 0.0, 0.0])
+                        new_full_matrix = np.column_stack((new_rot_matrix, new_translation_vector))
+                        data.apply(ovito.modifiers.AffineTransformationModifier(transformation=new_full_matrix))
+                    return
         raise RuntimeError("No suitable cubic particle found for rotation")
 
     def plot(self) -> None:

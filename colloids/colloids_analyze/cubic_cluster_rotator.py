@@ -71,6 +71,7 @@ class CubicClusterRotator(PlotterWithClusterIndex):
                     data.apply(ovito.modifiers.AffineTransformationModifier(transformation=new_full_matrix))
 
                 return
+        raise RuntimeError("No suitable cubic particle found for rotation")
 
     def plot(self) -> None:
         for index, rp in enumerate(self._run_parameters):
@@ -95,7 +96,10 @@ class CubicClusterRotator(PlotterWithClusterIndex):
             assert pipeline.num_frames == 1
             xyz_path = trajectory_path.with_stem(trajectory_path.stem + f"_cluster_{self._cluster_index}_rotated")
             xyz_path = xyz_path.with_suffix(".xyz")
-            ovito.io.export_file(
-                pipeline, xyz_path, "xyz", frame=0,
-                columns=["Particle Identifier", "Particle Type", "Position.X", "Position.Y", "Position.Z",
-                         "Radius", "Charge"])
+            try:
+                ovito.io.export_file(
+                    pipeline, xyz_path, "xyz", frame=0,
+                    columns=["Particle Identifier", "Particle Type", "Position.X", "Position.Y", "Position.Z",
+                             "Radius", "Charge"])
+            except RuntimeError as error:
+                print(f"Rotating cluster in file {cluster_xyz_path} failed with error: {error}.")

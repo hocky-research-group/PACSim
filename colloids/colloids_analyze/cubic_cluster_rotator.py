@@ -62,6 +62,14 @@ class CubicClusterRotator(PlotterWithClusterIndex):
                 translation_vector = -first_position
                 full_matrix = np.column_stack((rot_matrix, translation_vector))
                 data.apply(ovito.modifiers.AffineTransformationModifier(transformation=full_matrix))
+
+                # If z-axis is pointing downwards, rotate the system by 180 degrees around the y-axis.
+                if data.cell[2, 2] <= 0.0:
+                    new_rot_matrix = scipy.spatial.transform.Rotation.from_euler("y", np.pi).as_matrix()
+                    new_translation_vector = np.array([0.0, 0.0, 0.0])
+                    new_full_matrix = np.column_stack((new_rot_matrix, new_translation_vector))
+                    data.apply(ovito.modifiers.AffineTransformationModifier(transformation=new_full_matrix))
+
                 return
 
     def plot(self) -> None:

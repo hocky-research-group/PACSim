@@ -86,5 +86,5 @@ class ClusterAnalyzer(Plotter):
             ovito.io.export_file(
                 pipeline, xyz_path, "xyz",
                 frame=self._frame_index if self._frame_index >= 0 else pipeline.num_frames + self._frame_index,
-                columns=["Particle Identifier", "Particle Type", "Position.X", "Position.Y", "Position.Z",
+                columns=["Particle Type", "Position.X", "Position.Y", "Position.Z", "Particle Identifier",
                          "Color.R", "Color.G", "Color.B", "Radius", "Charge", "Cluster"])

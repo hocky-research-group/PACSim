@@ -111,7 +111,7 @@ class CubicClusterRotator(PlotterWithClusterIndex):
             try:
                 ovito.io.export_file(
                     pipeline, xyz_path, "xyz", frame=0,
-                    columns=["Particle Identifier", "Particle Type", "Position.X", "Position.Y", "Position.Z",
+                    columns=["Particle Type", "Position.X", "Position.Y", "Position.Z", "Particle Identifier",
                              "Radius", "Charge"])
             except RuntimeError as error:
                 print(f"Rotating cluster in file {cluster_xyz_path} failed with error: {error}.")

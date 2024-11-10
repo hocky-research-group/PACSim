@@ -67,7 +67,7 @@ class ClusterAnalyzer(Plotter):
             # If run_parameters["parameters"].trajectory_filename is a complete path, the division operator of paths
             # only returns that complete path. Otherwise, this combines base_path and path.
             trajectory_path = rp.path / rp.run_parameters.trajectory_filename
-            if not trajectory_path.exists() and trajectory_path.is_file():
+            if not trajectory_path.exists() or not trajectory_path.is_file():
                 raise ValueError(f"The trajectory file {trajectory_path} does not exist.")
             if not trajectory_path.suffix == ".gsd":
                 raise ValueError(f"The trajectory file {trajectory_path} does not have the .gsd extension.")

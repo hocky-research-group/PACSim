@@ -62,6 +62,8 @@ class SnowmanOrientationDistributionPlotter(PlotterWithClusterIndex):
                     for body_index, snowman_body in enumerate(snowman_body_group):
                         snowman_head = snowman_head_group[snowman_indices[body_index]]
                         assert cluster_map[snowman_body.id] == cluster_map[snowman_head.id]
+                        if cluster_map[snowman_body.id] != self._cluster_index:
+                            continue
                         snowman_distance_vector = snowman_head.position - snowman_body.position
                         assert np.abs(np.linalg.norm(snowman_distance_vector) - snowman_distance) < 1.0e-1
                         snowman_distance_vector /= np.linalg.norm(snowman_distance_vector)

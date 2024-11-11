@@ -18,7 +18,8 @@ dependencies = [
     "tqdm >= 4.65",
     "pandas >= 2.2",
     "ase >= 3.22",
-    "scipy >= 1.12"
+    "scipy >= 1.12",
+    "MDAnalysis >= 2.7",
 ]
 
 [project.scripts]

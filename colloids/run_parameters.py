@@ -5,7 +5,7 @@ from openmm import unit
 from colloids.abstracts import Parameters
 import colloids.integrators as integrators
 import colloids.update_reporters as update_reporters
-from colloids.helper_functions import read_xyz_file
+from colloids.helper_functions import read_initial_file
 import warnings
 
 
@@ -330,8 +330,8 @@ class RunParameters(Parameters):
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
-        if not self.initial_configuration.endswith(".xyz"):
-            raise ValueError("The filename of the initial configuration must end with '.xyz'")
+        if not (self.initial_configuration.endswith(".xyz") or self.initial_configuration.endswith(".gsd")):
+            raise ValueError("The filename of the initial configuration must end with '.xyz' or '.gsd'.")
         for t in self.masses:
             if not self.masses[t].unit.is_compatible(unit.amu):
                 raise TypeError(f"Mass of type {t} must have a unit compatible with atomic mass units.")
@@ -560,7 +560,7 @@ class RunParameters(Parameters):
             If the types of the initial configuration are not consistent with the masses, radii, and surface-potentials
             dictionaries.
         """
-        types_from_file, _, _ = read_xyz_file(self.initial_configuration)
+        types_from_file, _, _ = read_initial_file(self.initial_configuration)
         types = list(dict.fromkeys(types_from_file))
         for t in types:
             if t not in self.masses:
@@ -569,12 +569,6 @@ class RunParameters(Parameters):
                 raise ValueError(f"Type {t} of the initial configuration is not in radii dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
-            if t == self.substrate_type:
-                raise ValueError(f"Type {t} of the initial configuration cannot be the substrate type. Use "
-                                 f"checkpoints to restart simulations with a substrate.")
-            if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
-                raise ValueError(f"Type {t} of the initial configuration cannot be a snowman head type. Use "
-                                 f"checkpoints to restart simulations with snowman colloids.")
         for t in self.masses:
             if t not in types:
                 if t == self.substrate_type:

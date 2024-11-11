@@ -1,6 +1,8 @@
 from math import acos, cos, pi, sin, sqrt
 from typing import Iterator
+import ase.data
 import ase.io
+import ase.symbols
 import gsd.hoomd
 import numpy as np
 import numpy.typing as npt
@@ -10,13 +12,44 @@ from openmm import unit
 from scipy.spatial.transform import Rotation
 
 
+def read_initial_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[float]):
+    if filename.endswith(".xyz"):
+        return read_xyz_file(filename)
+    if filename.endswith(".gsd"):
+        return read_gsd_file(filename)
+    raise ValueError("The file must have the .xyz or .gsd extension.")
+
+
 def read_xyz_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[float]):
     if not filename.endswith(".xyz"):
         raise ValueError("The file must have the .xyz extension.")
+    original_numbers = ase.symbols.atomic_numbers
+    types = np.loadtxt(filename, skiprows=2, dtype=str, usecols=0)
+    # Hack because ase could complain about non-existing elements.
+    ase.symbols.atomic_numbers = {t.capitalize(): i for i, t in enumerate(set(types))}
     atoms = ase.io.read(filename, format="extxyz")
+    ase.symbols.atomic_numbers = original_numbers
     cell = atoms.get_cell()[:]
     assert cell.shape == (3, 3)
-    return atoms.get_chemical_symbols(), atoms.get_positions(), cell
+    return types, atoms.get_positions(), cell
+
+
+def read_gsd_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[float]):
+    if not filename.endswith(".gsd"):
+        raise ValueError("The file must have the .gsd extension.")
+    with gsd.hoomd.open(filename) as f:
+        if len(f) != 1:
+            raise ValueError("The GSD file must contain exactly one frame.")
+        frame = f[0]
+        cell = np.zeros((3, 3))
+        cell[0][0] = frame.configuration.box[0]
+        cell[1][1] = frame.configuration.box[1]
+        cell[2][2] = frame.configuration.box[2]
+        cell[1][0] = frame.configuration.box[1] * frame.configuration.box[3]
+        cell[2][0] = frame.configuration.box[2] * frame.configuration.box[4]
+        cell[2][1] = frame.configuration.box[2] * frame.configuration.box[5]
+        return (list(map(frame.particles.types.__getitem__, frame.particles.typeid)),
+                frame.particles.position.astype(np.float64), cell)
 
 
 # noinspection PyUnresolvedReferences

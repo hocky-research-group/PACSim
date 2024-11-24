@@ -89,10 +89,15 @@ class SnowmanOrientationDistributionPlotter(PlotterWithClusterIndex):
                 # If run_parameters["parameters"].trajectory_filename is a complete path, the division operator of paths
                 # only returns that complete path. Otherwise, this combines base_path and path.
                 trajectory_path = rp.path / rp.run_parameters.trajectory_filename
-                xyz_path = trajectory_path.with_stem(trajectory_path.stem + f"_cluster_{self._cluster_index}_rotated")
+                xyz_path = trajectory_path.with_stem(trajectory_path.stem + f"_cluster_{self._cluster_index}_rotated_corrected")
                 xyz_path = xyz_path.with_suffix(".xyz")
+                use_corrected = True
                 if not xyz_path.exists() or not xyz_path.is_file():
-                    raise ValueError(f"The file {xyz_path} does not exist, run the CubicClusterRotator first.")
+                    xyz_path = trajectory_path.with_stem(trajectory_path.stem + f"_cluster_{self._cluster_index}_rotated")
+                    xyz_path = xyz_path.with_suffix(".xyz")
+                    if not xyz_path.exists() or not xyz_path.is_file():
+                        raise ValueError(f"The file {xyz_path} does not exist, run the CubicClusterRotator first.")
+                    use_corrected = False
                 universe = MDAnalysis.Universe(xyz_path, in_memory=True)
                 # Advance to correct frame index.
                 _ = universe.trajectory[self._frame_index]
@@ -155,7 +160,7 @@ class SnowmanOrientationDistributionPlotter(PlotterWithClusterIndex):
                         y_coords.append(snowman_distance_vector[1])
                         z_coords.append(snowman_distance_vector[2])
                     ax.scatter(x_coords, y_coords, z_coords, marker="o", alpha=0.1, color=f"C{i}")
-                ax.set_title(f"{rp.label}, orientation of snowmen, cluster {self._cluster_index}")
+                ax.set_title(f"{rp.label}, orientation of snowmen, cluster {self._cluster_index}, corrected={use_corrected}")
                 ax.set_aspect("equal")
                 ax.set_xlim(-1.1, 1.1)
                 ax.set_ylim(-1.1, 1.1)

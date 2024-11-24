@@ -19,5 +19,7 @@ class AnalysisParameters(Parameters):
     snowman_orientation_distribution_parameters: Optional[dict[str, Any]] = None
     run_cluster_analysis: bool = True
     cluster_analysis_parameters: Optional[dict[str, Any]] = None
-    run_cubic_cluster_rotator: bool = True
+    run_cubic_cluster_rotator: bool = False
     cubic_cluster_rotator_parameters: Optional[dict[str, Any]] = None
+    animate_snowman_orientation_distribution: bool = False
+    snowman_orientation_distribution_animator_parameters: Optional[dict[str, Any]] = None

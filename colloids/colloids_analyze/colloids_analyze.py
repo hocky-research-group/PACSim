@@ -10,6 +10,7 @@ from colloids.colloids_analyze.cubic_cluster_rotator import CubicClusterRotator
 from colloids.colloids_analyze.rdf_plotter import RDFPlotter
 from colloids.colloids_analyze.sdf_plotter import SDFPlotter
 from colloids.colloids_analyze.snowman_orientation_distribution_plotter import SnowmanOrientationDistributionPlotter
+from colloids.colloids_analyze.snowman_orientation_distribution_animator import SnowmanOrientationDistributionAnimator
 from colloids.colloids_analyze.state_data_plotter import StateDataPlotter
 
 
@@ -147,6 +148,22 @@ def main():
                     f"run_parameters arguments need not be specified).")
         else:
             plotter = SnowmanOrientationDistributionPlotter(analysis_parameters.working_directory, run_parameters)
+        plotter.plot()
+
+    if analysis_parameters.animate_snowman_orientation_distribution:
+        if analysis_parameters.snowman_orientation_distribution_animator_parameters is not None:
+            try:
+                plotter = SnowmanOrientationDistributionAnimator(
+                    analysis_parameters.working_directory, run_parameters,
+                    **analysis_parameters.snowman_orientation_distribution_animator_parameters)
+            except TypeError:
+                raise TypeError(
+                    f"SnowmanOrientationDistributionAnimator does not accept the given arguments "
+                    f"{analysis_parameters.snowman_orientation_distribution_animator_parameters}. The expected "
+                    f"signature is {inspect.signature(SnowmanOrientationDistributionAnimator)} (the working_directory "
+                    f"and run_parameters arguments need not be specified).")
+        else:
+            plotter = SnowmanOrientationDistributionAnimator(analysis_parameters.working_directory, run_parameters)
         plotter.plot()
 
 

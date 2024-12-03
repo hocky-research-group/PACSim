@@ -23,3 +23,5 @@ class AnalysisParameters(Parameters):
     cubic_cluster_rotator_parameters: Optional[dict[str, Any]] = None
     animate_snowman_orientation_distribution: bool = False
     snowman_orientation_distribution_animator_parameters: Optional[dict[str, Any]] = None
+    plot_snowman_orientation_rmsd: bool = False
+    snowman_orientation_rmsd_parameters: Optional[dict[str, Any]] = None

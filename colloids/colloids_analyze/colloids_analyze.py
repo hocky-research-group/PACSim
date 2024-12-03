@@ -11,6 +11,7 @@ from colloids.colloids_analyze.rdf_plotter import RDFPlotter
 from colloids.colloids_analyze.sdf_plotter import SDFPlotter
 from colloids.colloids_analyze.snowman_orientation_distribution_plotter import SnowmanOrientationDistributionPlotter
 from colloids.colloids_analyze.snowman_orientation_distribution_animator import SnowmanOrientationDistributionAnimator
+from colloids.colloids_analyze.snowman_orientation_rmsd_plotter import SnowmanOrientationRMSDPlotter
 from colloids.colloids_analyze.state_data_plotter import StateDataPlotter
 
 
@@ -164,6 +165,22 @@ def main():
                     f"and run_parameters arguments need not be specified).")
         else:
             plotter = SnowmanOrientationDistributionAnimator(analysis_parameters.working_directory, run_parameters)
+        plotter.plot()
+
+    if analysis_parameters.plot_snowman_orientation_rmsd:
+        if analysis_parameters.snowman_orientation_rmsd_parameters is not None:
+            try:
+                plotter = SnowmanOrientationRMSDPlotter(
+                    analysis_parameters.working_directory, run_parameters,
+                    **analysis_parameters.snowman_orientation_rmsd_parameters)
+            except TypeError:
+                raise TypeError(
+                    f"SnowmanOrientationRMSDPlotter does not accept the given arguments "
+                    f"{analysis_parameters.snowman_orientation_rmsd_parameters}. The expected "
+                    f"signature is {inspect.signature(SnowmanOrientationRMSDPlotter)} (the working_directory "
+                    f"and run_parameters arguments need not be specified).")
+        else:
+            plotter = SnowmanOrientationRMSDPlotter(analysis_parameters.working_directory, run_parameters)
         plotter.plot()
 
 

@@ -9,9 +9,6 @@ import numpy as np
 from openmm import unit
 from colloids.colloids_analyze import LabeledRunParametersWithPath, PlotterWithClusterIndex
 
-# Switch of LaTeX rendering for the plot labels in the animation (switched on in colloids.colloids_analyze.abstracts).
-plt.rcParams.update({"text.usetex": False})
-
 
 # See https://stackoverflow.com/questions/44985966/managing-dynamic-plotting-in-matplotlib-animation-module
 class Player(FuncAnimation):
@@ -110,6 +107,10 @@ class SnowmanOrientationDistributionAnimator(PlotterWithClusterIndex):
         self._start_frame = start_frame
 
     def plot(self) -> None:
+        old_rc_params = plt.rcParams.copy()
+        # Switch of LaTeX rendering for the plot labels in the animation (switched on in colloids.colloids_analyze.abstracts).
+        plt.rcParams.update({"text.usetex": False})
+
         for index, rp in enumerate(self._run_parameters):
             if not len(rp.run_parameters.snowman_bond_types) == 1:
                 raise ValueError("The number of snowman bond types must be exactly one.")
@@ -199,3 +200,6 @@ class SnowmanOrientationDistributionAnimator(PlotterWithClusterIndex):
             # ani.save("snowman_orientation_distribution.mp4")
             plt.show()
             plt.close()
+
+        # Reset rcParams.
+        plt.rcParams = old_rc_params

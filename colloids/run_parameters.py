@@ -12,7 +12,7 @@ import warnings
 @dataclass(order=True, frozen=True)
 class RunParameters(Parameters):
     """
-    Data class for the parameters of an OpenMM simulation of colloidal particles periodic boundary conditions.
+    Data class for the parameters of an OpenMM simulation of colloidal particles.
 
     This dataclass can be written to and read from a yaml file. The yaml file contains the parameters as key-value
     pairs. Any OpenMM quantities are converted to Quantity objects that can be represented in a readable way in the
@@ -22,31 +22,49 @@ class RunParameters(Parameters):
     (see https://doi.org/10.1038/s41586-020-2205-0). Any references to equations or symbols in the code refer to this
     paper.
 
+    The initial configuration must be a single frame in a gsd file, and the filename must end with the ".gsd" extension
+    (see https://gsd.readthedocs.io/en/stable/python-module-gsd.hoomd.html). The following attributes of the frame are
+    used during the simulation:
+
+    - frame.particles.N -> Total number of particles in the frame (including colloids, substrate, snowman heads, etc.).
+    - frame.particles.position -> Positions of all particles in the frame.
+    - frame.particles.types -> Possible types of all particles in the frame.
+    - frame.particles.typeid -> Type index within the frame.particles.types tuple of each particle in the frame.
+    - frame.particles.diameter -> Diameter in nanometer of each particle in the frame that is used to infer the radius.
+    - frame.particles.charge -> Surface potential in millivolt of each particle in the frame.
+    - frame.particles.mass -> Mass in atomic mass units of each particle in the frame. A zero mass signals non-mobile
+                              particles and are interpreted as the substrate.
+    - frame.configuration.box -> Box dimensions of the frame. The first three entries are the box lengths in x, y, and z
+                                 directions in nanometers. The next three entries are the tilt factors xy, xz, and yz.
+    - frame.bonds.N -> Total number of fixed bonds in the frame.
+    - frame.bonds.types -> Possible types of all fixed bonds in the frame.
+    - frame.bonds.typeid -> Type index within the frame.bonds.types tuple of each fixed bond in the frame.
+    - frame.bonds.group -> Indices of the two particles that are connected by each fixed bond in the frame.
+
+    Note that gsd files can, in principle, store constraints directly in the frame.constraints attribute. However,
+    we store them in the frame.bonds attribute since Ovito ignores the frame.constraints attribute. This means that
+    one has to manually store the constraint distances. This is done by storing the bond distances in a separate
+    constraints file. The constraints file must contain two columns. The first column contains the bond name within the
+    frame.bonds.types tuple of the initial configuration. The second column contains the bond distance in nanometers.
+
+    TODO: Finish sentence, also store velocities in gsd file, add frame index argument.
+
     :param initial_configuration:
-        The path to the initial configuration of the system in an xyz file.
-        The filename must end with ".xyz".
-        Defaults to "colloids/tests/first_frame.xyz".
+        The path to the initial configuration of the system in a gsd file.
+        The filename must end with ".gsd".
+        Defaults to "initial_configuration.gsd".
     :type initial_configuration: str
-    :param masses:
-        The masses of the different types of colloidal particles that appear in the initial configuration file.
-        The keys of the dictionary are the types of the colloidal particles and the values are the masses.
-        The unit of the masses must be compatible with atomic mass units and the values must be greater than zero,
-        except for immobile particles (as the substrate), which should have a mass of zero.
-        Defaults to {"P": 1.0 * unit.amu, "N": (95.0 / 105.0) ** 3 * unit.amu}.
-    :type masses: dict[str, unit.Quantity]
-    :param radii:
-        The radii of the different types of colloidal particles that appear in the initial configuration file.
-        The keys of the dictionary are the types of the colloidal particles and the values are the radii.
-        The unit of the radii must be compatible with nanometers and the values must be greater than zero.
-        Defaults to {"P": 105.0 * (unit.nano * unit.meter), "N": 95.0 * (unit.nano * unit.meter)}.
-    :type radii: dict[str, unit.Quantity]
-    :param surface_potentials:
-        The surface potentials of the different types of colloidal particles that appear in the initial configuration
-        file.
-        The keys of the dictionary are the types of the colloidal particles and the values are the surface potentials.
-        The unit of the surface potentials must be compatible with millivolts.
-        Defaults to {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)}.
-    :type surface_potentials: dict[str, unit.Quantity]
+    :param constraints:
+        The path to the constraints file that contains the bond distances of the fixed bonds in the system.
+        The filename must end with ".txt".
+        If None, no constraints are used.
+        Defaults to None.
+    :type constraints: Optional[str]
+    :param frame_index:
+        The index of the frame in the gsd file that is used as the initial configuration.
+        It is also possible to use negative indices to count from the end of the file.
+        Defaults to -1 (i.e., the last frame in the file).
+    :type frame_index: int
     :param platform_name:
         The name of the platform to use for the simulation.
         Defaults to "Reference". Other possible choices are "CPU", "CUDA", or "OpenCL".
@@ -153,12 +171,6 @@ class RunParameters(Parameters):
         The filename must end with ".gsd".
         Defaults to "final_frame.gsd".
     :type final_configuration_gsd_filename: Optional[str]
-    :param final_configuration_xyz_filename:
-        The name of the xyz file to which the final configuration is written.
-        If None, the final configuration is not written to an xyz file.
-        The filename must end with ".xyz".
-        Defaults to "final_frame.xyz".
-    :type final_configuration_xyz_filename: Optional[str]
     :param wall_directions:
         A list of three booleans indicating whether the walls in the x, y, and z directions are active for
         closed-wall simulations with shifted Lennard-Jones potential walls.
@@ -230,43 +242,6 @@ class RunParameters(Parameters):
         and an append_file boolean that should not appear in this dictionary.
         Defaults to None.
     :type update_reporter_parameters: Optional[dict[str, Any]]
-    :param use_substrate:
-        A boolean indicating whether to use a substrate at the bottom of the simulation box.
-        A substrate can only be used when all walls are active. The bottom wall is then replaced by the substrate.
-        If True, the substrate radius and the substrate potential depth must be specified.
-        A substrate can only be used with the algebraic colloid potentials (use_tabulated=False).
-        Defaults to False.
-    :type use_substrate: bool
-    :param substrate_type:
-        The type of the substrate that is used at the bottom of the simulation box.
-        If a substrate is used, the substrate type must not be None and it must appear in the radii, masses, and
-        surface_potentials dictionaries.
-        Defaults to None.
-    :type substrate_type: Optional[str]
-    :param use_snowman:
-        A boolean indicating whether to use the snowman colloids in the simulation.
-        In a snowman colloid, a colloidal head particle is attached to a colloidal base particle at a fixed distance.
-        If True, the snowman bond types, the snowman distances, and optionally the snowman seed must be specified.
-        Defaults to False.
-    :type use_snowman: bool
-    :param snowman_seed:
-        The seed for the random number generator that is used to sample the positions of the snowman heads.
-        If zero or smaller than zero, the positions of the snowman heads are not randomized.
-        If None, a random seed is used.
-        Defaults to None.
-    :type snowman_seed: Optional[int]
-    :param snowman_bond_types:
-        Dictionary mapping from the type of the base particle to the type of the head particle in the snowman colloid.
-        Snowman heads are attached to every base particle type in this dictionary.
-        Every snowman head type must appear in the masses, radii, and surface potentials dictionaries.
-        Defaults to None.
-    :type snowman_bond_types: Optional[dict[str, str]]
-    :param snowman_distances:
-        Dictionary mapping from the type of the base particle to the desired distance to the snowman head.
-        Every type appearing in the snowman bond types dictionary must have a corresponding distance in this dictionary.
-        The unit of every distance must be compatible with nanometers and the value must be greater than zero.
-        Defaults to None.
-    :type snowman_distances: Optional[dict[str, unit.Quantity]]
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -274,13 +249,9 @@ class RunParameters(Parameters):
         If any of the parameters has an invalid value.
     """
 
-    initial_configuration: str = "colloids/tests/first_frame.xyz"
-    masses: dict[str, unit.Quantity] = field(
-        default_factory=lambda: {"P": 1.0 * unit.amu, "N": (95.0 / 105.0) ** 3 * unit.amu})
-    radii: dict[str, unit.Quantity] = field(
-        default_factory=lambda: {"P": 105.0 * (unit.nano * unit.meter), "N": 95.0 * (unit.nano * unit.meter)})
-    surface_potentials: dict[str, unit.Quantity] = field(
-        default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
+    initial_configuration: str = "initial_configuration.gsd"
+    constraints: Optional[str] = None
+    frame_index: int = -1
     platform_name: str = "Reference"
     potential_temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
     integrator: str = "LangevinIntegrator"
@@ -308,7 +279,6 @@ class RunParameters(Parameters):
     checkpoint_filename: str = "checkpoint.chk"
     minimize_energy_initially: bool = False
     final_configuration_gsd_filename: Optional[str] = "final_frame.gsd"
-    final_configuration_xyz_filename: Optional[str] = "final_frame.xyz"
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
@@ -321,44 +291,13 @@ class RunParameters(Parameters):
     particle_density: Optional[unit.Quantity] = None
     update_reporter: Optional[str] = None
     update_reporter_parameters: Optional[dict[str, Any]] = None
-    use_substrate: bool = False
-    substrate_type: Optional[str] = None
-    use_snowman: bool = False
-    snowman_seed: Optional[int] = None
-    snowman_bond_types: Optional[dict[str, str]] = None
-    snowman_distances: Optional[dict[str, unit.Quantity]] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
-        if not (self.initial_configuration.endswith(".xyz") or self.initial_configuration.endswith(".gsd")):
-            raise ValueError("The filename of the initial configuration must end with '.xyz' or '.gsd'.")
-        for t in self.masses:
-            if not self.masses[t].unit.is_compatible(unit.amu):
-                raise TypeError(f"Mass of type {t} must have a unit compatible with atomic mass units.")
-            if self.masses[t] < 0.0 * unit.amu:
-                raise ValueError(f"Mass of type {t} must be greater than zero.")
-            if t != self.substrate_type and self.masses[t] == 0.0 * unit.amu:
-                raise ValueError(f"Mass of type {t} must be greater than zero unless it is the substrate.")
-            if t not in self.radii:
-                raise ValueError(f"Type {t} of the masses dictionary is not in radii dictionary.")
-            if t not in self.surface_potentials:
-                raise ValueError(f"Type {t} of the masses dictionary is not in surface potentials dictionary.")
-        for t in self.radii:
-            if not self.radii[t].unit.is_compatible(unit.nano * unit.meter):
-                raise TypeError(f"Radius of type {t} must have a unit compatible with nanometers.")
-            if self.radii[t] <= 0.0 * (unit.nano * unit.meter):
-                raise ValueError(f"Radius of type {t} must be greater than zero.")
-            if t not in self.masses:
-                raise ValueError(f"Type {t} of the radii dictionary is not in masses dictionary.")
-            if t not in self.surface_potentials:
-                raise ValueError(f"Type {t} of the radii dictionary is not in surface potentials dictionary.")
-        for t in self.surface_potentials:
-            if not self.surface_potentials[t].unit.is_compatible(unit.milli * unit.volt):
-                raise TypeError(f"Surface potential of type {t} must have a unit compatible with millivolts.")
-            if t not in self.masses:
-                raise ValueError(f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
-            if t not in self.radii:
-                raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
+        if not self.initial_configuration.endswith(".gsd"):
+            raise ValueError("The filename of the initial configuration must end with '.gsd'.")
+        if self.constraints is not None and not self.constraints.endswith(".txt"):
+            raise ValueError("The filename of the constraints file must end with '.txt'.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
         possible_integrators = [name for name, _ in inspect.getmembers(integrators, inspect.isfunction)]
@@ -409,9 +348,6 @@ class RunParameters(Parameters):
         if (self.final_configuration_gsd_filename is not None
                 and not self.final_configuration_gsd_filename.endswith(".gsd")):
             raise ValueError("The filename of the final configuration must end with '.gsd'.")
-        if (self.final_configuration_xyz_filename is not None
-                and not self.final_configuration_xyz_filename.endswith(".xyz")):
-            raise ValueError("The filename of the final configuration must end with '.xyz'.")
         if isinstance(self.wall_directions, str):
             raise ValueError("Wall directions was parsed as a string although it should be a list of bools. "
                              "Make sure that the yaml file is correctly formatted and that there is space after each "
@@ -503,93 +439,8 @@ class RunParameters(Parameters):
         if self.use_substrate:
             if not all(self.wall_directions):
                 raise ValueError("A substrate can only be used if all walls are active.")
-            if self.substrate_type is None:
-                raise ValueError("The substrate type must be specified if a substrate is used.")
-            if self.substrate_type not in self.radii:
-                raise ValueError("The substrate type must be in the radii dictionary.")
-            if self.substrate_type not in self.masses:
-                raise ValueError("The substrate type must be in the masses dictionary.")
-            if self.substrate_type not in self.surface_potentials:
-                raise ValueError("The substrate type must be in the surface potentials dictionary.")
-            if self.masses[self.substrate_type] != 0.0 * unit.amu:
-                warnings.warn("The mass of the substrate type is not zero. Substrate will move during the simulation.")
             if self.use_tabulated:
                 raise ValueError("A substrate can only be used with the algebraic colloid potentials.")
-        else:
-            if self.substrate_type is not None:
-                raise ValueError("The substrate type must not be specified if a substrate is not used.")
-        if self.use_snowman:
-            if self.snowman_bond_types is None:
-                raise ValueError("Snowman bond types must be specified if snowman is on.")
-            if self.snowman_distances is None:
-                raise ValueError("Snowman distances must be specified if snowman is on.")
-            for t in self.snowman_bond_types:
-                st = self.snowman_bond_types[t]
-                if st not in self.masses:
-                    raise ValueError(f"Type {st} of the snowman bond types dictionary is not in masses dictionary.")
-                if st not in self.radii:
-                    raise ValueError(f"Type {st} of the snowman bond types dictionary is not in radii dictionary.")
-                if st not in self.surface_potentials:
-                    raise ValueError(f"Type {st} of the snowman bond types dictionary is not in surface potentials "
-                                     f"dictionary.")
-                if t not in self.snowman_distances:
-                    raise ValueError(f"Type {t} of the snowman bond types dictionary is not in snowman distances "
-                                     f"dictionary.")
-            for t in self.snowman_distances:
-                if t not in self.snowman_bond_types:
-                    raise ValueError(f"Type {t} of the snowman distances dictionary is not in snowman bond types "
-                                     f"dictionary.")
-                if not self.snowman_distances[t].unit.is_compatible(unit.nano * unit.meter):
-                    raise TypeError(f"Distance of type {t} must have a unit compatible with nanometers.")
-                if self.snowman_distances[t] <= 0.0 * (unit.nano * unit.meter):
-                    raise ValueError(f"Distance of type {t} must be greater than zero.")
-        else:
-            if self.snowman_bond_types is not None:
-                raise ValueError("Snowman bond types must not be specified if snowman is not on.")
-            if self.snowman_distances is not None:
-                raise ValueError("Snowman distances must not be specified if snowman is not on.")
-            if self.snowman_seed is not None:
-                raise ValueError("Snowman seed must not be specified if snowman is not on.")
-
-    def check_types_of_initial_configuration(self):
-        """
-        Check if the types of the initial configuration are consistent with the masses, radii, and surface-potentials
-        dictionaries.
-
-        :raises ValueError:
-            If the types of the initial configuration are not consistent with the masses, radii, and surface-potentials
-            dictionaries.
-        """
-        types_from_file, _, _ = read_initial_file(self.initial_configuration)
-        types = list(dict.fromkeys(types_from_file))
-        for t in types:
-            if t not in self.masses:
-                raise ValueError(f"Type {t} of the initial configuration is not in masses dictionary.")
-            if t not in self.radii:
-                raise ValueError(f"Type {t} of the initial configuration is not in radii dictionary.")
-            if t not in self.surface_potentials:
-                raise ValueError(f"Type {t} of the initial configuration is not in surface potentials dictionary.")
-        for t in self.masses:
-            if t not in types:
-                if t == self.substrate_type:
-                    continue
-                if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
-                    continue
-                raise ValueError(f"Type {t} of the masses dictionary is not in the initial configuration.")
-        for t in self.radii:
-            if t not in types:
-                if t == self.substrate_type:
-                    continue
-                if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
-                    continue
-                raise ValueError(f"Type {t} of the radii dictionary is not in the initial configuration.")
-        for t in self.surface_potentials:
-            if t not in types:
-                if t == self.substrate_type:
-                    continue
-                if self.snowman_bond_types is not None and t in self.snowman_bond_types.values():
-                    continue
-                raise ValueError(f"Type {t} of the surface potentials dictionary is not in the initial configuration.")
 
 
 if __name__ == '__main__':

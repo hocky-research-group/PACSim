@@ -1,5 +1,3 @@
-from math import acos, cos, pi, sin, sqrt
-from typing import Iterator
 import ase.data
 import ase.io
 import ase.symbols
@@ -9,7 +7,6 @@ import numpy.typing as npt
 import openmm
 from openmm import app
 from openmm import unit
-from scipy.spatial.transform import Rotation
 
 
 def read_initial_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[float]):
@@ -41,7 +38,7 @@ def read_gsd_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[
         if len(f) != 1:
             raise ValueError("The GSD file must contain exactly one frame.")
         frame = f[0]
-        cell = np.zeros((3, 3))
+        cell = np.zeros((3, 3), dtype=np.float64)
         cell[0][0] = frame.configuration.box[0]
         cell[1][1] = frame.configuration.box[1]
         cell[2][2] = frame.configuration.box[2]
@@ -55,6 +52,8 @@ def read_gsd_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[
 # noinspection PyUnresolvedReferences
 def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict: dict[str, unit.Quantity],
                    surface_potentials_dict: dict[str, unit.Quantity], cell: npt.NDArray[unit.Quantity]) -> None:
+    # TODO: WRITE VELOCITIES
+
     nanometer = unit.nano * unit.meter
     millivolt = unit.milli * unit.volt
 
@@ -152,19 +151,6 @@ def write_xyz_file_from_gsd_frame(filename: str, gsd_frame: gsd.hoomd.Frame) -> 
             position = gsd_frame.particles.position[index, :]
             t = gsd_frame.particles.types[gsd_frame.particles.typeid[index]]
             print(f"{t} {position[0]} {position[1]} {position[2]}", file=file)
-
-
-def generate_fibonacci_sphere_grid_points(number_points: int, radius: float,
-                                          random_rotation: bool) -> Iterator[npt.NDArray[np.floating]]:
-    # See https://extremelearning.com.au/how-to-evenly-distribute-points-on-a-sphere-more-effectively-than-the-canonical-fibonacci-lattice/
-    # Output, real xgB(3,ng): the grid points.
-    golden_ratio = (1.0 + sqrt(5.0)) / 2.0
-    epsilon = 0.36
-    random_rotation = Rotation.random() if random_rotation else Rotation.identity()
-    for i in range(number_points):
-        theta = 2.0 * pi * i / golden_ratio
-        phi = acos(1.0 - 2.0 * (i + epsilon) / (number_points - 1.0 + 2.0 * epsilon))
-        yield random_rotation.apply([cos(theta) * sin(phi) * radius, sin(theta) * sin(phi) * radius, cos(phi) * radius])
 
 
 def main() -> None:

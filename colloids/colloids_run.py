@@ -13,7 +13,7 @@ from openmm import unit
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
                       ShiftedLennardJonesWalls, DepletionPotential, Gravity)
 from colloids.gsd_reporter import GSDReporter
-from colloids.helper_functions import (generate_fibonacci_sphere_grid_points, read_initial_file, write_gsd_file,
+from colloids.helper_functions import (generate_fibonacci_sphere_grid_points, read_gsd_file, write_gsd_file,
                                        write_xyz_file)
 import colloids.integrators as integrators
 from colloids.run_parameters import RunParameters
@@ -399,7 +399,7 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
     parameters = RunParameters.from_yaml(args.yaml_file)
     parameters.check_types_of_initial_configuration()
 
-    types, positions, cell = read_initial_file(parameters.initial_configuration)
+    types, positions, cell = read_gsd_file(parameters.initial_configuration)
 
     simulation, extra_positions = set_up_simulation(parameters, types, cell, positions)
 

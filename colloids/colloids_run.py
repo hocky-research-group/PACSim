@@ -366,7 +366,8 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
                                             parameters.radii, parameters.surface_potentials, simulation,
                                             append_file=append_file,
                                             cell=cell * (unit.nano * unit.meter)))
-    simulation.reporters.append(StatusReporter(max(1, total_number_steps // 100), total_number_steps))
+    simulation.reporters.append(StatusReporter(max(1, total_number_steps // 100), total_number_steps,
+                                               desc="Production"))
     simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
                                                       parameters.state_data_interval, time=True,
                                                       kineticEnergy=True, potentialEnergy=True, temperature=True,
@@ -416,6 +417,15 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
         # Add reporter during minimization?
         # See https://openmm.github.io/openmm-cookbook/dev/notebooks/cookbook/report_minimization.html
         simulation.minimizeEnergy()
+
+    if parameters.equilibration_steps > 0:
+        simulation.reporters.append(StatusReporter(
+            max(1, parameters.equilibration_steps // 100), parameters.equilibration_steps, desc="Equilibration"))
+        simulation.step(parameters.equilibration_steps)
+        simulation.reporters = []
+
+    # Reset the current step to zero after the equilibration.
+    simulation.currentStep = 0
 
     set_up_reporters(parameters, simulation, False, parameters.run_steps, cell)
 

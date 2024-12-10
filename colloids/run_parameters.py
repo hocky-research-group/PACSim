@@ -108,6 +108,12 @@ class RunParameters(Parameters):
         If None, a random seed is used.
         Defaults to None.
     :type velocity_seed: Optional[int]
+    :param equilibration_steps:
+        The number of time steps to equilibrate the system before the production run.
+        During the equilibration run, no data is written.
+        The number of time steps must be greater than or equal to zero.
+        Defaults to 0.
+    :type equilibration_steps: int
     :param run_steps:
         The number of time steps to run the simulation.
         The number of time steps must be greater than zero.
@@ -299,6 +305,7 @@ class RunParameters(Parameters):
     use_log: bool = False
     use_tabulated: bool = False
     velocity_seed: Optional[int] = None
+    equilibration_steps: int = 0
     run_steps: int = 100
     state_data_interval: int = 100
     state_data_filename: str = "state_data.csv"
@@ -390,6 +397,8 @@ class RunParameters(Parameters):
             raise ValueError("The Debye length must be greater than zero.")
         if self.dielectric_constant <= 0.0:
             raise ValueError("The dielectric constant must be greater than zero.")
+        if self.equilibration_steps < 0:
+            raise ValueError("The number of equilibration steps must be greater than or equal to zero.")
         if self.run_steps == 0:
             warnings.warn("The number of time steps is zero.")
         if self.run_steps < 0:

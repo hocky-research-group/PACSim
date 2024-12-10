@@ -132,10 +132,11 @@ class SnowmanOrientationRMSDPlotter(Plotter):
 
                     fig = plt.figure()
                     for body_index, snowman_body in enumerate(snowman_body_group):
-                        plt.plot(mean_square_rotations[body_index], color="C0", alpha=0.01)
+                        plt.plot(mean_square_rotations[body_index], color="C0", alpha=0.1)
                     full_mean_square_rotations[snowman_body_type + ", " + rp.label] = np.mean(
                         np.array(mean_square_rotations), axis=0)
-                    plt.plot(full_mean_square_rotations[snowman_body_type + ", " + rp.label], color="C1")
+                    plt.plot(full_mean_square_rotations[snowman_body_type + ", " + rp.label], color="C1",
+                             marker=".")
                     plt.title(f"{rp.label}, Snowman body type: {snowman_body_type}")
                     plt.xlabel(r"$\Delta t$")
                     plt.ylabel(r"$\langle \theta^2 \rangle$")
@@ -145,7 +146,7 @@ class SnowmanOrientationRMSDPlotter(Plotter):
 
             fig = plt.figure()
             for label, msr in full_mean_square_rotations.items():
-                plt.plot(msr, label=label)
+                plt.plot(msr, label=label, marker=".")
             plt.xlabel(r"$\Delta t$")
             plt.ylabel(r"$\langle \theta^2 \rangle$")
             plt.legend()
@@ -155,7 +156,7 @@ class SnowmanOrientationRMSDPlotter(Plotter):
 
             fig = plt.figure()
             for label, msr in full_mean_square_rotations.items():
-                plt.plot(msr, label=label)
+                plt.plot(msr, label=label, marker=".")
             plt.xlabel(r"$\Delta t$")
             plt.ylabel(r"$\langle \theta^2 \rangle$")
             plt.xscale("log")

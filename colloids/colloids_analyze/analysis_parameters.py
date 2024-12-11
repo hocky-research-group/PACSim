@@ -25,3 +25,5 @@ class AnalysisParameters(Parameters):
     snowman_orientation_distribution_animator_parameters: Optional[dict[str, Any]] = None
     plot_snowman_orientation_rmsd: bool = False
     snowman_orientation_rmsd_parameters: Optional[dict[str, Any]] = None
+    plot_snowman_orientation_correlation: bool = False
+    snowman_orientation_correlation_parameters: Optional[dict[str, Any]] = None

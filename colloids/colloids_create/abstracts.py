@@ -13,7 +13,7 @@ class ConfigurationGenerator(ABC):
         pass
 
     @abstractmethod
-    def generate_configuration(self) -> (Frame, dict[str, float]):
+    def generate_configuration(self) -> tuple[Frame, list[tuple[int, int]]]:
         """
         Generate the initial positions of the colloids in a gsd.hoomd.Frame instance together with constraints.
 

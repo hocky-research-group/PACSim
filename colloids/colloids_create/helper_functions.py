@@ -130,7 +130,7 @@ def get_constraint_dict(cluster_specifications: dict[str, dict[str, Union[str, l
 
     return constraints
 
-def get_constrain_map(cluster_numbers: npt.NDArray[np.int32]) -> list[npt.NDArray[np.int32]]:
+def get_constraint_map(cluster_numbers: npt.NDArray[np.int32]) -> list[npt.NDArray[np.int32]]:
     """
     Get the constraint map for the clusters.
 

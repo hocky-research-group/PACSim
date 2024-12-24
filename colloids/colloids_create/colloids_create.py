@@ -114,9 +114,9 @@ def main():
     if not run_parameters.initial_configuration.endswith(".gsd"):
         raise ValueError("The initial configuration must have the .gsd extension.")
 
-    if configuration_parameters.use_snowman:
+    if configuration_parameters.use_cluster:
         if run_parameters.constraints is None:
-            raise ValueError("Snowmen require a filename where the constraints can be stored.")
+            raise ValueError("Clusters require a filename where the constraints can be stored.")
         if not run_parameters.constraints.endswith(".txt"):
             raise ValueError("The constraints file must have the .txt extension.")
 

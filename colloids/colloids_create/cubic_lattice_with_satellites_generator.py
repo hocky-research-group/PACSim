@@ -140,7 +140,7 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         self._colloid_radii = colloid_radii
         self._random_rotation = random_rotation
 
-    def generate_configuration(self) -> (Frame, list[tuple[int, int]]):
+    def generate_configuration(self) -> tuple[Frame, list[tuple[int]]]:
         # Create the lattice.
         positions, intracluster_ids, colloid_types, cluster_ids, cluster_numbers = build_positions(self._total_clusters, self._lattice_constant, 
                                                                                   self._cluster_order, self._cluster_specifications, random_rotation=self._random_rotation)
@@ -185,14 +185,17 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         frame.particles.position = atoms.positions.astype(np.float32)
         frame.particles.N = len(atoms)
 
+        self.atoms = atoms
+
+        return frame, list(zip(intracluster_ids, cluster_ids, cluster_numbers))
+
     def write_positions(self) -> None:
         # Save positions as xyz
         with open("positions.xyz", "w") as f:
-            f.write(f"{len(atoms)}\n")
+            f.write(f"{len(self.atoms)}\n")
             f.write("Lattice\n")
-            for i, atom in enumerate(atoms):
+            for i, atom in enumerate(self.atoms):
                 f.write(f"{atom.symbol} {atom.position[0]} {atom.position[1]} {atom.position[2]}\n")
-        return frame, list(zip(intracluster_ids, cluster_ids, cluster_numbers))
 
 if __name__ == "__main__":
     lattice = CubicLattice.SC

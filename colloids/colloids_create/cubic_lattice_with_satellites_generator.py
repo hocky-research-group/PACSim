@@ -6,7 +6,7 @@ import numpy as np
 import warnings
 from openmm import unit
 from colloids.colloids_create import ConfigurationGenerator
-from colloids.colloids_create.helper_functions import build_positions, get_constraint_dict, get_constraint_map
+from colloids.colloids_create.helper_functions import build_positions, get_constraint_dict, get_constraint_map, get_constraint_dists
 
 
 class CubicLattice(Enum):
@@ -142,7 +142,7 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
 
     def generate_configuration(self) -> tuple[Frame, list[tuple[int]]]:
         # Create the lattice.
-        positions, intracluster_ids, colloid_types, cluster_ids, cluster_numbers = build_positions(self._total_clusters, self._lattice_constant, 
+        positions, intracluster_ids, colloid_types, cluster_ids, cluster_numbers, cluster_id_dict = build_positions(self._total_clusters, self._lattice_constant, 
                                                                                   self._cluster_order, self._cluster_specifications, random_rotation=self._random_rotation)
         # Tags are a linear combination of the intracluster ids, the cluster ids, and the cluster numbers. They can 
         # be decomposed into the intracluster ids by taking the floor after dividing by number of cluster types times the
@@ -160,6 +160,7 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
 
         constraint_dist_dict = get_constraint_dict(self._cluster_specifications)
         constraint_map = get_constraint_map(cluster_numbers)
+        constraint_dists = get_constraint_dists(constraint_map, constraint_dist_dict, cluster_ids)
 
         masses = [self.masses[identity] for identity in colloid_types]
         atoms = Atoms(symbols=["X"] * len(tags), positions=positions.tolist(), tags=tags.tolist(), masses=masses)
@@ -187,7 +188,7 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
 
         self.atoms = atoms
 
-        return frame, list(zip(intracluster_ids, cluster_ids, cluster_numbers))
+        return frame, list(zip(intracluster_ids, cluster_ids, cluster_numbers, constraint_map, constraint_dists))
 
     def write_positions(self) -> None:
         # Save positions as xyz

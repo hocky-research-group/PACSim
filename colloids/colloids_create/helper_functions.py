@@ -7,7 +7,7 @@ from math import ceil
 from typing import Union
 from openmm import unit
 
-
+# these should all be moved to class functions of generate_colloids since they are very interconnected
 def build_positions(n_clusters: Union[int, tuple[int]], lattice_constant: tuple[float], cluster_order: list[str], 
                     cluster_specifications: dict[str, dict[str, Union[str, list[list[float]]]]], 
                     random_rotation: bool = False) -> npt.NDArray[np.floating]:
@@ -107,7 +107,7 @@ def build_positions(n_clusters: Union[int, tuple[int]], lattice_constant: tuple[
         if cluster_index == n_clusters:
             break
         
-    return positions, intracluster_ids, colloid_types, cluster_ids, cluster_numbers
+    return positions, intracluster_ids, colloid_types, cluster_ids, cluster_numbers, cluster_id_dict
 
 def get_constraint_dict(cluster_specifications: dict[str, dict[str, Union[str, list[list[float]]]]]) -> dict[str, dict[int, npt.NDArray[np.floating]]]:
     """
@@ -148,3 +148,21 @@ def get_constraint_map(cluster_numbers: npt.NDArray[np.int32]) -> list[npt.NDArr
         constraint_map.append(in_cluster)
 
     return constraint_map
+
+def get_constraint_dists(constraint_map: list[npt.NDArray[np.int32]], 
+                         constraint_dist_dict: dict[str, dict[int, npt.NDArray[np.floating]]], 
+                         cluster_ids: npt.NDArray[np.int32],
+                         intracluster_ids: npt.NDArray[np.int32],
+                         cluster_id_dict: dict[str, int]
+                         ) -> list[npt.NDArray[np.floating]]:
+    constraint_dists = []
+
+    for i in range(len(constraint_map)):
+        cluster_id = cluster_ids[i]
+        intracluster_id = intracluster_ids[i]
+        
+        # the distances between colloids in the cluster type specified by the cluster_id and containing the colloid specified by intracluster_id
+        dists = constraint_dist_dict[cluster_id_dict[cluster_id]][intracluster_id]
+        constraint_dists.append(dists)
+
+    return constraint_dists

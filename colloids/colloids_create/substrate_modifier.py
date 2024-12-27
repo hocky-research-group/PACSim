@@ -106,7 +106,7 @@ class SubstrateModifier(ConfigurationModifier):
 
         return np.array(substrate_positions)
 
-    def modify_configuration(self, frame: Frame, constraints: dict[str, float]) -> None:
+    def modify_configuration(self, frame: Frame) -> None:
         """
         Modify the given configuration and constraints in-place by adding a substrate.
 
@@ -115,8 +115,6 @@ class SubstrateModifier(ConfigurationModifier):
         - frame.particles.position
         - frame.particles.types
         - frame.particles.typeid
-
-        This method does not modify the constraints dictionary.
 
         :param frame:
             The frame to modify.

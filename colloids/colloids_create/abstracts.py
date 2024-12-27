@@ -13,7 +13,7 @@ class ConfigurationGenerator(ABC):
         pass
 
     @abstractmethod
-    def generate_configuration(self) -> (Frame, dict[str, float]):
+    def generate_configuration(self) -> Frame:
         """
         Generate the initial positions of the colloids in a gsd.hoomd.Frame instance together with constraints.
 
@@ -23,10 +23,9 @@ class ConfigurationGenerator(ABC):
         - frame.particles.types
         - frame.particles.typeid
         - frame.configuration.box
-        - frame.bonds.N (optionally if bonds are present)
-        - frame.bonds.types (optionally if bonds are present)
-        - frame.bonds.typeid (optionally if bonds are present)
-        - frame.bonds.group (optionally if bonds are present)
+        - frame.constraints.N (optionally if constraints are present)
+        - frame.constraints.value (optionally if constraints are present)
+        - frame.constraints.group (optionally if constraints are present)
 
         The generated frame should not populate the following attributes:
         - frame.particles.type_shapes
@@ -34,12 +33,9 @@ class ConfigurationGenerator(ABC):
         - frame.particles.charge
         - frame.particles.mass attributes
 
-        This method can generate constraints in addition to the positions of the colloids. The constraints should be
-        returned as a dictionary mapping from the bond type to a constraint distance in nanometers.
-
         :return:
-            The initial configuration of the colloids, the constraints.
-        :rtype: gsd.hoomd.Frame, dict[str, float]
+            The initial configuration of the colloids.
+        :rtype: gsd.hoomd.Frame
         """
         raise NotImplementedError
 
@@ -55,7 +51,7 @@ class ConfigurationModifier(ABC):
         pass
 
     @abstractmethod
-    def modify_configuration(self, frame: Frame, constraints: dict[str, float]) -> None:
+    def modify_configuration(self, frame: Frame) -> None:
         """
         Modify the given configuration and constraints in-place (for instance, by adding a substrate).
 
@@ -65,10 +61,9 @@ class ConfigurationModifier(ABC):
         - frame.particles.types
         - frame.particles.typeid
         - frame.configuration.box
-        - frame.bonds.N (optionally if bonds are present)
-        - frame.bonds.types (optionally if bonds are present)
-        - frame.bonds.typeid (optionally if bonds are present)
-        - frame.bonds.group (optionally if bonds are present)
+        - frame.constraints.N (optionally if constraints are present)
+        - frame.constraints.value (optionally if constraints are present)
+        - frame.constraints.group (optionally if constraints are present)
 
         The overloading method should not modify the following attributes of the given frame:
         - frame.particles.type_shapes
@@ -76,14 +71,8 @@ class ConfigurationModifier(ABC):
         - frame.particles.charge
         - frame.particles.mass attributes
 
-        This method should only add (and not overwrite) constraints to the dictionary mapping from the bond type to a
-        constraint distance in nanometers.
-
         :param frame:
             The frame to modify.
         :type frame: gsd.hoomd.Frame
-        :param constraints:
-            The constraints to modify.
-        :type constraints: dict[str, float]
         """
         raise NotImplementedError

@@ -114,12 +114,6 @@ def main():
     if not run_parameters.initial_configuration.endswith(".gsd"):
         raise ValueError("The initial configuration must have the .gsd extension.")
 
-    if configuration_parameters.use_snowman:
-        if run_parameters.constraints is None:
-            raise ValueError("Snowmen require a filename where the constraints can be stored.")
-        if not run_parameters.constraints.endswith(".txt"):
-            raise ValueError("The constraints file must have the .txt extension.")
-
     relevant_radii = {k: v for k, v in configuration_parameters.radii.items()
                       if k != configuration_parameters.substrate_type
                       and (k not in configuration_parameters.snowman_bond_types.values()
@@ -140,20 +134,20 @@ def main():
         CubicLattice.from_string(configuration_parameters.lattice_type),
         lattice_spacing, configuration_parameters.lattice_repeats, orbit_distance, padding_distance,
         configuration_parameters.satellites_per_center, radii[0][0], radii[1][0])
-    frame, constraints = generator.generate_configuration()
+    frame = generator.generate_configuration()
     _check_frame_changes(frame, generator.__class__.__name__)
 
     if configuration_parameters.use_substrate:
         substrate_modifier = SubstrateModifier(configuration_parameters.radii[configuration_parameters.substrate_type],
                                                configuration_parameters.substrate_type)
-        substrate_modifier.modify_configuration(frame, constraints)
+        substrate_modifier.modify_configuration(frame)
         _check_frame_changes(frame, substrate_modifier.__class__.__name__)
 
     if configuration_parameters.use_snowman:
         snowman_modifier = SnowmanModifier(configuration_parameters.snowman_bond_types,
                                            configuration_parameters.snowman_distances,
                                            configuration_parameters.snowman_seed)
-        snowman_modifier.modify_configuration(frame, constraints)
+        snowman_modifier.modify_configuration(frame)
         _check_frame_changes(frame, snowman_modifier.__class__.__name__)
 
     # Check if the frame has the necessary attributes.
@@ -173,11 +167,6 @@ def main():
 
     with gsd.hoomd.open(name=run_parameters.initial_configuration, mode="w") as f:
         f.append(frame)
-
-    with open(run_parameters.constraints, "w") as f:
-        print("# Bond type\tConstraint distance (nm)", file=f)
-        for bond_type, distance in constraints.items():
-            print(f"{bond_type}\t{distance}", file=f)
 
 
 if __name__ == '__main__':

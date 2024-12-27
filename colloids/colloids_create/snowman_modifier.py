@@ -60,7 +60,7 @@ class SnowmanModifier(ConfigurationModifier):
             if self._snowman_distances[t] <= 0.0 * self._nanometer:
                 raise ValueError(f"Distance of type {t} must be greater than zero.")
 
-    def modify_configuration(self, frame: gsd.hoomd.Frame, constraints: dict[str, float]) -> None:
+    def modify_configuration(self, frame: gsd.hoomd.Frame) -> None:
         """
         Modify the given configuration and constraints in-place by adding snowman heads.
 
@@ -69,20 +69,13 @@ class SnowmanModifier(ConfigurationModifier):
         - frame.particles.position
         - frame.particles.types
         - frame.particles.typeid
-        - frame.bonds.N
-        - frame.bonds.types
-        - frame.bonds.typeid
-        - frame.bonds.group
-
-        Adds the snowmen constraints to the dictionary mapping from the bond type to a constraint distance in
-        nanometers.
+        - frame.constraints.N
+        - frame.constraints.value
+        - frame.constraints.group
 
         :param frame:
             The frame to modify.
         :type frame: gsd.hoomd.Frame
-        :param constraints:
-            The constraints to modify.
-        :type constraints: dict[str, float]
 
         :raises ValueError:
             If a snowman body type is not in the given frame.
@@ -94,33 +87,25 @@ class SnowmanModifier(ConfigurationModifier):
         assert frame.particles.position is not None
         assert frame.particles.types is not None
         assert frame.particles.typeid is not None
-        if frame.bonds.types is None:
-            frame.bonds.types = []
-        if frame.bonds.typeid is None:
-            frame.bonds.typeid = np.array([], dtype=np.uint32)
-        if frame.bonds.group is None:
-            frame.bonds.group = np.empty((0, 2), dtype=np.uint32)
-        new_constraints = {}
+        if frame.constraints.value is None:
+            frame.constraints.value = np.array([], dtype=np.float32)
+        if frame.constraints.group is None:
+            frame.constraints.group = np.empty((0, 2), dtype=np.uint32)
+
         for body_type, head_type in self._snowman_bond_types.values():
             if body_type not in frame.particles.types:
                 raise ValueError(f"Type {body_type} of the snowman bond types dictionary is not in the given frame.")
             if head_type in frame.particles.types:
                 raise ValueError(f"Type {head_type} of the snowman bond types dictionary is already in the given "
                                  f"frame.")
-            if f"{body_type}-{head_type}" in constraints:
-                raise ValueError(f"Constraint for bond type {body_type}-{head_type} already exists.")
-            frame.bonds.types.append(f"{body_type}-{head_type}")
-            new_constraints[f"{body_type}-{head_type}"] = self._snowman_distances[body_type].value_in_unit(
-                self._nanometer)
-            bond_index = len(frame.bonds.types) - 1
             frame.particles.types = frame.particles.types + (head_type,)
             head_index = len(frame.particles.types) - 1
             body_type_index = frame.particles.types.index(body_type)
 
             new_positions = []
             new_type_ids = []
-            new_bond_type_ids = []
-            new_bond_groups = []
+            new_constraint_values = []
+            new_constraints = []
 
             for i, (body_position, type_index) in enumerate(zip(frame.particles.position, frame.particles.typeid)):
                 if type_index != body_type_index:
@@ -131,19 +116,17 @@ class SnowmanModifier(ConfigurationModifier):
                 assert norm(offset) - self._snowman_distances[body_type].value_in_unit(self._nanometer) < 1.0e-12
                 new_positions.append(body_position + offset)
                 new_type_ids.append(head_index)
-                new_bond_type_ids.append(bond_index)
-                new_bond_groups.append([i, frame.particles.N + len(new_positions) - 1])
+                new_constraint_values.append(self._snowman_distances[body_type].value_in_unit(self._nanometer))
+                new_constraints.append([i, frame.particles.N + len(new_positions) - 1])
 
             new_positions = np.array(new_positions, dtype=np.float32)
             new_type_ids = np.array(new_type_ids, dtype=np.uint32)
-            new_bond_type_ids = np.array(new_bond_type_ids, dtype=np.uint32)
-            new_bond_groups = np.array(new_bond_groups, dtype=np.uint32)
+            new_constraint_values = np.array(new_constraint_values, dtype=np.float32)
+            new_constraints = np.array(new_constraints, dtype=np.uint32)
 
             frame.particles.N += len(new_positions)
             frame.particles.position = np.concatenate((frame.particles.position, new_positions), axis=0)
             frame.particles.typeid = np.concatenate((frame.particles.typeid, new_type_ids), axis=0)
-            frame.bonds.N += len(new_bond_groups)
-            frame.bonds.typeid = np.concatenate((frame.bonds.typeid, new_bond_type_ids), axis=0)
-            frame.bonds.group = np.concatenate((frame.bonds.group, new_bond_groups), axis=0)
-
-            constraints.update(new_constraints)
+            frame.constraints.N += len(new_constraint_values)
+            frame.constraints.value = np.concatenate((frame.constraints.value, new_constraint_values), axis=0)
+            frame.constraints.group = np.concatenate((frame.constraints.group, new_constraints), axis=0)

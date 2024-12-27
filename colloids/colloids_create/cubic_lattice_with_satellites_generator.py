@@ -66,7 +66,7 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         self._type_lattice = type_lattice
         self._type_satellite = type_satellite
 
-    def generate_configuration(self) -> (Frame, dict[str, float]):
+    def generate_configuration(self) -> Frame:
         # Use X as the atom name to avoid a clash with an existing chemical symbol.
         atoms = build.bulk(name="X", crystalstructure=self._lattice.to_ase_string(),
                            a=self._lattice_constant.value_in_unit(self._nanometer),
@@ -108,5 +108,4 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         frame.configuration.box = np.array([atoms.cell[0][0], atoms.cell[1][1], atoms.cell[2][2],
                                             atoms.cell[1][0] / atoms.cell[1][1], atoms.cell[2][0] / atoms.cell[2][2],
                                             atoms.cell[2][1] / atoms.cell[2][2]], dtype=np.float32)
-        # No constraints are generated.
-        return frame, {}
+        return frame

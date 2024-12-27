@@ -36,30 +36,21 @@ class RunParameters(Parameters):
                               particles and are interpreted as the substrate.
     - frame.configuration.box -> Box dimensions of the frame. The first three entries are the box lengths in x, y, and z
                                  directions in nanometers. The next three entries are the tilt factors xy, xz, and yz.
-    - frame.bonds.N -> Total number of fixed bonds in the frame.
-    - frame.bonds.types -> Possible types of all fixed bonds in the frame.
-    - frame.bonds.typeid -> Type index within the frame.bonds.types tuple of each fixed bond in the frame.
-    - frame.bonds.group -> Indices of the two particles that are connected by each fixed bond in the frame.
+    - frame.constraints.N -> Total number of constraints in the frame.
+    - frame.constraints.value -> Constraint lengths in nanometers of all constraints in the frame.
+    - frame.constraints.group -> Particle pairs for all constraints in the frame.
 
-    Note that gsd files can, in principle, store constraints directly in the frame.constraints attribute. However,
-    we store them in the frame.bonds attribute since Ovito ignores the frame.constraints attribute. This means that
-    one has to manually store the constraint distances. This is done by storing the bond distances in a separate
-    constraints file. The constraints file must contain two columns. The first column contains the bond name within the
-    frame.bonds.types tuple of the initial configuration. The second column contains the bond distance in nanometers.
+    Note that gsd files can store constraints directly in the frame.constraints attribute. One has to be careful,
+    however, that Ovito ignores the frame.constraints attribute. This means that one has to manually store the
+    constraint distances into the GSD file once a gsd file is exported from Ovito
 
-    TODO: Finish sentence, also store velocities in gsd file, add frame index argument.
+    TODO: Also store velocities in gsd file, add frame index argument.
 
     :param initial_configuration:
         The path to the initial configuration of the system in a gsd file.
         The filename must end with ".gsd".
         Defaults to "initial_configuration.gsd".
     :type initial_configuration: str
-    :param constraints:
-        The path to the constraints file that contains the bond distances of the fixed bonds in the system.
-        The filename must end with ".txt".
-        If None, no constraints are used.
-        Defaults to None.
-    :type constraints: Optional[str]
     :param frame_index:
         The index of the frame in the gsd file that is used as the initial configuration.
         It is also possible to use negative indices to count from the end of the file.
@@ -250,7 +241,6 @@ class RunParameters(Parameters):
     """
 
     initial_configuration: str = "initial_configuration.gsd"
-    constraints: Optional[str] = None
     frame_index: int = -1
     platform_name: str = "Reference"
     potential_temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
@@ -296,8 +286,6 @@ class RunParameters(Parameters):
         """Check if the parameters are valid after initialization."""
         if not self.initial_configuration.endswith(".gsd"):
             raise ValueError("The filename of the initial configuration must end with '.gsd'.")
-        if self.constraints is not None and not self.constraints.endswith(".txt"):
-            raise ValueError("The filename of the constraints file must end with '.txt'.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
         possible_integrators = [name for name, _ in inspect.getmembers(integrators, inspect.isfunction)]

@@ -171,6 +171,10 @@ class RunParameters(Parameters):
         The filename must end with ".gsd".
         Defaults to "final_frame.gsd".
     :type final_configuration_gsd_filename: Optional[str]
+    :param use_clusters:
+        If True, the simulation uses clusters of colloids.
+        Defaults to False.
+    :type use_clusters: bool
     :param wall_directions:
         A list of three booleans indicating whether the walls in the x, y, and z directions are active for
         closed-wall simulations with shifted Lennard-Jones potential walls.
@@ -279,6 +283,8 @@ class RunParameters(Parameters):
     checkpoint_filename: str = "checkpoint.chk"
     minimize_energy_initially: bool = False
     final_configuration_gsd_filename: Optional[str] = "final_frame.gsd"
+    use_clusters: bool = False
+    constraints: Optional[str] = None
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
@@ -286,6 +292,8 @@ class RunParameters(Parameters):
     depletion_phi: Optional[float] = None
     depletant_radius: Optional[unit.Quantity] = None
     use_gravity: bool = False
+    use_substrate: bool = False
+    substrate_type: str = "S"
     gravitational_acceleration: Optional[unit.Quantity] = None
     water_density: Optional[unit.Quantity] = None
     particle_density: Optional[unit.Quantity] = None

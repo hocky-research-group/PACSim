@@ -36,7 +36,7 @@ class SubstrateModifier(ConfigurationModifier):
 
     @staticmethod
     def _generate_substrate_positions_hexagonal(substrate_radius: float,
-                                                box: npt.NDArray[float]) -> npt.NDArray[float]:
+                                                box: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """
         Generate the positions of the substrate particles in a hexagonal lattice at the bottom of the simulation box.
 

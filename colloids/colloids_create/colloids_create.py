@@ -4,9 +4,8 @@ import numpy as np
 from openmm import unit
 from colloids.run_parameters import RunParameters
 from colloids.colloids_create.configuration_parameters import ConfigurationParameters
-from colloids.colloids_create.cubic_lattice_with_satellites_generator import (CubicLattice,
-                                                                              CubicLatticeWithSatellitesGenerator)
-from colloids.colloids_create.snowman_modifier import SnowmanModifier
+from colloids.colloids_create.cluster_generator import (CubicLattice,
+                                                                              ClusterGenerator)
 from colloids.colloids_create.substrate_modifier import SubstrateModifier
 
 
@@ -114,52 +113,21 @@ def main():
     if not run_parameters.initial_configuration.endswith(".gsd"):
         raise ValueError("The initial configuration must have the .gsd extension.")
 
-    if configuration_parameters.use_cluster:
-        if run_parameters.constraints is None:
-            raise ValueError("Clusters require a filename where the constraints can be stored.")
-        if not run_parameters.constraints.endswith(".txt"):
-            raise ValueError("The constraints file must have the .txt extension.")
+    generator = ClusterGenerator(configuration_parameters)
 
-    relevant_radii = {k: v for k, v in configuration_parameters.radii.items()
-                      if k != configuration_parameters.substrate_type
-                      and (k not in configuration_parameters.snowman_bond_types.values()
-                           if configuration_parameters.snowman_bond_types is not None else True)}
-
-    if not len(relevant_radii) == 2:
-        raise ValueError("This script can only generate an initial configuration for two types of particles "
-                         "(excluding substrate and snowman heads).")
-
-    # Sort entries in dictionary by value in descending order.
-    radii = sorted(relevant_radii.items(), key=lambda r: r[1], reverse=True)
-
-    lattice_spacing = 2.0 * radii[0][1] * configuration_parameters.lattice_spacing_factor
-    orbit_distance = ((radii[0][1] + radii[1][1] + 2.0 * run_parameters.brush_length)
-                      * configuration_parameters.orbit_factor)
-    padding_distance = radii[0][1] * configuration_parameters.padding_factor
-    generator = CubicLatticeWithSatellitesGenerator(
-        CubicLattice.from_string(configuration_parameters.lattice_type),
-        lattice_spacing, configuration_parameters.lattice_repeats, orbit_distance, padding_distance,
-        configuration_parameters.satellites_per_center, radii[0][0], radii[1][0])
     frame, constraints = generator.generate_configuration()
     _check_frame_changes(frame, generator.__class__.__name__)
 
-    if configuration_parameters.use_substrate:
-        substrate_modifier = SubstrateModifier(configuration_parameters.radii[configuration_parameters.substrate_type],
-                                               configuration_parameters.substrate_type)
+    if run_parameters.use_substrate:
+        substrate_modifier = SubstrateModifier(run_parameters.substrate_radius,
+                                               run_parameters.substrate_type)
         substrate_modifier.modify_configuration(frame, constraints)
         _check_frame_changes(frame, substrate_modifier.__class__.__name__)
-
-    if configuration_parameters.use_snowman:
-        snowman_modifier = SnowmanModifier(configuration_parameters.snowman_bond_types,
-                                           configuration_parameters.snowman_distances,
-                                           configuration_parameters.snowman_seed)
-        snowman_modifier.modify_configuration(frame, constraints)
-        _check_frame_changes(frame, snowman_modifier.__class__.__name__)
 
     # Check if the frame has the necessary attributes.
     check_frame_types(frame, configuration_parameters.masses, configuration_parameters.radii,
                       configuration_parameters.surface_potentials)
-
+    
     frame.particles.mass = np.array([configuration_parameters.masses[frame.particles.types[i]].value_in_unit(unit.amu)
                                      for i in frame.particles.typeid], dtype=np.float32)
     millivolt = unit.milli * unit.volt
@@ -170,14 +138,30 @@ def main():
     frame.particles.diameter = np.array(
         [2.0 * configuration_parameters.radii[frame.particles.types[i]].value_in_unit(nanometer)
          for i in frame.particles.typeid], dtype=np.float32)
+    
+    # Interpret the constraints as a list of pairs of particle indices and distances
+    constraints_values = []
+    constraints_groups = []
+
+    for i, constraint_data in enumerate(constraints):
+        constraint_pairs = constraint_data[0]
+        constraint_distances = constraint_data[1]
+
+        for ind in range(len(constraint_pairs)):
+            pair = constraint_pairs[ind]
+            constraint_distance = constraint_distances[ind]
+
+            if pair > i:
+                constraints_values.append(constraint_distance)
+                constraints_groups.append((i, pair))
+
+    # Write the constraints to the gsd 
+    frame.constraints.N = len(constraints_values)
+    frame.constraints.value = np.array(constraints_values, dtype=np.float32)
+    frame.constraints.group = np.array(constraints_groups, dtype=np.uint32)
 
     with gsd.hoomd.open(name=run_parameters.initial_configuration, mode="w") as f:
         f.append(frame)
-
-    with open(run_parameters.constraints, "w") as f:
-        print("# Bond type\tConstraint distance (nm)", file=f)
-        for bond_type, distance in constraints.items():
-            print(f"{bond_type}\t{distance}", file=f)
 
 
 if __name__ == '__main__':

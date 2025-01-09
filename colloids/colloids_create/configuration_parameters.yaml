@@ -1,0 +1,63 @@
+total_clusters: 240
+lattice_constant: !Quantity
+  unit: nanometer
+  value: [900.0, 900.0, 900.0]
+box_size: !Quantity
+  unit: nanometer
+  value: [7200.0, 7200.0, 7200.0]
+random_rotation: true
+cluster_order: ["A", "B","B"]
+masses:
+  A: !Quantity
+    unit: dalton
+    value: 0.7406327610409243
+  B: !Quantity
+    unit: dalton
+    value: 1.0
+  C: !Quantity
+    unit: dalton
+    value: 1.0
+radii:
+  A: !Quantity
+    unit: nanometer
+    value: 95.0
+  B: !Quantity
+    unit: nanometer
+    value: 105.0
+  C: !Quantity
+    unit: nanometer
+    value: 105.0
+surface_potentials:
+  A: !Quantity
+    unit: millivolt
+    value: -54.0
+  B: !Quantity
+    unit: millivolt
+    value: 44.0
+  C: !Quantity
+    unit: millivolt
+    value: 44.0
+cluster_specifications:
+  A:
+    identity:
+      - "A"
+    coordinates: !Quantity
+      unit: nanometer
+      value:
+      - [0.0, 0.0, 0.0]
+  B:
+    identity:
+      - "B"
+      - "B"
+      - "B"
+      - "B"
+      - "C"
+    coordinates: !Quantity
+      unit: nanometer
+      value:
+      - [100.0, 100.0, 100.0]
+      - [-100.0, -100.0, 100.0]
+      - [100.0, -100.0, -100.0]
+      - [-100.0, 100.0, -100.0]
+      - [0.0, 0.0, 0.0]
+

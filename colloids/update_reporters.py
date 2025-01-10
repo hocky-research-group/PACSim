@@ -79,7 +79,7 @@ class UpdateReporterAbstract(ABC):
         self._file = open(filename, "a" if append_file else "w")
         if not append_file:
             print(f"timestep,{self._global_parameter_name}", file=self._file, flush=True)
-        #self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
+        self._start_value = start_value #.value_in_unit_system(unit.md_unit_system)
         # Check if the start value of the global parameter matches the value in the OpenMM simulation.
         # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
         # the start value is not necessarily the same as the value in the OpenMM simulation.

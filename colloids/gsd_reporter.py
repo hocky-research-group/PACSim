@@ -116,7 +116,7 @@ class GSDReporter(object):
 
     def _set_up_frame(self, simulation: openmm.app.Simulation) -> gsd.hoomd.Frame:
         if not self._append_file:
-            if not len(self._radii) == len(self._surface_potentials) == len(simulation.topology.atoms()):
+            if not len(self._radii) == len(self._surface_potentials) == simulation.topology.getNumAtoms():
                 raise ValueError("The number of radii and surface potentials must match the number of atoms in the "
                                  "topology of the OpenMM simulation.")
             # Assume that the following properties are constant throughout the simulation.

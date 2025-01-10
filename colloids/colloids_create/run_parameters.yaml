@@ -5,6 +5,7 @@ brush_length: !Quantity
   unit: nanometer
   value: 10.0
 checkpoint_filename: checkpoint.chk
+run_steps: 100000
 checkpoint_interval: 50000
 cutoff_factor: 21.0
 debye_length: !Quantity
@@ -12,7 +13,7 @@ debye_length: !Quantity
   value: 5.2
 depletant_radius: null
 depletion_phi: null
-dielectric_constant: 80.0
+dielectric_constant: 80.0 
 gravitational_acceleration: null
 integrator: LangevinIntegrator
 integrator_parameters:
@@ -38,14 +39,25 @@ trajectory_interval: 500000
 update_reporter: null
 update_reporter_parameters: null
 use_depletion: false
-use_gravity: false
-use_substrate: false
+use_gravity: true
+gravitational_acceleration: !Quantity
+    unit: meter/(second**2)
+    value: 500.0
+particle_density: !Quantity
+  unit: gram/(centimeter**3)
+  value: 1.05
+water_density: !Quantity
+  unit: gram/(centimeter**3)
+  value: 0.998
 use_log: false
 use_tabulated: false
 use_clusters: true
 velocity_seed: null
 wall_directions:
-  - false
-  - false
-  - false
-water_density: null
+  - true
+  - true
+  - true
+epsilon: !Quantity
+  unit: kilojoule/mole
+  value: 2.47
+alpha: 1.0

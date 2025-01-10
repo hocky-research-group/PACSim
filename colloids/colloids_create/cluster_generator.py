@@ -149,7 +149,7 @@ class ClusterGenerator(ConfigurationGenerator):
         # the number of clusters total
         self._total_clusters = self._total_clusters - (self._total_clusters % len(self._cluster_order))
         # the number of repeats in each dimension
-        number_repeats_per_dimension = [ceil(self._total_clusters**(1/3))] * 3
+        number_repeats_per_dimension = np.array([self.box_size[i] // self._lattice_constant[i] for i in range(3)])
         # the number of times the order of the clusters is repeated
         n_repeats = self._total_clusters // len(self._cluster_order)
 

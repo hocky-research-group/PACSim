@@ -1,12 +1,12 @@
-total_clusters: 240
+total_clusters: 6500
 lattice_constant: !Quantity
   unit: nanometer
   value: [900.0, 900.0, 900.0]
 box_size: !Quantity
   unit: nanometer
-  value: [7200.0, 7200.0, 7200.0]
+  value: [9000.0, 9000.0, 90000.0]
 random_rotation: true
-cluster_order: ["A", "B","B"]
+cluster_order: ["A", "B"]
 masses:
   A: !Quantity
     unit: dalton
@@ -20,13 +20,13 @@ masses:
 radii:
   A: !Quantity
     unit: nanometer
-    value: 95.0
+    value: SINGLE_PARTICLE_RADIUS
   B: !Quantity
     unit: nanometer
     value: 105.0
   C: !Quantity
     unit: nanometer
-    value: 105.0
+    value: 52.5
 surface_potentials:
   A: !Quantity
     unit: millivolt
@@ -36,7 +36,7 @@ surface_potentials:
     value: 44.0
   C: !Quantity
     unit: millivolt
-    value: 44.0
+    value: -44.0
 cluster_specifications:
   A:
     identity:
@@ -55,9 +55,9 @@ cluster_specifications:
     coordinates: !Quantity
       unit: nanometer
       value:
-      - [100.0, 100.0, 100.0]
-      - [-100.0, -100.0, 100.0]
-      - [100.0, -100.0, -100.0]
-      - [-100.0, 100.0, -100.0]
+      - [TETRAHEDRA_SPACING, TETRAHEDRA_SPACING, TETRAHEDRA_SPACING]
+      - [-TETRAHEDRA_SPACING, -TETRAHEDRA_SPACING, TETRAHEDRA_SPACING]
+      - [TETRAHEDRA_SPACING, -TETRAHEDRA_SPACING, -TETRAHEDRA_SPACING]
+      - [-TETRAHEDRA_SPACING, TETRAHEDRA_SPACING, -TETRAHEDRA_SPACING]
       - [0.0, 0.0, 0.0]
 

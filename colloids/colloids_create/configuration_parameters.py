@@ -107,15 +107,13 @@ class ConfigurationParameters(Parameters):
             raise ValueError("The lattice constant must be three quantities compatible with nanometer.")
         if not all(isinstance(i, unit.Quantity) for i in self.lattice_constant):
             raise TypeError("The lattice constant must be a list of quantities.")
-        unit_cell_volume = np.prod([i.value_in_unit(unit.nanometer) for i in self.lattice_constant])
-
         if len(self.box_size) == 6:
             raise ValueError("Tilted box not supported currently.")
         if not len(self.box_size) == 3:
             raise ValueError("The box size must be a list of three quantities.")
-        box_volume = np.prod([i.value_in_unit(unit.nanometer) for i in self.box_size])
+        effective_repeats = np.prod([self.box_size[i].value_in_unit(unit.nanometer) // self.lattice_constant[i].value_in_unit(unit.nanometer) for i in range(3)])
 
-        if unit_cell_volume * self.total_clusters > box_volume:
+        if self.total_clusters > effective_repeats:
             raise ValueError("The volume of the unit cell times the number of clusters must be less than the volume of the box.")
         
         # Check the cluster specifications.

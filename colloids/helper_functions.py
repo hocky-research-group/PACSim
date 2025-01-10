@@ -65,6 +65,7 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, frame0: gsd
     frame.particles.types = types
     typeid = frame0.particles.typeid
     frame.particles.typeid = typeid
+    frame.particles.diameter = frame0.particles.diameter
     frame.particles.type_shapes = frame0.particles.type_shapes
     frame.particles.charge = frame0.particles.charge
     frame.particles.mass = frame0.particles.mass

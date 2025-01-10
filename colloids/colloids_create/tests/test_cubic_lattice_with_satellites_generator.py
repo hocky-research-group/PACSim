@@ -19,7 +19,7 @@ class TestCubicLatticeWithSatellitesGenerator(object):
 
     @pytest.fixture
     def initial_configuration_filename(self):
-        return "first_frame.xyz"
+        return "first_frame.gsd"
 
     @pytest.fixture(autouse=True)
     def create_xyz_reference_configurations(self):
@@ -43,12 +43,17 @@ class TestCubicLatticeWithSatellitesGenerator(object):
         subprocess.run(f"colloids-create {run_parameters_file} {configuration_parameters_file}",
                        shell=True, check=True)
         assert os.path.isfile(initial_configuration_filename)
-        atoms = ase.io.read(initial_configuration_filename, format="extxyz")
+        xyz_initial_configuration_filename = initial_configuration_filename.replace(".gsd", ".xyz")
+        with gsd.hoomd.open(initial_configuration_filename, "r") as f:
+            assert len(f) == 1
+            write_xyz_file_from_gsd_frame(xyz_initial_configuration_filename, f[0])
+        atoms = ase.io.read(xyz_initial_configuration_filename, format="extxyz")
         reference_atoms = ase.io.read(reference_configuration_filename, format="extxyz")
         assert atoms.get_chemical_symbols() == reference_atoms.get_chemical_symbols()
         assert atoms.get_cell() == pytest.approx(reference_atoms.get_cell(), rel=1e-12, abs=1e-12)
         assert atoms.get_positions() == pytest.approx(reference_atoms.get_positions(), rel=1e-5, abs=1e-5)
         os.remove(initial_configuration_filename)
+        os.remove(xyz_initial_configuration_filename)
 
 
 if __name__ == '__main__':

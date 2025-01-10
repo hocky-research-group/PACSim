@@ -99,7 +99,7 @@ class CubicLatticeWithSatellitesGenerator(ConfigurationGenerator):
         frame = Frame()
         frame.particles.N = len(atoms)
         frame.particles.position = atoms.positions.astype(np.float32)
-        assert all(atom.tag == self._type_lattice or atom.tag == self._satellite_tag for atom in atoms)
+        assert all(atom.tag == self._lattice_tag or atom.tag == self._satellite_tag for atom in atoms)
         frame.particles.types = (self._type_lattice, self._type_satellite)
         frame.particles.typeid = np.array([0 if atom.tag == self._lattice_tag else 1 for atom in atoms],
                                           dtype=np.uint32)

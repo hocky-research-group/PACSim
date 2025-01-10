@@ -31,27 +31,31 @@ def read_xyz_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[
     return types, atoms.get_positions(), cell
 
 
-def read_gsd_file(filename: str) -> (list[str], npt.NDArray[float], npt.NDArray[float]):
+def get_cell_from_box(box: npt.NDArray[float]) -> npt.NDArray[float]:
+    assert len(box) == 6
+    cell = np.zeros((3, 3), dtype=np.float64)
+    cell[0][0] = box[0]
+    cell[1][1] = box[1]
+    cell[2][2] = box[2]
+    cell[1][0] = box[1] * box[3]
+    cell[2][0] = box[2] * box[4]
+    cell[2][1] = box[2] * box[5]
+    return cell
+
+
+def read_gsd_file(filename: str, frame_index: int) -> gsd.hoomd.Frame:
     if not filename.endswith(".gsd"):
         raise ValueError("The file must have the .gsd extension.")
     with gsd.hoomd.open(filename) as f:
         if len(f) != 1:
             raise ValueError("The GSD file must contain exactly one frame.")
-        frame = f[0]
-        cell = np.zeros((3, 3), dtype=np.float64)
-        cell[0][0] = frame.configuration.box[0]
-        cell[1][1] = frame.configuration.box[1]
-        cell[2][2] = frame.configuration.box[2]
-        cell[1][0] = frame.configuration.box[1] * frame.configuration.box[3]
-        cell[2][0] = frame.configuration.box[2] * frame.configuration.box[4]
-        cell[2][1] = frame.configuration.box[2] * frame.configuration.box[5]
-        return (list(map(frame.particles.types.__getitem__, frame.particles.typeid)),
-                frame.particles.position.astype(np.float64), cell)
+        frame = f[frame_index]
+    return frame
 
 
 # noinspection PyUnresolvedReferences
-def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict: dict[str, unit.Quantity],
-                   surface_potentials_dict: dict[str, unit.Quantity], cell: npt.NDArray[unit.Quantity]) -> None:
+def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radii: npt.NDArray[unit.Quantity],
+                   surface_potentials: npt.NDArray[unit.Quantity], cell: npt.NDArray[unit.Quantity]) -> None:
     # TODO: WRITE VELOCITIES
 
     nanometer = unit.nano * unit.meter
@@ -76,18 +80,11 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radius_dict
     # Works since Python 3.7.
     types_set = list(dict.fromkeys(atom.name for atom in topology.atoms()))
     types = list(types_set)
-    assert all(t in radius_dict for t in types)
     frame.particles.types = types
     typeid = [types.index(atom.name) for atom in topology.atoms()]
     frame.particles.typeid = typeid
-    frame.particles.type_shapes = [
-        {"type": "Sphere", "diameter": 2.0 * radius_dict[t].value_in_unit(nanometer)} for t in types]
-    frame.particles.diameter = [
-        2.0 * radius_dict[types[typeid[atom_index]]].value_in_unit(nanometer)
-        for atom_index in range(topology.getNumAtoms())]
-    frame.particles.charge = [
-        surface_potentials_dict[types[typeid[atom_index]]].value_in_unit(millivolt)
-        for atom_index in range(topology.getNumAtoms())]
+    frame.particles.diameter = [2.0 * r.value_in_unit(nanometer) for r in radii]
+    frame.particles.charge = [s.value_in_unit(millivolt) for s in surface_potentials]
     frame.particles.mass = [openmm_simulation.system.getParticleMass(atom_index).value_in_unit(unit.amu)
                             for atom_index in range(topology.getNumAtoms())]
     # See http://docs.openmm.org/7.6.0/userguide/theory/05_other_features.html

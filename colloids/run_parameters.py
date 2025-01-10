@@ -5,7 +5,6 @@ from openmm import unit
 from colloids.abstracts import Parameters
 import colloids.integrators as integrators
 import colloids.update_reporters as update_reporters
-from colloids.helper_functions import read_initial_file
 import warnings
 
 
@@ -107,11 +106,6 @@ class RunParameters(Parameters):
         (Oxford University Press, 2001), 2nd edition].
         Defaults to False.
     :type use_log: bool
-    :param use_tabulated:
-        If True, the steric and electrostatic forces are computed based on tabulated functions.
-        If False, the steric and electrostatic forces are computed based on algebraic expressions.
-        Defaults to False.
-    :type use_tabulated: bool
     :param velocity_seed:
         The seed for the random number generator that is used to sample the initial velocities.
         If None, a random seed is used.
@@ -258,7 +252,6 @@ class RunParameters(Parameters):
     dielectric_constant: float = 80.0
     cutoff_factor: float = 21.0
     use_log: bool = False
-    use_tabulated: bool = False
     velocity_seed: Optional[int] = None
     run_steps: int = 100
     state_data_interval: int = 100
@@ -370,12 +363,6 @@ class RunParameters(Parameters):
                 raise TypeError("Depletant radius must have a unit compatible with nanometers.")
             if self.depletant_radius <= 0.0 * (unit.nano * unit.meter):
                 raise ValueError("Depletant radius must be greater than zero.")
-            for t in self.radii:
-                if self.depletant_radius / self.radii[t] > 0.1547:
-                    warnings.warn("Size ratio of depletant to colloid particles is too large. "
-                                  "Analytical computation of depletion potential may be invalid."
-                                  "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
-                                  "pp 10079 - 10106.")
         else:
             if self.depletion_phi is not None:
                 raise ValueError("Depletion phi must not be specified if depletion potential is not on.")
@@ -424,11 +411,6 @@ class RunParameters(Parameters):
         else:
             if self.update_reporter_parameters is not None:
                 raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")
-        if self.use_substrate:
-            if not all(self.wall_directions):
-                raise ValueError("A substrate can only be used if all walls are active.")
-            if self.use_tabulated:
-                raise ValueError("A substrate can only be used with the algebraic colloid potentials.")
 
 
 if __name__ == '__main__':

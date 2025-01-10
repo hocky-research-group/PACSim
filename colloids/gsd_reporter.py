@@ -37,15 +37,13 @@ class GSDReporter(object):
         The value must be greater than zero.
     :type report_interval: int
     :param radii:
-        The radii of the different types of colloidal particles that appear in the OpenMM simulation.
-        The keys of the dictionary are the types of the colloidal particles and the values are the radii.
+        The radii of the colloidal particles that appear in the OpenMM simulation.
         The unit of the radii must be compatible with nanometers and the values must be greater than zero.
-    :type radii: dict[str, unit.Quantity]
+    :type radii: npt.NDArray[unit.Quantity]
     :param surface_potentials:
-        The surface potentials of the different types of colloidal particles that appear in the OpenMM simulation.
-        The keys of the dictionary are the types of the colloidal particles and the values are the surface potentials.
+        The surface potentials of the colloidal particles that appear in the OpenMM simulation.
         The unit of the surface potentials must be compatible with millivolts.
-    :type surface_potentials: dict[str, unit.Quantity]
+    :type surface_potentials: npt.NDArray[unit.Quantity]
     :param simulation:
         The OpenMM simulation that this reporter will be added to.
         The topology of the simulation is used to check that a radius and surface potential is defined for every type of
@@ -87,8 +85,8 @@ class GSDReporter(object):
     _nanometer_per_picosecond = (unit.nano * unit.meter) / (unit.pico * unit.second)
     _millivolt = unit.milli * unit.volt
 
-    def __init__(self, filename: str, report_interval: int, radii: dict[str, unit.Quantity],
-                 surface_potentials: dict[str, unit.Quantity], simulation: openmm.app.Simulation,
+    def __init__(self, filename: str, report_interval: int, radii: npt.NDArray[unit.Quantity],
+                 surface_potentials: npt.NDArray[unit.Quantity], simulation: openmm.app.Simulation,
                  append_file: bool = False, cell: Optional[npt.NDArray[unit.Quantity]] = None) -> None:
         """Constructor of the GSDReporter class."""
         if not filename.endswith(".gsd"):
@@ -98,26 +96,14 @@ class GSDReporter(object):
         assert simulation.topology.getNumChains() == 1
         assert simulation.topology.getNumResidues() == 1
         assert simulation.topology.getNumAtoms() == simulation.system.getNumParticles()
-        types = list(dict.fromkeys(atom.name for atom in simulation.topology.atoms()))
-        if not all(t in radii for t in types):
-            raise ValueError("All types of the simulation must have a radius.")
-        if not all(rt in types for rt in radii):
-            raise ValueError("All types with a radius must appear in the simulation.")
-        if not all(t in surface_potentials for t in types):
-            raise ValueError("All types of the simulation must have a surface potential.")
-        if not all(st in types for st in surface_potentials):
-            raise ValueError("All types with a surface potential must appear in the simulation.")
-        for r in radii.values():
-            if not r.unit.is_compatible(self._nanometer):
-                raise TypeError("Radius must have a unit compatible with nanometers.")
-            if r <= 0.0 * self._nanometer:
-                raise ValueError("Radius must be greater than zero.")
-        for s in surface_potentials.values():
-            if not s.unit.is_compatible(self._millivolt):
-                raise TypeError("Surface potential must have a unit compatible with millivolts.")
-
         self._report_interval = report_interval
+        if not all(r.unit.is_compatible(self._nanometer) for r in radii):
+            raise TypeError("All radii must have a unit compatible with nanometers.")
+        if not all(r > 0.0 * self._nanometer for r in radii):
+            raise ValueError("All radii must be greater than zero.")
         self._radii = radii
+        if not all(s.unit.is_compatible(self._millivolt) for s in surface_potentials):
+            raise TypeError("All surface potentials must have a unit compatible with millivolts.")
         self._surface_potentials = surface_potentials
         self._append_file = append_file
         self._file = gsd.hoomd.open(name=filename, mode="r+" if self._append_file else "w")
@@ -130,6 +116,9 @@ class GSDReporter(object):
 
     def _set_up_frame(self, simulation: openmm.app.Simulation) -> gsd.hoomd.Frame:
         if not self._append_file:
+            if not len(self._radii) == len(self._surface_potentials) == len(simulation.topology.atoms()):
+                raise ValueError("The number of radii and surface potentials must match the number of atoms in the "
+                                 "topology of the OpenMM simulation.")
             # Assume that the following properties are constant throughout the simulation.
             frame = gsd.hoomd.Frame()
             frame.particles.N = simulation.topology.getNumAtoms()
@@ -138,19 +127,12 @@ class GSDReporter(object):
             # Works since Python 3.7.
             types = list(dict.fromkeys(atom.name for atom in simulation.topology.atoms()))
             frame.particles.types = types
-            frame.particles.type_shapes = [
-                {"type": "Sphere", "diameter": 2.0 * self._radii[t].value_in_unit(self._nanometer)}
-                for t in types]
             assert (list(atom.index for atom in simulation.topology.atoms())
                     == list(range(simulation.topology.getNumAtoms())))
             typeid = [types.index(atom.name) for atom in simulation.topology.atoms()]
             frame.particles.typeid = typeid
-            frame.particles.diameter = [
-                2.0 * self._radii[types[typeid[atom_index]]].value_in_unit(self._nanometer)
-                for atom_index in range(simulation.topology.getNumAtoms())]
-            frame.particles.charge = [
-                self._surface_potentials[types[typeid[atom_index]]].value_in_unit(self._millivolt)
-                for atom_index in range(simulation.topology.getNumAtoms())]
+            frame.particles.diameter = [2.0 * r.value_in_unit(self._nanometer) for r in self._radii]
+            frame.particles.charge = [s.value_in_unit(self._millivolt) for s in self._surface_potentials]
             frame.particles.mass = [simulation.system.getParticleMass(atom_index).value_in_unit(unit.amu)
                                     for atom_index in range(simulation.topology.getNumAtoms())]
             frame.configuration.dimensions = 3

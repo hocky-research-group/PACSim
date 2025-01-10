@@ -70,6 +70,10 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
 
 
 def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.Simulation:
+    nanometer = unit.nano * unit.meter
+    radii = frame.particles.diameter / 2.0 * nanometer
+    surface_potentials = frame.particles.charge * (unit.milli * unit.volt)
+
     # ----------------------------------- Set up system and parameters. ------------------------------------------------
     topology = app.topology.Topology()
     chain = topology.addChain()
@@ -91,9 +95,9 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         assert (box_vector_one[1] == 0.0 and box_vector_one[2] == 0.0 and
                 box_vector_two[0] == 0.0 and box_vector_two[2] == 0.0 and
                 box_vector_three[0] == 0.0 and box_vector_three[1] == 0.0)
-        wall_distances = (box_vector_one[0] * (unit.nano * unit.meter) if parameters.wall_directions[0] else None,
-                          box_vector_two[1] * (unit.nano * unit.meter) if parameters.wall_directions[1] else None,
-                          box_vector_three[2] * (unit.nano * unit.meter) if parameters.wall_directions[2] else None)
+        wall_distances = (box_vector_one[0] * nanometer if parameters.wall_directions[0] else None,
+                          box_vector_two[1] * nanometer if parameters.wall_directions[1] else None,
+                          box_vector_three[2] * nanometer if parameters.wall_directions[2] else None)
         final_cell = cell.copy()
         if not all_walls:
             assert (not parameters.use_depletion
@@ -109,8 +113,7 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
                     # through the walls, we thus increase the length of the periodic box vectors (not the wall) by
                     # 2 * (radius_max - radius_min) + 2 + cutoff_factor * debye_length.
                     final_cell[index][index] += \
-                        (2.0 * (max(frame.particles.diameter) / 2.0 - min(frame.particles.diameter) / 2.0)
-                         + 2.0 * (unit.nano * unit.meter)
+                        (2.0 * (max(radii) - min(radii)) + 2.0 * (unit.nano * unit.meter)
                          + parameters.cutoff_factor * parameters.debye_length).value_in_unit(unit.nano * unit.meter)
     else:
         wall_distances = None
@@ -173,15 +176,14 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     # Be careful to add the particles in the same order as to the system.
     for i in range(frame.particles.N):
         is_substrate = frame.particles.mass[i] == 0.0
-        colloid_potentials.add_particle(radius=frame.particles.diameter[i] / 2.0,
-                                        surface_potential=frame.particles.charge[i],
+        colloid_potentials.add_particle(radius=radii[i], surface_potential=surface_potentials[i],
                                         substrate_flag=is_substrate)
         if include_walls and not is_substrate:
-            slj_walls.add_particle(index=i, radius=frame.particles.diameter[i] / 2.0)
+            slj_walls.add_particle(index=i, radius=radii[i])
         if parameters.use_depletion:
-            depletion_potential.add_particle(radius=frame.particles.diameter[i] / 2.0, substrate_flag=is_substrate)
+            depletion_potential.add_particle(radius=radii[i], substrate_flag=is_substrate)
         if parameters.use_gravity and not is_substrate:
-            gravitational_potential.add_particle(index=i, radius=frame.particles.diameter[i] / 2.0)
+            gravitational_potential.add_particle(index=i, radius=radii[i])
 
     for i in range(frame.constraints.N):
         colloid_potentials.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
@@ -218,8 +220,7 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
                 cutoff_distance = force.getCutoffDistance()
                 cutoff_distance_index = -1
                 for other_cutoff_index in range(len(cutoffs)):
-                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(
-                            unit.nano * unit.meter)) < 1.0e-6:
+                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(nanometer)) < 1.0e-6:
                         cutoff_distance_index = other_cutoff_index
                 if cutoff_distance_index == -1:
                     cutoffs.append(cutoff_distance)
@@ -306,8 +307,8 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
     if parameters.final_configuration_gsd_filename is not None:
         write_gsd_file(parameters.final_configuration_gsd_filename, simulation,
                        frame.particles.diameter / 2.0 * (unit.nano * unit.meter),
-                       frame.particles.charge  * (unit.milli * unit.volt),
-                       get_cell_from_box(frame.configuration.box) * (unit.nano * unit.meter) * (unit.nano * unit.meter))
+                       frame.particles.charge * (unit.milli * unit.volt),
+                       get_cell_from_box(frame.configuration.box) * (unit.nano * unit.meter))
 
     return simulation
 

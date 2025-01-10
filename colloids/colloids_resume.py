@@ -3,8 +3,8 @@ import sys
 from typing import Sequence
 from openmm import app
 from openmm import unit
-from colloids.colloids_run import set_up_simulation, set_up_reporters
-from colloids.helper_functions import read_xyz_file, write_gsd_file, write_xyz_file
+from colloids.colloids_run import set_up_simulation, set_up_reporters, check_frame, get_cell_from_box
+from colloids.helper_functions import read_gsd_file, write_gsd_file
 from colloids.run_parameters import RunParameters
 
 
@@ -23,22 +23,24 @@ def colloids_resume(argv: Sequence[str]) -> app.Simulation:
         raise ValueError("The number of steps must be positive.")
 
     parameters = RunParameters.from_yaml(args.yaml_file)
-    types, positions, cell = read_xyz_file(parameters.initial_configuration)
 
-    simulation, _ = set_up_simulation(parameters, types, cell, positions)
+    frame = read_gsd_file(parameters.initial_configuration, parameters.frame_index)
+
+    check_frame(parameters, frame)
+
+    simulation = set_up_simulation(parameters, frame)
 
     simulation.loadCheckpoint(args.checkpoint_file)
 
-    set_up_reporters(parameters, simulation, True, args.number_steps, cell)
+    set_up_reporters(parameters, simulation, True, args.number_steps, frame)
 
     simulation.step(args.number_steps)
 
     if parameters.final_configuration_gsd_filename is not None:
-        write_gsd_file(parameters.final_configuration_gsd_filename, simulation, parameters.radii,
-                       parameters.surface_potentials, cell * (unit.nano * unit.meter))
-
-    if parameters.final_configuration_xyz_filename is not None:
-        write_xyz_file(parameters.final_configuration_xyz_filename, simulation, cell * (unit.nano * unit.meter))
+        write_gsd_file(parameters.final_configuration_gsd_filename, simulation,
+                       frame.particles.diameter / 2.0 * (unit.nano * unit.meter),
+                       frame.particles.charge * (unit.milli * unit.volt),
+                       get_cell_from_box(frame.configuration.box) * (unit.nano * unit.meter) * (unit.nano * unit.meter))
 
     return simulation
 

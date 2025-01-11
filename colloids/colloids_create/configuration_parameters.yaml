@@ -20,7 +20,7 @@ masses:
 radii:
   A: !Quantity
     unit: nanometer
-    value: SINGLE_PARTICLE_RADIUS
+    value: 105.0
   B: !Quantity
     unit: nanometer
     value: 105.0
@@ -55,9 +55,9 @@ cluster_specifications:
     coordinates: !Quantity
       unit: nanometer
       value:
-      - [TETRAHEDRA_SPACING, TETRAHEDRA_SPACING, TETRAHEDRA_SPACING]
-      - [-TETRAHEDRA_SPACING, -TETRAHEDRA_SPACING, TETRAHEDRA_SPACING]
-      - [TETRAHEDRA_SPACING, -TETRAHEDRA_SPACING, -TETRAHEDRA_SPACING]
-      - [-TETRAHEDRA_SPACING, TETRAHEDRA_SPACING, -TETRAHEDRA_SPACING]
+      - [50, 50, 50]
+      - [-50, -50, 50]
+      - [50, -50, -50]
+      - [-50, 50, -50]
       - [0.0, 0.0, 0.0]
 

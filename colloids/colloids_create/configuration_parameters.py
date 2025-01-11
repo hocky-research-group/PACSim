@@ -111,9 +111,10 @@ class ConfigurationParameters(Parameters):
             raise ValueError("Tilted box not supported currently.")
         if not len(self.box_size) == 3:
             raise ValueError("The box size must be a list of three quantities.")
-        effective_repeats = np.prod([self.box_size[i].value_in_unit(unit.nanometer) // self.lattice_constant[i].value_in_unit(unit.nanometer) for i in range(3)])
+        effective_repeats = np.array([self.box_size[i].value_in_unit(unit.nanometer) // self.lattice_constant[i].value_in_unit(unit.nanometer) for i in range(3)])
+        effective_clusters = np.prod(effective_repeats - 1)
 
-        if self.total_clusters > effective_repeats:
+        if self.total_clusters > effective_clusters:
             raise ValueError("The volume of the unit cell times the number of clusters must be less than the volume of the box.")
         
         # Check the cluster specifications.

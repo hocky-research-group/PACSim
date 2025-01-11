@@ -151,6 +151,7 @@ class ClusterGenerator(ConfigurationGenerator):
         # the number of repeats in each dimension
         number_repeats_per_dimension = np.array([self.box_size[i].value_in_unit(unit.nanometer) // self._lattice_constant[i].value_in_unit(unit.nanometer) 
                                                  for i in range(3)], dtype=int)
+        number_repeats_per_dimension = number_repeats_per_dimension - 1
         # the number of times the order of the clusters is repeated
         n_repeats = self._total_clusters // len(self._cluster_order)
 
@@ -225,6 +226,8 @@ class ClusterGenerator(ConfigurationGenerator):
             if cluster_index == self._total_clusters:
                 break
             
+        positions = positions - np.array(self.box_size.value_in_unit(unit.nanometer)) / 2 + np.array(self._lattice_constant.value_in_unit(unit.nanometer)) / 2
+
         self.positions = positions
         self.cluster_numbers = cluster_numbers.squeeze()
         self.cluster_ids = cluster_ids

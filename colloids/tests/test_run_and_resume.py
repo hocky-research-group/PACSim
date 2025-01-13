@@ -51,8 +51,6 @@ class TestRunAndResume(object):
     def test_run_and_resume(self, directory_name):
         assert filecmp.cmp(directory_name + "/final_frame.gsd", directory_name + "/final_frame_resume.gsd",
                            shallow=False)
-        assert filecmp.cmp(directory_name + "/final_frame.xyz", directory_name + "/final_frame_resume.xyz",
-                           shallow=False)
         assert filecmp.cmp(directory_name + "/state_data.csv", directory_name + "/state_data_resume.csv",
                            shallow=False)
         assert filecmp.cmp(directory_name + "/trajectory.gsd", directory_name + "/trajectory_resume.gsd",

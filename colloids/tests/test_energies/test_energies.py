@@ -27,12 +27,12 @@ class TestEnergies(object):
                              [# Gsd files store position only with float32 precision so we reduce the tolerance.
                               ("run_cp.yaml", -10122.62271419458, 1.0e-5),
                               ("run_cp_depletion.yaml", -44424.402360702596, 1.0e-5),
-                              ("run_cp_walls_substrate_explicit_gsd.yaml", -12286.15816959927, 1.0e-5),
-                              ("run_cp_walls_substrate_depletion_explicit_gsd.yaml", -54312.08243054912, 1.0e-5),
-                              ("run_cp_walls_substrate_gravity_explicit_gsd.yaml", -12286.225633072137, 1.0e-5),
-                              ("run_cp_walls_snowman_explicit_gsd.yaml", -231.80203391587074, 1.0e-5),
+                              ("run_cp_walls_substrate.yaml", -12286.15816959927, 1.0e-5),
+                              ("run_cp_walls_substrate_depletion.yaml", -54312.08243054912, 1.0e-5),
+                              ("run_cp_walls_substrate_gravity.yaml", -12286.225633072137, 1.0e-5),
+                              ("run_cp_walls_snowman.yaml", -231.80203391587074, 1.0e-5),
                               ("run_cp_walls.yaml", -0.13903947128075853, 1.0e-5),
-                              ("run_cp_full_explicit_gsd.yaml", -436.24104513031267, 1.0e-5),])
+                              ("run_cp_full.yaml", -436.24104513031267, 1.0e-5),])
     def test_energies(self, yaml_file, expected_energy, tolerance):
         simulation = colloids_run([yaml_file])
         potential_energy = simulation.context.getState(getEnergy=True).getPotentialEnergy()

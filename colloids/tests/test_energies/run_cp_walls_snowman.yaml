@@ -19,7 +19,7 @@ epsilon: !Quantity
     value: 2.477709860209665  # 1 k_B T
 final_configuration_gsd_filename: final_frame.gsd
 gravitational_acceleration: null
-initial_configuration: initial_frame_snowman_explicit.gsd
+initial_configuration: initial_frame_snowman.gsd
 integrator: LangevinIntegrator
 integrator_parameters:
   frictionCoeff: !Quantity

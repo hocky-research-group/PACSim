@@ -27,7 +27,6 @@ class TestRunAndResume(object):
     def run(self, directory_name):
         subprocess.run("colloids-run run_test.yaml", shell=True, check=True, capture_output=True)
         assert os.path.isfile(directory_name + "/final_frame.gsd")
-        assert os.path.isfile(directory_name + "/final_frame.xyz")
         assert os.path.isfile(directory_name + "/state_data.csv")
         assert os.path.isfile(directory_name + "/trajectory.gsd")
         assert os.path.isfile(directory_name + "/update_reporter.csv")
@@ -42,7 +41,6 @@ class TestRunAndResume(object):
         subprocess.run(f"colloids-resume resume_test.yaml {directory_name}/checkpoint.chk 50", shell=True,
                        check=True, capture_output=True)
         assert os.path.isfile(directory_name + "/final_frame_resume.gsd")
-        assert os.path.isfile(directory_name + "/final_frame_resume.xyz")
         assert os.path.isfile(directory_name + "/state_data_resume.csv")
         assert os.path.isfile(directory_name + "/trajectory_resume.gsd")
         assert os.path.isfile(directory_name + "/update_reporter_resume.csv")

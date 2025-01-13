@@ -40,7 +40,7 @@ def colloids_resume(argv: Sequence[str]) -> app.Simulation:
         write_gsd_file(parameters.final_configuration_gsd_filename, simulation,
                        frame.particles.diameter / 2.0 * (unit.nano * unit.meter),
                        frame.particles.charge * (unit.milli * unit.volt),
-                       get_cell_from_box(frame.configuration.box) * (unit.nano * unit.meter) * (unit.nano * unit.meter))
+                       get_cell_from_box(frame.configuration.box) * (unit.nano * unit.meter))
 
     return simulation
 

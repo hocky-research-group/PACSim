@@ -97,6 +97,20 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radii: npt.
         cell[2][0] / cell[2][2],
         cell[2][1] / cell[2][2]
     ]
+
+    num_constraints = openmm_simulation.system.getNumConstraints()
+    if num_constraints > 0:
+        frame.constraints.N = num_constraints
+        constraint_lengths = np.empty((num_constraints,), dtype=np.float32)
+        constraint_groups = np.empty((num_constraints, 2), dtype=np.uint32)
+        for constraint_index in range(num_constraints):
+            (particle_index1, particle_index2, distance) = openmm_simulation.system.getConstraintParameters(
+                constraint_index)
+            constraint_lengths[constraint_index] = distance.value_in_unit(nanometer)
+            constraint_groups[constraint_index] = [particle_index1, particle_index2]
+        frame.constraints.value = constraint_lengths
+        frame.constraints.group = constraint_groups
+
     with gsd.hoomd.open(name=filename, mode="w") as f:
         f.append(frame)
 

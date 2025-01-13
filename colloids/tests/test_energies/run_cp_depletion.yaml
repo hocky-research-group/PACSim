@@ -18,9 +18,8 @@ depletion_phi: 0.5
 dielectric_constant: 80.0
 epsilon: null
 final_configuration_gsd_filename: final_frame.gsd
-final_configuration_xyz_filename: final_frame.xyz
 gravitational_acceleration: null
-initial_configuration: final_frame_wo_substrate.xyz
+initial_configuration: final_frame_wo_substrate.gsd
 integrator: LangevinIntegrator
 integrator_parameters:
   frictionCoeff: !Quantity
@@ -32,40 +31,15 @@ integrator_parameters:
     value: 0.015
   temperature: !Copy
     key: potential_temperature
-masses:
-  N: !Quantity
-    unit: dalton
-    value: 1.884998982291879
-  P: !Quantity
-    unit: dalton
-    value: 1.0
 minimize_energy_initially: false
 particle_density: null
 platform_name: Reference
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0
-radii:
-  N: !Quantity
-    unit: nanometer
-    value: 105.0
-  P: !Quantity
-    unit: nanometer
-    value: 85.0
 run_steps: 0
-snowman_bond_types: null
-snowman_distances: null
-snowman_seed: null
 state_data_filename: state_data.csv
 state_data_interval: 5000
-substrate_type: null
-surface_potentials:
-  N: !Quantity
-    unit: millivolt
-    value: -50.0
-  P: !Quantity
-    unit: millivolt
-    value: 50.0
 trajectory_filename: trajectory.gsd
 trajectory_interval: 500000
 update_reporter: null
@@ -73,9 +47,6 @@ update_reporter_parameters: null
 use_depletion: true
 use_gravity: false
 use_log: false
-use_snowman: false
-use_substrate: false
-use_tabulated: false
 velocity_seed: null
 wall_directions:
   - false

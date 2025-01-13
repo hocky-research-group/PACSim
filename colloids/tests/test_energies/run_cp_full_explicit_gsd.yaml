@@ -20,7 +20,6 @@ epsilon: !Quantity
     unit: kilojoule/mole
     value: 2.477709860209665  # 1 k_B T
 final_configuration_gsd_filename: final_frame.gsd
-final_configuration_xyz_filename: final_frame.xyz
 gravitational_acceleration: !Quantity
     unit: meter/(second**2)
     value: 9.8
@@ -36,19 +35,6 @@ integrator_parameters:
     value: 0.00317647015905543
   temperature: !Copy
     key: potential_temperature
-masses:
-  N: !Quantity
-    unit: dalton
-    value: 0.7406327610409243
-  P: !Quantity
-    unit: dalton
-    value: 1.0
-  S: !Quantity
-    unit: dalton
-    value: 0.0
-  NN: !Quantity
-    unit: dalton
-    value: 0.1865889212827988
 minimize_energy_initially: false
 particle_density: !Quantity
   unit: gram/(centimeter**3)
@@ -57,43 +43,9 @@ platform_name: Reference
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0
-radii:
-  N: !Quantity
-    unit: nanometer
-    value: 95.0
-  P: !Quantity
-    unit: nanometer
-    value: 105.0
-  S: !Quantity
-    unit: nanometer
-    value: 30.0
-  NN: !Quantity
-    unit: nanometer
-    value: 60.0
 run_steps: 0
-snowman_bond_types:
-  N: NN
-snowman_distances:
-  N: !Quantity
-    unit: nanometer
-    value: 95.0
-snowman_seed: 3
 state_data_filename: state_data.csv
 state_data_interval: 10
-substrate_type: S
-surface_potentials:
-  N: !Quantity
-    unit: millivolt
-    value: -54.0
-  P: !Quantity
-    unit: millivolt
-    value: 44.0
-  S: !Quantity
-    unit: millivolt
-    value: -47.94502672295134  # Tuned with colloids-tune so that potential depth is at -3 k_B T.
-  NN: !Quantity
-    unit: millivolt
-    value: -54.0
 trajectory_filename: trajectory.gsd
 trajectory_interval: 10
 update_reporter: null
@@ -101,9 +53,6 @@ update_reporter_parameters: null
 use_depletion: true
 use_gravity: true
 use_log: false
-use_snowman: true
-use_substrate: true
-use_tabulated: false
 velocity_seed: 2
 wall_directions:
   - true

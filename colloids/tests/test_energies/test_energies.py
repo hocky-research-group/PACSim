@@ -17,32 +17,21 @@ class TestEnergies(object):
     def tear_down(self):
         yield
         assert os.path.isfile("final_frame.gsd")
-        assert os.path.isfile("final_frame.xyz")
         assert os.path.isfile("state_data.csv")
         assert os.path.isfile("trajectory.gsd")
         os.remove("final_frame.gsd")
-        os.remove("final_frame.xyz")
         os.remove("state_data.csv")
         os.remove("trajectory.gsd")
 
     @pytest.mark.parametrize("yaml_file,expected_energy,tolerance",
-                             [("run_cp.yaml", -10122.62271419458, 1.0e-12),
-                              ("run_cp_depletion.yaml", -44424.402360702596, 1.0e-12),
-                              ("run_cp_walls_substrate.yaml", -12286.15816959927, 1.0e-12),
-                              # Gsd files store position only with float32 precision so we reduce the tolerance.
+                             [# Gsd files store position only with float32 precision so we reduce the tolerance.
+                              ("run_cp.yaml", -10122.62271419458, 1.0e-5),
+                              ("run_cp_depletion.yaml", -44424.402360702596, 1.0e-5),
                               ("run_cp_walls_substrate_explicit_gsd.yaml", -12286.15816959927, 1.0e-5),
-                              ("run_cp_walls_substrate_explicit_xyz.yaml", -12286.15816959927, 1.0e-12),
-                              ("run_cp_walls_substrate_depletion.yaml", -54312.08243054912, 1.0e-12),
-                              ("run_cp_walls_substrate_depletion_explicit_gsd.yaml", -54312.08243054912, 1.0e-6),
-                              ("run_cp_walls_substrate_depletion_explicit_xyz.yaml", -54312.08243054912, 1.0e-12),
-                              ("run_cp_walls_substrate_gravity.yaml", -12286.225633072137, 1.0e-12),
-                              ("run_cp_walls_substrate_gravity_explicit_gsd.yaml", -12286.225633072137, 1.0e-6),
-                              ("run_cp_walls_substrate_gravity_explicit_xyz.yaml", -12286.225633072137, 1.0e-12),
-                              ("run_cp_walls_snowman.yaml", -231.80203391587074, 1.0e-12),
+                              ("run_cp_walls_substrate_depletion_explicit_gsd.yaml", -54312.08243054912, 1.0e-5),
+                              ("run_cp_walls_substrate_gravity_explicit_gsd.yaml", -12286.225633072137, 1.0e-5),
                               ("run_cp_walls_snowman_explicit_gsd.yaml", -231.80203391587074, 1.0e-5),
-                              ("run_cp_walls_snowman_explicit_xyz.yaml", -231.80203391587074, 1.0e-12),
-                              ("run_cp_walls.yaml", -0.13903947128075853, 1.0e-12),
-                              ("run_cp_full_explicit_xyz.yaml", -436.24104513031267, 1.0e-12),
+                              ("run_cp_walls.yaml", -0.13903947128075853, 1.0e-5),
                               ("run_cp_full_explicit_gsd.yaml", -436.24104513031267, 1.0e-5),])
     def test_energies(self, yaml_file, expected_energy, tolerance):
         simulation = colloids_run([yaml_file])

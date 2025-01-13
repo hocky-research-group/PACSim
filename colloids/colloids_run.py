@@ -56,9 +56,10 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
                                      "partial walls are included (r_d <= (cutoff_factor * lambda_D - 2 * L) / 2)")
 
     if parameters.use_depletion:
-        assert parameters.depletant_radius is not None and parameters.depletant_radius > 0.0
+        assert (parameters.depletant_radius is not None
+                and parameters.depletant_radius.value_in_unit(unit.nano * unit.meter) > 0.0)
         for diameter in frame.particles.diameter:
-            if parameters.depletant_radius / (diameter / 2.0) > 0.1547:
+            if parameters.depletant_radius.value_in_unit(unit.nano * unit.meter) / (diameter / 2.0) > 0.1547:
                 warnings.warn("Size ratio of depletant to colloid particles is too large. "
                               "Analytical computation of depletion potential may be invalid."
                               "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "

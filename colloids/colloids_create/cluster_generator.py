@@ -65,6 +65,7 @@ class ClusterGenerator(ConfigurationGenerator):
         total_clusters: int = configuration_parameters.total_clusters
         cluster_order: Union[str, list[str]] = configuration_parameters.cluster_order
         padding_distance: unit.Quantity = configuration_parameters.padding_distance
+        padding_factor: float = configuration_parameters.padding_factor
         cluster_specifications: dict[str, dict[str, Union[list[str], list[unit.Quantity]]]] = configuration_parameters.cluster_specifications
         colloid_radii: dict[str, unit.Quantity] = configuration_parameters.radii
         masses: dict[str, unit.Quantity] = configuration_parameters.masses
@@ -75,6 +76,7 @@ class ClusterGenerator(ConfigurationGenerator):
         self._lattice_constant = lattice_constant
         self._total_clusters = total_clusters
         self._padding_distance = padding_distance
+        self._padding_factor = padding_factor
         self._cluster_order = cluster_order
         self._cluster_specifications = cluster_specifications
         self._colloid_radii = colloid_radii
@@ -226,7 +228,7 @@ class ClusterGenerator(ConfigurationGenerator):
             if cluster_index == self._total_clusters:
                 break
             
-        positions = positions - np.array(self.box_size.value_in_unit(unit.nanometer)) / 2 + np.array(self._lattice_constant.value_in_unit(unit.nanometer)) / 2
+        positions = positions - np.array(self.box_size.value_in_unit(unit.nanometer)) / 2 + np.array(self._lattice_constant.value_in_unit(unit.nanometer)) * self._padding_factor
 
         self.positions = positions
         self.cluster_numbers = cluster_numbers.squeeze()
@@ -295,35 +297,3 @@ class ClusterGenerator(ConfigurationGenerator):
 
         self.constraint_dists = constraint_dists
 
-if __name__ == "__main__":
-    lattice_constant = 6.0 * unit.nanometer
-    total_clusters = 2400
-    cluster_order = ["A", "B","B"]
-    padding_distance = 0.0 * unit.nanometer
-    cluster_specifications = {
-        "A": {
-            "identity": ["A"],
-            "coordinates": [[0.0, 0.0, 0.0]]
-        },
-        "B": {
-            "identity": ["B", "B", "B", "B", "C"],
-            "coordinates": [[1.0, 1.0, 1.0],
-                            [-1.0, -1.0, 1.0],
-                            [1.0, -1.0, -1.0],
-                            [-1.0, 1.0, -1.0],
-                            [0.0, 0.0, 0.0]]
-        }
-    }
-    colloid_radii = {
-        "A": 1.0 * unit.nanometer,
-        "B": 1.0 * unit.nanometer
-    }
-    masses = {
-        "A": 1.0 * unit.amu,
-        "B": 1.0 * unit.amu
-    }
-    generator = ClusterGenerator(lattice_constant, total_clusters, cluster_order,
-                                padding_distance, cluster_specifications, colloid_radii, masses, random_rotation=True)
-    frame, constraints = generator.generate_configuration()
-    print(frame)
-    print(constraints)

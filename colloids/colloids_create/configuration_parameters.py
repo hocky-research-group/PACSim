@@ -35,6 +35,10 @@ class ConfigurationParameters(Parameters):
     :param padding_distance:
         The minimum distance between colloids in the different clusters. Defaults to 0.0 * unit.nanometer.
     :type padding_distance: unit.Quantity
+    :param padding_factor:
+        The fraction of the lattice constant that is used as padding between the colloids and the edge of the box.
+        Defaults to 0.5.
+    :type padding_factor: float
     :param cluster_order:
         The order in which the clusters should be placed in the lattice.
         Must be a list of strings with the names of the clusters.
@@ -73,6 +77,7 @@ class ConfigurationParameters(Parameters):
     random_rotation: bool = False
     cluster_specifications: dict[str, dict[str, Union[list[str], list[unit.Quantity]]]] = None
     padding_distance: unit.Quantity = field(default_factory=lambda: 0.0 * unit.nanometer)
+    padding_factor: float = 0.5
     masses: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 1.0 * unit.amu, "N": (95.0 / 105.0) ** 3 * unit.amu})
     radii: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 105.0 * (unit.nano * unit.meter), "N": 95.0 * (unit.nano * unit.meter)})
     surface_potentials: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
@@ -111,8 +116,8 @@ class ConfigurationParameters(Parameters):
             raise ValueError("Tilted box not supported currently.")
         if not len(self.box_size) == 3:
             raise ValueError("The box size must be a list of three quantities.")
-        effective_repeats = np.array([self.box_size[i].value_in_unit(unit.nanometer) // self.lattice_constant[i].value_in_unit(unit.nanometer) for i in range(3)])
-        effective_clusters = np.prod(effective_repeats - 1)
+        effective_repeats = np.array([self.box_size[i].value_in_unit(unit.nanometer) / self.lattice_constant[i].value_in_unit(unit.nanometer) for i in range(3)])
+        effective_clusters = np.prod(np.floor(effective_repeats - 2.0 * self.padding_factor))
 
         if self.total_clusters > effective_clusters:
             raise ValueError("The volume of the unit cell times the number of clusters must be less than the volume of the box.")

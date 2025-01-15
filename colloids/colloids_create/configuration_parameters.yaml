@@ -1,12 +1,12 @@
-total_clusters: 6500
+total_clusters: 10000
 lattice_constant: !Quantity
   unit: nanometer
-  value: [900.0, 900.0, 900.0]
+  value: [800.0, 800.0, 800.0]
 box_size: !Quantity
   unit: nanometer
   value: [9000.0, 9000.0, 90000.0]
 random_rotation: true
-cluster_order: ["A", "B"]
+cluster_order: ["A", "A", "B"]
 masses:
   A: !Quantity
     unit: dalton
@@ -20,7 +20,7 @@ masses:
 radii:
   A: !Quantity
     unit: nanometer
-    value: 105.0
+    value: 59.39696961966999204974
   B: !Quantity
     unit: nanometer
     value: 105.0
@@ -55,9 +55,8 @@ cluster_specifications:
     coordinates: !Quantity
       unit: nanometer
       value:
-      - [50, 50, 50]
-      - [-50, -50, 50]
-      - [50, -50, -50]
-      - [-50, 50, -50]
+      - [105.0, 105.0, 105.0]
+      - [-105.0, -105.0, 105.0]
+      - [105.0, -105.0, -105.0]
+      - [-105.0, 105.0, -105.0]
       - [0.0, 0.0, 0.0]
-

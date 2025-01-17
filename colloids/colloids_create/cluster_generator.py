@@ -6,7 +6,7 @@ from gsd.hoomd import Frame
 import numpy as np
 import numpy.typing as npt
 from scipy.spatial.transform import Rotation
-from math import pi, ceil
+from math import pi
 
 import warnings
 from openmm import unit
@@ -197,36 +197,33 @@ class ClusterGenerator(ConfigurationGenerator):
         repeat_index = np.repeat(np.arange(n_repeats), n_colloids_per_repeat)
 
         # create the positions
+        lattice_displacements_x = np.tile(np.arange(number_repeats_per_dimension[0]), number_repeats_per_dimension[1] * number_repeats_per_dimension[2])
+        lattice_displacements_y = np.repeat(np.tile(np.arange(number_repeats_per_dimension[1]), number_repeats_per_dimension[0]), number_repeats_per_dimension[2])
+        lattice_displacements_z = np.repeat(np.arange(number_repeats_per_dimension[2]), number_repeats_per_dimension[1] * number_repeats_per_dimension[0])
+        lattice_displacements = np.array([lattice_displacements_x, lattice_displacements_y, lattice_displacements_z]).T
+
+        # sort the lattice displacements by the maximum displacement
+        lattice_displacements = lattice_displacements[np.argsort(np.max(lattice_displacements, axis=1))]
+
         positions = np.zeros((n_colloids_total, 3))
-        cluster_index = 0
-        for x_i in range(number_repeats_per_dimension[0]):
-            for y_i in range(number_repeats_per_dimension[1]):
-                for z_i in range(number_repeats_per_dimension[2]):
-                    # the index of the cluster in the cluster order
-                    relative_cluster_index = cluster_index % len(self._cluster_order)
-                    # the number of times the cluster (of this specific index in the order) has been repeated
-                    n_repeat = cluster_index // len(self._cluster_order)
-                    # use above to find where to insert the cluster in the positions tensor
-                    positions_mask = (cluster_numbers == cluster_index) * (repeat_index == n_repeat)
+        for cluster_index, lattice_displacement in enumerate(lattice_displacements):
+            # the index of the cluster in the cluster order
+            relative_cluster_index = cluster_index % len(self._cluster_order)
+            # the number of times the cluster (of this specific index in the order) has been repeated
+            n_repeat = cluster_index // len(self._cluster_order)
+            # use above to find where to insert the cluster in the positions tensor
+            positions_mask = (cluster_numbers == cluster_index) * (repeat_index == n_repeat)
 
-                    # the cluster name
-                    cluster = self._cluster_order[relative_cluster_index]
+            # the cluster name
+            cluster = self._cluster_order[relative_cluster_index]
 
-                    # create the positions of the cluster
-                    relative_positions = self._cluster_specifications[cluster]["coordinates"]
-                    if self._random_rotation:
-                        rotation = Rotation.from_euler("xyz", np.random.uniform(0, 2*pi, 3))
-                        relative_positions = rotation.apply(relative_positions.value_in_unit(unit.nanometer))
-                    offset = np.array([x_i, y_i, z_i]) * self._lattice_constant.value_in_unit(unit.nanometer)
-                    positions[positions_mask] = relative_positions + offset
-
-                    cluster_index += 1
-                    if cluster_index == self._total_clusters:
-                        break
-                if cluster_index == self._total_clusters:
-                    break
-            if cluster_index == self._total_clusters:
-                break
+            # create the positions of the cluster
+            relative_positions = self._cluster_specifications[cluster]["coordinates"]
+            if self._random_rotation:
+                rotation = Rotation.from_euler("xyz", np.random.uniform(0, 2*pi, 3))
+                relative_positions = rotation.apply(relative_positions.value_in_unit(unit.nanometer))
+            offset = lattice_displacement * self._lattice_constant.value_in_unit(unit.nanometer)
+            positions[positions_mask] = relative_positions + offset
             
         positions = positions - np.array(self.box_size.value_in_unit(unit.nanometer)) / 2 + np.array(self._lattice_constant.value_in_unit(unit.nanometer)) * self._padding_factor
 

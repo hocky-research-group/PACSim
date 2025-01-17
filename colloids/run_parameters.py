@@ -495,8 +495,8 @@ class RunParameters(Parameters):
                                  f"{', '.join(possible_update_reporters)}.")
             if self.update_reporter_parameters is None:
                 raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")
-            if "simulation" in self.update_reporter_parameters or "append_file" in self.update_reporter_parameters:
-                raise ValueError("Update-reporter parameters should not contain simulation and append_file keys.")
+            if "system" in self.update_reporter_parameters or "simulation" in self.update_reporter_parameters or "append_file" in self.update_reporter_parameters:
+                raise ValueError("Update-reporter parameters should not contain system, simulation, or append_file keys.")
         else:
             if self.update_reporter_parameters is not None:
                 raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")

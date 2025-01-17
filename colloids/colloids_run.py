@@ -357,10 +357,10 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         simulation = app.Simulation(topology, system, integrator, platform)
 
     extra_positions = np.array([p for p in itertools.chain(snowman_positions, substrate_positions) if p is not None])
-    return simulation, extra_positions
+    return system, simulation, extra_positions
 
 
-def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
+def set_up_reporters(parameters: RunParameters, system: openmm.System, simulation: app.Simulation, append_file: bool,
                      total_number_steps: int, cell: npt.NDArray[float]) -> None:
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
                                             parameters.radii, parameters.surface_potentials, simulation,
@@ -375,12 +375,12 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
     if parameters.update_reporter is not None:
         update_reporter = getattr(update_reporters, parameters.update_reporter)
         try:
-            simulation.reporters.append(update_reporter(simulation=simulation, append_file=append_file,
+            simulation.reporters.append(update_reporter(system=system, simulation=simulation, append_file=append_file,
                                                         **parameters.update_reporter_parameters))
         except TypeError:
             raise TypeError(
                 f"UpdateReporter does not accept the given arguments {parameters.update_reporter_parameters}. "
-                f"The expected signature is {inspect.signature(update_reporter)} (the simulation argument need not be "
+                f"The expected signature is {inspect.signature(update_reporter)} (the system and simulation arguments need not be "
                 f"specified).")
     # The CheckpointReporter should always be last to ensure that all other reporters have been executed before it.
     simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
@@ -401,7 +401,7 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
 
     types, positions, cell = read_initial_file(parameters.initial_configuration)
 
-    simulation, extra_positions = set_up_simulation(parameters, types, cell, positions)
+    system, simulation, extra_positions = set_up_simulation(parameters, types, cell, positions)
 
     simulation.context.setPositions(np.concatenate((positions, extra_positions)) if len(extra_positions) > 0
                                     else positions)
@@ -417,7 +417,7 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
         # See https://openmm.github.io/openmm-cookbook/dev/notebooks/cookbook/report_minimization.html
         simulation.minimizeEnergy()
 
-    set_up_reporters(parameters, simulation, False, parameters.run_steps, cell)
+    set_up_reporters(parameters, system, simulation, False, parameters.run_steps, cell)
 
     simulation.step(parameters.run_steps)
 

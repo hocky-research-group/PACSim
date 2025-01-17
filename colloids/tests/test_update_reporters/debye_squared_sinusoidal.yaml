@@ -72,13 +72,15 @@ update_reporter_parameters:
   print_interval: 1
   final_update_step: !Copy
     key: run_steps
-  global_parameter_name: debye_length
-  start_value: !Copy
-    key: debye_length
+  parameter_name: psi
+  start_value: !Quantity
+    unit: millivolt
+    value: 44.0
   end_value: !Quantity
-    unit: nanometer
-    value: 6.0
+    unit: millivolt
+    value: -10.0
   switch_step: 10
+  particle_type_index: 1
 use_depletion: false
 use_gravity: false
 use_log: false

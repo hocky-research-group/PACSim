@@ -15,6 +15,7 @@ depletant_radius: null
 depletion_phi: null
 dielectric_constant: 80.0 
 gravitational_acceleration: null
+initial_configuration: initial_configuration.gsd
 integrator: LangevinIntegrator
 integrator_parameters:
   frictionCoeff: !Quantity

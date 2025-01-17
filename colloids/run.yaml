@@ -42,6 +42,7 @@ masses:
 minimize_energy_initially: false
 particle_density: null
 platform_name: CPU
+psi_scale: 1.0
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0

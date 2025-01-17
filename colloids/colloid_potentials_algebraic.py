@@ -104,7 +104,7 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         if self._use_log:
             electrostatic_potential = CustomNonbondedForce(
                 "select(flag1 * flag2, 0, "
-                "electrostatic_prefactor * radius * psi1 * psi2 * log(1.0 + exp(-h / debye_length))); "
+                "electrostatic_prefactor * psi_scale * radius * psi1 * psi2 * log(1.0 + exp(-h / debye_length))); "
                 "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
                 "h = r - rs;"
                 "rs = radius1 + radius2"
@@ -112,7 +112,7 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         else:
             electrostatic_potential = CustomNonbondedForce(
                 "select(flag1 * flag2, 0, "
-                "electrostatic_prefactor * radius * psi1 * psi2 * exp(-h / debye_length)); "
+                "electrostatic_prefactor * psi_scale * radius * psi1 * psi2 * exp(-h / debye_length)); "
                 "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
                 "h = r - rs;"
                 "rs = radius1 + radius2"
@@ -125,6 +125,8 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
                 unit.kilojoule_per_mole / (self._nanometer * self._millivolt ** 2)))
         electrostatic_potential.addGlobalParameter("debye_length",
                                                    self._parameters.debye_length.value_in_unit(self._nanometer))
+        
+        electrostatic_potential.addGlobalParameter("psi_scale", self._parameters.psi_scale)
         electrostatic_potential.addPerParticleParameter("radius")
         # Psi should be given in millivolts.
         electrostatic_potential.addPerParticleParameter("psi")

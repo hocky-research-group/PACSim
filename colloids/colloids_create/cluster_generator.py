@@ -83,6 +83,13 @@ class ClusterGenerator(ConfigurationGenerator):
         self._random_rotation = random_rotation
 
     def generate_configuration(self) -> tuple[Frame, list[tuple[int]]]:
+        # Build the cluster ids.
+        if not isinstance(self._cluster_order, list):
+            self.unitcell = True
+            self.build_cluster_ids_unit_cells()
+        else:
+            self.unitcell = False
+            self.build_cluster_ids_clusters()
         # Create the lattice.
         self.build_positions()
         # Tags are a linear combination of the intracluster ids, the cluster ids, and the cluster numbers. They can 
@@ -118,7 +125,7 @@ class ClusterGenerator(ConfigurationGenerator):
         frame.particles.types = tuple(self.colloid_id_dict.keys())
         frame.particles.typeid = [self.colloid_id_dict[colloid_type] for colloid_type in self.colloid_types]
 
-        return frame, list(zip(self.constraint_map, self.constraint_dists, self.intracluster_ids, self.cluster_ids, self.cluster_numbers))
+        return frame, list(zip(self.constraint_map, self.constraint_dists))
 
     def write_positions(self) -> None:
         # Save positions as xyz
@@ -128,9 +135,65 @@ class ClusterGenerator(ConfigurationGenerator):
             for i, atom in enumerate(self.atoms):
                 f.write(f"{atom.symbol} {atom.position[0]} {atom.position[1]} {atom.position[2]}\n")
 
-    def build_positions(self) -> None:
+    def build_cluster_ids_unit_cells(self) -> None:
         """
-        Build the positions of the clusters on a sphere using the Fibonacci lattice.
+        Build the positions of the clusters from the unit cells.
+        some of the variable names need to be reworked since now the unit cell is specified
+        and the clusters are specified by the cluster specifications "cluster" key. 
+        """
+        self._cluster_order = list(self._cluster_specifications.keys())
+
+        # the number of clusters total
+        key = list(self._cluster_specifications.keys())[0]
+        cluster_names = list(dict.fromkeys(self._cluster_specifications[key]["cluster"]))
+        n_clusters_per_unit_cell = len(cluster_names)
+        self._total_clusters = self._total_clusters - (self._total_clusters % n_clusters_per_unit_cell)
+
+        colloid_id_dict = {colloid: i for i, colloid in enumerate(list(dict.fromkeys(self._cluster_specifications[key]["identity"])))}
+        cluster_id_dict = {cluster: i for i, cluster in enumerate(cluster_names)}
+        cluster_sizes = {cluster: sum(1 for is_cluster in self._cluster_specifications[key]["cluster"] if is_cluster == cluster) for cluster in cluster_names}
+
+        # create the cluster ids (dict method is used to remove duplicates and keep the order)
+        self.colloid_id_dict = colloid_id_dict
+        self.cluster_id_dict = cluster_id_dict
+
+        # the number of times the unit cell is repeated
+        self.n_repeats = self._total_clusters // n_clusters_per_unit_cell
+        
+        self.n_colloids_per_repeat = sum(cluster_sizes.values())
+        self.box_numbers = np.arange(self._total_clusters)
+
+        # total number of colloids
+        self.n_colloids_total = self.n_colloids_per_repeat * self.n_repeats
+
+        # the cluster ids are a one hot encoding of the colloid types
+        cluster_ids = np.array(self._cluster_specifications[key]["cluster"] * self.n_repeats)
+
+        # the intracluster ids are the identity of the colloids in the cluster
+        intracluster_ids = np.zeros(self.n_colloids_per_repeat)
+        for cluster in cluster_names:   
+            intracluster_ids[cluster_ids[:self.n_colloids_per_repeat] == cluster_id_dict[cluster]] = np.arange(cluster_sizes[cluster])
+        intracluster_ids = np.tile(intracluster_ids, self.n_repeats)
+
+        # the cluster numbers are a unique number for each cluster based on genertation order
+        cluster_numbers = []
+        for i, cluster in enumerate(cluster_names * self.n_repeats):
+            cluster_numbers += [i] * cluster_sizes[cluster]
+        cluster_numbers = np.array(cluster_numbers)
+
+        # the colloids types are the identity of the colloids in the cluster
+        colloid_types = self._cluster_specifications[key]["identity"] * self.n_repeats
+
+        self.cluster_numbers = cluster_numbers
+        self.cluster_ids = cluster_ids
+        self.intracluster_ids = intracluster_ids
+        self.colloid_types = colloid_types
+
+        self.box_numbers = np.repeat(np.arange(self.n_repeats), self.n_colloids_per_repeat)
+
+    def build_cluster_ids_clusters(self) -> None:
+        """
+        Build the positions of the clusters
 
         :param total_clusters:
             The number of clusters to generate
@@ -150,90 +213,97 @@ class ClusterGenerator(ConfigurationGenerator):
         """
         # the number of clusters total
         self._total_clusters = self._total_clusters - (self._total_clusters % len(self._cluster_order))
-        # the number of repeats in each dimension
-        number_repeats_per_dimension = np.array([self.box_size[i].value_in_unit(unit.nanometer) // self._lattice_constant[i].value_in_unit(unit.nanometer) 
-                                                 for i in range(3)], dtype=int)
-        number_repeats_per_dimension = number_repeats_per_dimension - 1
         # the number of times the order of the clusters is repeated
-        n_repeats = self._total_clusters // len(self._cluster_order)
-
-        n_colloids = {}
-        for cluster in set(self._cluster_order):
-            n_colloids[cluster] = len(self._cluster_specifications[cluster]["identity"])
-        n_colloids_per_repeat = sum([n_colloids[cluster] for cluster in self._cluster_order])
-
-        n_colloids_total = n_colloids_per_repeat * n_repeats
-
-        # the intracluster ids are the identity of the colloids in the cluster
-        intracluster_ids = []
-        for cluster in self._cluster_order:
-            intracluster_ids += list(range(len(self._cluster_specifications[cluster]["identity"])))
-        intracluster_ids = intracluster_ids * n_repeats
-            
+        self.n_repeats = self._total_clusters // len(self._cluster_order)
 
         # the colloids types are the identity of the colloids in the cluster
         colloid_types = []
         for cluster in self._cluster_order:
             colloid_types += self._cluster_specifications[cluster]["identity"]
-
-        colloid_types = colloid_types * n_repeats
+        colloid_types = colloid_types * self.n_repeats
 
         # create the cluster ids (dict method is used to remove duplicates and keep the order)
         cluster_id_dict = {cluster: i for i, cluster in enumerate(list(dict.fromkeys(self._cluster_order)))}
         colloid_id_dict = {colloid: i for i, colloid in enumerate(list(dict.fromkeys(colloid_types)))}
 
+        self.colloid_id_dict = colloid_id_dict
+        self.cluster_id_dict = cluster_id_dict
+
+        n_colloids = {}
+        for cluster in set(self._cluster_order):
+            n_colloids[cluster] = len(self._cluster_specifications[cluster]["identity"])
+        self.n_colloids_per_repeat = sum([n_colloids[cluster] for cluster in self._cluster_order])
+
+        self.n_colloids_total = self.n_colloids_per_repeat * self.n_repeats
+
+        # the intracluster ids are the identity of the colloids in the cluster
+        intracluster_ids = []
+        for cluster in self._cluster_order:
+            intracluster_ids += list(range(len(self._cluster_specifications[cluster]["identity"])))
+        intracluster_ids = intracluster_ids * self.n_repeats
+
         # the cluster ids are a one hot encoding of the colloid types
         cluster_ids = []
         for cluster in self._cluster_order:
             cluster_ids += [cluster_id_dict[cluster]] * n_colloids[cluster]
-        cluster_ids = np.tile(np.array(cluster_ids), n_repeats)
+        cluster_ids = np.tile(np.array(cluster_ids), self.n_repeats)
 
         # the cluster numbers are a unique number for each cluster based on genertation order
         cluster_numbers = []
-        for i, cluster in enumerate(self._cluster_order * n_repeats):
+        for i, cluster in enumerate(self._cluster_order * self.n_repeats):
             cluster_numbers += [i] * n_colloids[cluster]
         cluster_numbers = np.array(cluster_numbers)
 
-        repeat_index = np.repeat(np.arange(n_repeats), n_colloids_per_repeat)
+        self.cluster_numbers = cluster_numbers.squeeze()
+        self.cluster_ids = cluster_ids
+        self.intracluster_ids = intracluster_ids
+        self.colloid_types = colloid_types
+
+        self.box_numbers = cluster_numbers
+
+
+    def build_positions(self) -> None:
+        # the number of repeats in each dimension
+        number_repeats_per_dimension = np.array([self.box_size[i].value_in_unit(unit.nanometer) // self._lattice_constant[i].value_in_unit(unit.nanometer) 
+                                                 for i in range(3)], dtype=int) - 1 
+
+        repeat_index = np.repeat(np.arange(self.n_repeats), self.n_colloids_per_repeat)
 
         # create the positions
         lattice_displacements_x = np.tile(np.arange(number_repeats_per_dimension[0]), number_repeats_per_dimension[1] * number_repeats_per_dimension[2])
-        lattice_displacements_y = np.repeat(np.tile(np.arange(number_repeats_per_dimension[1]), number_repeats_per_dimension[0]), number_repeats_per_dimension[2])
-        lattice_displacements_z = np.repeat(np.arange(number_repeats_per_dimension[2]), number_repeats_per_dimension[1] * number_repeats_per_dimension[0])
+        lattice_displacements_y = np.repeat(np.tile(np.arange(number_repeats_per_dimension[1]), number_repeats_per_dimension[2]), number_repeats_per_dimension[0])
+        lattice_displacements_z = np.repeat(np.arange(number_repeats_per_dimension[2]), number_repeats_per_dimension[0] * number_repeats_per_dimension[1])
         lattice_displacements = np.array([lattice_displacements_x, lattice_displacements_y, lattice_displacements_z]).T
 
-        # sort the lattice displacements by the maximum displacement
+        # sort the lattice displacements by the minimum displacement
         lattice_displacements = lattice_displacements[np.argsort(np.max(lattice_displacements, axis=1))]
 
-        positions = np.zeros((n_colloids_total, 3))
-        for cluster_index, lattice_displacement in enumerate(lattice_displacements):
+        positions = np.zeros((self.n_colloids_total, 3))
+        for box_index in range(self.n_repeats):
+            lattice_displacement = lattice_displacements[box_index]
             # the index of the cluster in the cluster order
-            relative_cluster_index = cluster_index % len(self._cluster_order)
+            relative_cluster_index = box_index % len(self._cluster_order)
             # the number of times the cluster (of this specific index in the order) has been repeated
-            n_repeat = cluster_index // len(self._cluster_order)
+            n_repeat = box_index // len(self._cluster_order)
             # use above to find where to insert the cluster in the positions tensor
-            positions_mask = (cluster_numbers == cluster_index) * (repeat_index == n_repeat)
+
+            positions_mask = (self.box_numbers == box_index) * (repeat_index == n_repeat)
 
             # the cluster name
             cluster = self._cluster_order[relative_cluster_index]
 
             # create the positions of the cluster
-            relative_positions = self._cluster_specifications[cluster]["coordinates"]
+            relative_positions = self._cluster_specifications[cluster]["coordinates"].value_in_unit(unit.nanometer)
             if self._random_rotation:
                 rotation = Rotation.from_euler("xyz", np.random.uniform(0, 2*pi, 3))
-                relative_positions = rotation.apply(relative_positions.value_in_unit(unit.nanometer))
+                relative_positions = rotation.apply(relative_positions)
             offset = lattice_displacement * self._lattice_constant.value_in_unit(unit.nanometer)
-            positions[positions_mask] = relative_positions + offset
+            positions[positions_mask] = relative_positions + offset[None]
             
         positions = positions - np.array(self.box_size.value_in_unit(unit.nanometer)) / 2 + np.array(self._lattice_constant.value_in_unit(unit.nanometer)) * self._padding_factor
 
         self.positions = positions
-        self.cluster_numbers = cluster_numbers.squeeze()
-        self.cluster_ids = cluster_ids
-        self.intracluster_ids = intracluster_ids
-        self.cluster_id_dict = cluster_id_dict
-        self.colloid_types = colloid_types
-        self.colloid_id_dict = colloid_id_dict
+
 
     def get_constraint_dict(self) -> dict[str, dict[int, npt.NDArray[np.floating]]]:
         """
@@ -246,8 +316,9 @@ class ClusterGenerator(ConfigurationGenerator):
         """
         constraints = {}
 
-        for cluster in self._cluster_specifications:
-            coordinates = np.array(self._cluster_specifications[cluster]["coordinates"].value_in_unit(unit.nanometer))
+        for cluster in self.cluster_id_dict.keys():
+            coordinates = self.positions[:self.n_colloids_per_repeat]
+            coordinates = coordinates[self.cluster_ids[:self.n_colloids_per_repeat] == self.cluster_id_dict[cluster]]
             distance_matrix = np.linalg.norm(coordinates[:, np.newaxis, :] - coordinates[np.newaxis, :, :], axis=-1)
 
             constraints[cluster] = {}
@@ -281,14 +352,13 @@ class ClusterGenerator(ConfigurationGenerator):
     def get_constraint_dists(self) -> list[npt.NDArray[np.floating]]:
         constraint_dists = []
         reverse_cluster_id_dict = {v: k for k, v in self.cluster_id_dict.items()}
-
         for i in range(len(self.constraint_map)):
             cluster_id = self.cluster_ids[i]
             intracluster_id = self.intracluster_ids[i]
             
             # the distances between colloids in the cluster type specified by the cluster_id and containing the colloid specified by intracluster_id
             dists = self.constraint_dist_dict[reverse_cluster_id_dict[cluster_id]][intracluster_id]
-            dists = np.delete(dists, intracluster_id)
+            dists = np.delete(dists, int(intracluster_id))
 
             constraint_dists.append(dists)
 

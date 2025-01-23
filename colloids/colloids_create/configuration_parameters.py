@@ -73,7 +73,7 @@ class ConfigurationParameters(Parameters):
     total_clusters: int
     lattice_constant: Union[unit.Quantity, tuple[unit.Quantity]]
     box_size: unit.Quantity
-    cluster_order: list[str]
+    cluster_order: list[str] = None
     random_rotation: bool = False
     cluster_specifications: dict[str, dict[str, Union[list[str], list[unit.Quantity]]]] = None
     padding_distance: unit.Quantity = field(default_factory=lambda: 0.0 * unit.nanometer)
@@ -122,19 +122,30 @@ class ConfigurationParameters(Parameters):
         if self.total_clusters > effective_clusters:
             raise ValueError("The volume of the unit cell times the number of clusters must be less than the volume of the box.")
         
+        # Check the cluster order.
+        clusters_in_specifications = set(self.cluster_specifications.keys())
+        if isinstance(self.cluster_order, list):
+            clusters_in_order = set(self.cluster_order)
+            if not clusters_in_order == clusters_in_specifications:
+                raise ValueError("The cluster order and the cluster specifications must have the same keys.")
+            check_intracluster_distances = True
+        elif self.cluster_order is None:
+            if len(self.cluster_specifications) > 1:
+                raise ValueError("The cluster order must be specified if there is more than one cluster, unit cell is not permitted.")
+            if not all("cluster" in self.cluster_specifications[cluster] for cluster in self.cluster_specifications):
+                raise ValueError("The cluster specifications must have a cluster key when using it as a unit cell.")
+            check_intracluster_distances = False
+        else:
+            raise TypeError("The cluster order must be a list of strings or None.")
+        
+        if not all("identity" in self.cluster_specifications[cluster] for cluster in self.cluster_specifications):
+            raise ValueError("The cluster specifications must have an identity key.")
+        if not all("coordinates" in self.cluster_specifications[cluster] for cluster in self.cluster_specifications):
+            raise ValueError("The cluster specifications must have a coordinates key.")
+
         # Check the cluster specifications.
-        if self.cluster_order is None:
-            raise ValueError("The cluster order must not be None.")   
-        if not isinstance(self.cluster_order, list):
-            raise TypeError("The cluster order must be a list of strings.") 
-        if self.cluster_specifications is None:
-            raise ValueError("The cluster specifications must not be None.")
         if not isinstance(self.cluster_specifications, dict):
             raise TypeError("The cluster specifications must be a dictionary.")
-        clusters_in_order = set(self.cluster_order)
-        clusters_in_specifications = set(self.cluster_specifications.keys())
-        if not clusters_in_order == clusters_in_specifications:
-            raise ValueError("The cluster order and the cluster specifications must have the same keys.")
         for cluster in self.cluster_specifications:
             if "identity" not in self.cluster_specifications[cluster]:
                 raise ValueError(f"Cluster {cluster} must have an identity key in the cluster specifications.")
@@ -185,15 +196,16 @@ class ConfigurationParameters(Parameters):
                 raise ValueError(f"Colloid type {t} in cluster_specifications is not in surface potentials dictionary.")
             
         # Check the longest distance between colloids plus radii of those colloids is less than the (shortest) lattice constant.
-        for cluster in self.cluster_specifications:
-            coordinates = np.array(self.cluster_specifications[cluster]["coordinates"].value_in_unit(unit.nanometer))
-            distance_matrix = np.linalg.norm(coordinates[:, np.newaxis, :] - coordinates[np.newaxis, :, :], axis=-1)
-            radius_vector = np.array([self.radii[identity].value_in_unit(unit.nanometer) for identity in self.cluster_specifications[cluster]["identity"]])
-            radius_matrix = radius_vector[:, np.newaxis] + radius_vector[np.newaxis, :]
+        if check_intracluster_distances:
+            for cluster in self.cluster_specifications:
+                coordinates = np.array(self.cluster_specifications[cluster]["coordinates"].value_in_unit(unit.nanometer))
+                distance_matrix = np.linalg.norm(coordinates[:, np.newaxis, :] - coordinates[np.newaxis, :, :], axis=-1)
+                radius_vector = np.array([self.radii[identity].value_in_unit(unit.nanometer) for identity in self.cluster_specifications[cluster]["identity"]])
+                radius_matrix = radius_vector[:, np.newaxis] + radius_vector[np.newaxis, :]
 
-            min_lattice_vec = min(self.lattice_constant)
-            max_distance = np.max(distance_matrix + radius_matrix)
-            if max_distance + self.padding_distance.value_in_unit(unit.nanometer) > min_lattice_vec.value_in_unit(unit.nanometer):
-                raise ValueError(f"The distance between the colloids plus the radii of the colloids must be less than the lattice constant for cluster {cluster}.")
+                min_lattice_vec = min(self.lattice_constant)
+                max_distance = np.max(distance_matrix + radius_matrix)
+                if max_distance + self.padding_distance.value_in_unit(unit.nanometer) > min_lattice_vec.value_in_unit(unit.nanometer):
+                    raise ValueError(f"The distance between the colloids plus the radii of the colloids must be less than the lattice constant for cluster {cluster}.")
 
 

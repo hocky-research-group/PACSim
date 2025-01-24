@@ -134,6 +134,8 @@ class ConfigurationParameters(Parameters):
                 raise ValueError("The cluster order must be specified if there is more than one cluster, unit cell is not permitted.")
             if not all("cluster" in self.cluster_specifications[cluster] for cluster in self.cluster_specifications):
                 raise ValueError("The cluster specifications must have a cluster key when using it as a unit cell.")
+            if self.random_rotation:
+                raise ValueError("Random rotation is not permitted when using the unit cell.")
             check_intracluster_distances = False
         else:
             raise TypeError("The cluster order must be a list of strings or None.")

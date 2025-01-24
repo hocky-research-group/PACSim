@@ -5,7 +5,7 @@ lattice_constant: !Quantity
 box_size: !Quantity
   unit: nanometer
   value: [9000.0, 9000.0, 90000.0]
-random_rotation: true
+random_rotation: false
 cluster_order: ["A", "A", "B"]
 masses:
   A: !Quantity

@@ -440,6 +440,18 @@ class Parameters(object):
         with open(filename, "w") as f:
             yaml.dump(self._as_dictionary(), f, default_flow_style=False)
 
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Represent this dataclass as a dictionary.
+
+        OpenMM quantities are converted to _Quantity objects.
+
+        :return:
+            The dictionary with the parameters.
+        :rtype: dict[str, Any]
+        """
+        return self._as_dictionary()
+
     def _as_dictionary(self):
         """Represent this dataclass as a dictionary while converting all OpenMM quantities to _Quantity objects."""
         result_dict = {}

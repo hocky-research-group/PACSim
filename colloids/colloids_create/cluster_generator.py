@@ -176,10 +176,7 @@ class ClusterGenerator(ConfigurationGenerator):
         intracluster_ids = np.tile(intracluster_ids, self.n_repeats)
 
         # the cluster numbers are a unique number for each cluster based on genertation order
-        cluster_numbers = []
-        for i, cluster in enumerate(cluster_names * self.n_repeats):
-            cluster_numbers += [i] * cluster_sizes[cluster]
-        cluster_numbers = np.array(cluster_numbers)
+        cluster_numbers = cluster_ids + np.repeat(np.arange(self.n_repeats), self.n_colloids_per_repeat) * n_clusters_per_unit_cell
 
         # the colloids types are the identity of the colloids in the cluster
         colloid_types = self._cluster_specifications[key]["identity"] * self.n_repeats
@@ -342,11 +339,10 @@ class ClusterGenerator(ConfigurationGenerator):
             cluster_number = self.cluster_numbers[i]
             current_index_onehot = np.zeros(n_colloids)
             current_index_onehot[i] = 1
-            
+
             in_cluster = np.where(np.logical_and(self.cluster_numbers == cluster_number, current_index_onehot == 0))
 
             constraint_map.append(in_cluster[0])
-
         self.constraint_map = constraint_map
 
     def get_constraint_dists(self) -> list[npt.NDArray[np.floating]]:

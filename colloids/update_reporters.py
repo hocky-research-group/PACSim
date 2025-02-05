@@ -79,17 +79,20 @@ class UpdateReporterAbstract(ABC):
         self._file = open(filename, "a" if append_file else "w")
         if not append_file:
             print(f"timestep,{self._global_parameter_name}", file=self._file, flush=True)
-        self._start_value = start_value #.value_in_unit_system(unit.md_unit_system)
+        try: 
+            self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
+        except AttributeError:
+            self._start_value = start_value
         # Check if the start value of the global parameter matches the value in the OpenMM simulation.
         # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
         # the start value is not necessarily the same as the value in the OpenMM simulation.
         if not print_interval > 0:
             raise ValueError("The print frequency must be greater than zero.")
         self._print_interval = print_interval
-        if (not append_file
+        '''if (not append_file
                 and abs(self._start_value - simulation.context.getParameters()[self._global_parameter_name]) > 1.0e-12):
             warnings.warn("The start value of the global parameter does not match the value in the OpenMM simulation.")
-            simulation.context.setParameter(self._global_parameter_name, self._start_value)
+            simulation.context.setParameter(self._global_parameter_name, self._start_value)'''
         if not append_file:
             print(f"0,{self._start_value}", file=self._file)
 
@@ -229,9 +232,13 @@ class RampUpdateReporter(UpdateReporterAbstract):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
                          print_interval=print_interval, simulation=simulation, append_file=append_file)
-       # if not start_value.unit.is_compatible(end_value.unit):
-          #  raise ValueError(f"The start and end values have incompatible units.")
-        self._end_value = end_value #.value_in_unit_system(unit.md_unit_system)
+        try:
+            if not start_value.unit.is_compatible(end_value.unit):
+                raise ValueError(f"The start and end values have incompatible units.")
+            self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
+
+        except AttributeError:
+            self._end_value = end_value
 
     def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
         """
@@ -325,9 +332,12 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
                          print_interval=print_interval, simulation=simulation, append_file=append_file)
-       # if not start_value.unit.is_compatible(end_value.unit):
-         #   raise ValueError(f"The start and end values have incompatible units.")
-        self._end_value = end_value #.value_in_unit_system(unit.md_unit_system)
+        try: 
+            if not start_value.unit.is_compatible(end_value.unit):
+                raise ValueError(f"The start and end values have incompatible units.")
+            self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
+        except AttributeError:
+            self._end_value = end_value
         if not final_update_step >= switch_step >= update_interval:
             raise ValueError("The switch step must be greater than or equal to the update frequency,"
                              "and less than or equal to the final update step.")
@@ -433,9 +443,12 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
                          print_interval=print_interval, simulation=simulation, append_file=append_file)
-       # if not start_value #.unit.is_compatible(end_value.unit):
-           # raise ValueError(f"The start value and amplitude have incompatible units.")
-        end_value_float = end_value #.value_in_unit_system(unit.md_unit_system)
+        try:
+            if not start_value.unit.is_compatible(end_value.unit):
+                raise ValueError(f"The start value and amplitude have incompatible units.")
+            end_value_float = end_value.value_in_unit_system(unit.md_unit_system)
+        except AttributeError:
+            self._end_value = end_value
         self._amplitude = end_value_float - self._start_value
         if not final_update_step >= switch_step >= update_interval:
             raise ValueError("The switch step must be greater than or equal to the update frequency,"

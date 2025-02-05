@@ -448,7 +448,7 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
                 raise ValueError(f"The start value and amplitude have incompatible units.")
             end_value_float = end_value.value_in_unit_system(unit.md_unit_system)
         except AttributeError:
-            self._end_value = end_value
+            end_value_float = end_value
         self._amplitude = end_value_float - self._start_value
         if not final_update_step >= switch_step >= update_interval:
             raise ValueError("The switch step must be greater than or equal to the update frequency,"

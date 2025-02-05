@@ -104,16 +104,20 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         if self._use_log:
             electrostatic_potential = CustomNonbondedForce(
                 "select(flag1 * flag2, 0, "
-                "electrostatic_prefactor * psi_scale * radius * psi1 * psi2 * log(1.0 + exp(-h / debye_length))); "
+                "electrostatic_prefactor * rescale_factor_one * rescale_factor_two * radius * psi1 * psi2 ** log(1.0 + exp(-h / debye_length))); "
                 "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
+                "rescale_factor_one = select(type_flag1, psi_scale, 1);"
+                "rescale_factor_two = select(type_flag2, psi_scale, 1);"
                 "h = r - rs;"
                 "rs = radius1 + radius2"
             )
         else:
             electrostatic_potential = CustomNonbondedForce(
                 "select(flag1 * flag2, 0, "
-                "electrostatic_prefactor * psi_scale * radius * psi1 * psi2 * exp(-h / debye_length)); "
+                "electrostatic_prefactor * rescale_factor_one * rescale_factor_two * radius * psi1 * psi2 * exp(-h / debye_length)); "
                 "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
+                "rescale_factor_one = select(type_flag1, psi_scale, 1);"
+                "rescale_factor_two = select(type_flag2, psi_scale, 1);"
                 "h = r - rs;"
                 "rs = radius1 + radius2"
             )
@@ -131,10 +135,11 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         # Psi should be given in millivolts.
         electrostatic_potential.addPerParticleParameter("psi")
         electrostatic_potential.addPerParticleParameter("flag")
+        electrostatic_potential.addPerParticleParameter("type_flag")
         return electrostatic_potential
 
     def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity,
-                     substrate_flag: bool = False) -> None:
+                     substrate_flag: bool = False, type_flag: bool = True) -> None:
         """
         Add a colloid with a given radius and surface potential to the system.
 
@@ -165,15 +170,17 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         :raises RuntimeError:
             If the method yield_potentials was called before this method (via the abstract base class).
         """
-        super().add_particle(radius, surface_potential, substrate_flag)
+        super().add_particle(radius, surface_potential, substrate_flag, type_flag)
 
         if radius.in_units_of(self._nanometer) > self._max_radius:
             self._max_radius = radius.in_units_of(self._nanometer)
 
         self._steric_potential.addParticle([radius.value_in_unit(self._nanometer), int(substrate_flag)])
+        
         self._electrostatic_potential.addParticle([radius.value_in_unit(self._nanometer),
                                                    surface_potential.value_in_unit(self._millivolt),
-                                                   int(substrate_flag)])
+                                                   int(substrate_flag),
+                                                   int(type_flag)])
 
     def add_exclusion(self, particle_one: int, particle_two: int) -> None:
         """

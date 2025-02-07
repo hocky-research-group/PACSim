@@ -276,7 +276,7 @@ class ClusterGenerator(ConfigurationGenerator):
         lattice_displacements = lattice_displacements[np.argsort(np.max(lattice_displacements, axis=1))]
 
         positions = np.zeros((self.n_colloids_total, 3))
-        for box_index in range(self.n_repeats):
+        for box_index in range(self.n_repeats * len(self._cluster_order)):
             lattice_displacement = lattice_displacements[box_index]
             # the index of the cluster in the cluster order
             relative_cluster_index = box_index % len(self._cluster_order)

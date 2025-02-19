@@ -4,7 +4,9 @@ import numpy as np
 from openmm import unit
 from colloids.abstracts import Parameters
 
-
+_nanometer = unit.nano * unit.meter # There is a bug in the openmm unit system that causes a memory leak when using a unit.x constant.
+_millivolt = unit.milli * unit.volt
+_amu = unit.amu
 @dataclass(order=True, frozen=True)
 class ConfigurationParameters(Parameters):
     """
@@ -33,7 +35,7 @@ class ConfigurationParameters(Parameters):
         The size of the simulation box in each dimension.
     :type box_size: unit.Quantity
     :param padding_distance:
-        The minimum distance between colloids in the different clusters. Defaults to 0.0 * unit.nanometer.
+        The minimum distance between colloids in the different clusters. Defaults to 0.0 * _nanometer.
     :type padding_distance: unit.Quantity
     :param padding_factor:
         The fraction of the lattice constant that is used as padding between the colloids and the edge of the box.
@@ -48,20 +50,20 @@ class ConfigurationParameters(Parameters):
         The keys of the dictionary are the types of the colloidal particles and the values are the masses.
         The unit of the masses must be compatible with atomic mass units and the values must be greater than zero,
         except for immobile particles (as the substrate), which should have a mass of zero.
-        Defaults to {"P": 1.0 * unit.amu, "N": (95.0 / 105.0) ** 3 * unit.amu}.
+        Defaults to {"P": 1.0 * _amu, "N": (95.0 / 105.0) ** 3 * _amu}.
     :type masses: dict[str, unit.Quantity]
     :param radii:
         The radii of the different types of colloidal particles that appear in the initial configuration file.
         The keys of the dictionary are the types of the colloidal particles and the values are the radii.
         The unit of the radii must be compatible with nanometers and the values must be greater than zero.
-        Defaults to {"P": 105.0 * (unit.nano * unit.meter), "N": 95.0 * (unit.nano * unit.meter)}.
+        Defaults to {"P": 105.0 * (_nanometer), "N": 95.0 * (_nanometer)}.
     :type radii: dict[str, unit.Quantity]
     :param surface_potentials:
         The surface potentials of the different types of colloidal particles that appear in the initial configuration
         file.
         The keys of the dictionary are the types of the colloidal particles and the values are the surface potentials.
         The unit of the surface potentials must be compatible with millivolts.
-        Defaults to {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)}.
+        Defaults to {"P": 44.0 * (_millivolt), "N": -54.0 * (_millivolt)}.
     :type surface_potentials: dict[str, unit.Quantity]
     :param cluster_specifications:
         The specifications of the clusters. A dictionary with the cluster name as the key and a dictionary as the value.
@@ -69,23 +71,22 @@ class ConfigurationParameters(Parameters):
         cluster filed under "coordinates". Must not be None.
     :type cluster_specifications: dict[str, dict[str, Union[str, list[list[unit.Quantity]]]]]
     """
-
     total_clusters: int
     lattice_constant: Union[unit.Quantity, tuple[unit.Quantity]]
     box_size: unit.Quantity
     cluster_order: list[str] = None
     random_rotation: bool = False
-    cluster_specifications: dict[str, dict[str, Union[list[str], list[unit.Quantity]]]] = None
-    padding_distance: unit.Quantity = field(default_factory=lambda: 0.0 * unit.nanometer)
     padding_factor: float = 0.5
-    masses: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 1.0 * unit.amu, "N": (95.0 / 105.0) ** 3 * unit.amu})
-    radii: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 105.0 * (unit.nano * unit.meter), "N": 95.0 * (unit.nano * unit.meter)})
-    surface_potentials: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
+    cluster_specifications: dict[str, dict[str, Union[list[str], list[unit.Quantity]]]] = None
+    padding_distance: unit.Quantity = field(default_factory=lambda: 0.0 * _nanometer)
+    masses: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 1.0 * _amu, "N": (95.0 / 105.0) ** 3 * _amu})
+    radii: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 105.0 * (_nanometer), "N": 95.0 * (_nanometer)})
+    surface_potentials: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 44.0 * (_millivolt), "N": -54.0 * (_millivolt)})
 
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
-        
+
         # Check the lattice specifications and number of clusters.
         if not isinstance(self.total_clusters, int):
             raise TypeError("The total number of clusters must be an integer.")
@@ -94,15 +95,15 @@ class ConfigurationParameters(Parameters):
         if not isinstance(self.lattice_constant, unit.Quantity) and not isinstance(self.lattice_constant, tuple):
             raise TypeError("The lattice constant must be a Quantity or a tuple of Quantities.")
         if isinstance(self.lattice_constant, unit.Quantity):
-            if not self.lattice_constant.unit.is_compatible(unit.nano * unit.meter):
+            if not self.lattice_constant.unit.is_compatible(_nanometer):
                 raise TypeError("The lattice constant must have a unit compatible with nanometers.")
-            if any(lattice_constant <= 0.0 * (unit.nano * unit.meter) for lattice_constant in self.lattice_constant):
+            if any(lattice_constant <= 0.0 * (_nanometer) for lattice_constant in self.lattice_constant):
                 raise ValueError("The lattice constant must be greater than zero.")
         if isinstance(self.lattice_constant, tuple):
             for l in self.lattice_constant:
-                if not l.unit.is_compatible(unit.nano * unit.meter):
+                if not l.unit.is_compatible(_nanometer):
                     raise TypeError("The lattice constant must have a unit compatible with nanometers.")
-                if l <= 0.0 * (unit.nano * unit.meter):
+                if l <= 0.0 * (_nanometer):
                     raise ValueError("The lattice constant must be greater than zero.")
         if not isinstance(self.random_rotation, bool):
             raise TypeError("The random rotation must be a boolean.")
@@ -116,10 +117,17 @@ class ConfigurationParameters(Parameters):
             raise ValueError("Tilted box not supported currently.")
         if not len(self.box_size) == 3:
             raise ValueError("The box size must be a list of three quantities.")
-        effective_repeats = np.array([self.box_size[i].value_in_unit(unit.nanometer) / self.lattice_constant[i].value_in_unit(unit.nanometer) for i in range(3)])
+        effective_repeats = np.array([self.box_size[i].value_in_unit(_nanometer) / self.lattice_constant[i].value_in_unit(_nanometer) for i in range(3)])
         effective_clusters = np.prod(np.floor(effective_repeats - 2.0 * self.padding_factor))
+        if self.cluster_order is not None:
+            n_unit_cells = len(self.cluster_order)
+        else:
+            key = list(self.cluster_specifications.keys())[0]
+            cluster_names = list(dict.fromkeys(self.cluster_specifications[key]["cluster"]))
+            n_clusters_per_unit_cell = len(cluster_names)
+            n_unit_cells = self.total_clusters // n_clusters_per_unit_cell
 
-        if self.total_clusters > effective_clusters:
+        if n_unit_cells > effective_clusters:
             raise ValueError("The volume of the unit cell times the number of clusters must be less than the volume of the box.")
         
         # Check the cluster order.
@@ -128,7 +136,7 @@ class ConfigurationParameters(Parameters):
             clusters_in_order = set(self.cluster_order)
             if not clusters_in_order == clusters_in_specifications:
                 raise ValueError("The cluster order and the cluster specifications must have the same keys.")
-            check_intracluster_distances = True
+            unit_cell = False
         elif self.cluster_order is None:
             if len(self.cluster_specifications) > 1:
                 raise ValueError("The cluster order must be specified if there is more than one cluster, unit cell is not permitted.")
@@ -136,7 +144,7 @@ class ConfigurationParameters(Parameters):
                 raise ValueError("The cluster specifications must have a cluster key when using it as a unit cell.")
             if self.random_rotation:
                 raise ValueError("Random rotation is not permitted when using the unit cell.")
-            check_intracluster_distances = False
+            unit_cell = True
         else:
             raise TypeError("The cluster order must be a list of strings or None.")
         
@@ -157,32 +165,32 @@ class ConfigurationParameters(Parameters):
                 raise TypeError(f"Identity of cluster {cluster} must be a list of strings.")
             if "coordinates" not in self.cluster_specifications[cluster]:
                 raise ValueError(f"Cluster {cluster} must have a coordinates key in the cluster specifications.")
-            if not all(i.unit.is_compatible(unit.nano * unit.meter) for i in self.cluster_specifications[cluster]["coordinates"]):
-                raise TypeError(f"Coordiantes of cluster {cluster} must be a iterable of triplets of nm.")
+            if not self.cluster_specifications[cluster]["coordinates"].unit.is_compatible(_nanometer):
+                raise TypeError(f"Coordiantes of cluster {cluster} must hvae units compatible with nm.")
             if not all(len(i) == 3 for i in self.cluster_specifications[cluster]["coordinates"]):
                 raise ValueError(f"Coordinates of cluster {cluster} must be a iterable of triplets of nm.")
 
         # Check the masses, radii, and surface potentials of colloids.
         for t in self.masses:
-            if not self.masses[t].unit.is_compatible(unit.amu):
+            if not self.masses[t].unit.is_compatible(_amu):
                 raise TypeError(f"Mass of type {t} must have a unit compatible with atomic mass units.")
-            if self.masses[t] < 0.0 * unit.amu:
+            if self.masses[t] < 0.0 * _amu:
                 raise ValueError(f"Mass of type {t} must be greater than zero.")
             if t not in self.radii:
                 raise ValueError(f"Type {t} of the masses dictionary is not in radii dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the masses dictionary is not in surface potentials dictionary.")
         for t in self.radii:
-            if not self.radii[t].unit.is_compatible(unit.nano * unit.meter):
+            if not self.radii[t].unit.is_compatible(_nanometer):
                 raise TypeError(f"Radius of type {t} must have a unit compatible with nanometers.")
-            if self.radii[t] <= 0.0 * (unit.nano * unit.meter):
+            if self.radii[t] <= 0.0 * (_nanometer):
                 raise ValueError(f"Radius of type {t} must be greater than zero.")
             if t not in self.masses:
                 raise ValueError(f"Type {t} of the radii dictionary is not in masses dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the radii dictionary is not in surface potentials dictionary.")
         for t in self.surface_potentials:
-            if not self.surface_potentials[t].unit.is_compatible(unit.milli * unit.volt):
+            if not self.surface_potentials[t].unit.is_compatible(_millivolt):
                 raise TypeError(f"Surface potential of type {t} must have a unit compatible with millivolts.")
             if t not in self.masses:
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
@@ -196,18 +204,33 @@ class ConfigurationParameters(Parameters):
                 raise ValueError(f"Colloid type {t} in cluster_specifications is not in radii dictionary.")
             if t not in self.surface_potentials:
                 raise ValueError(f"Colloid type {t} in cluster_specifications is not in surface potentials dictionary.")
-            
+
         # Check the longest distance between colloids plus radii of those colloids is less than the (shortest) lattice constant.
-        if check_intracluster_distances:
+
+        if not unit_cell:
             for cluster in self.cluster_specifications:
-                coordinates = np.array(self.cluster_specifications[cluster]["coordinates"].value_in_unit(unit.nanometer))
+                coordinates = np.array(self.cluster_specifications[cluster]["coordinates"].value_in_unit(_nanometer))
                 distance_matrix = np.linalg.norm(coordinates[:, np.newaxis, :] - coordinates[np.newaxis, :, :], axis=-1)
-                radius_vector = np.array([self.radii[identity].value_in_unit(unit.nanometer) for identity in self.cluster_specifications[cluster]["identity"]])
+
+                radius_vector = np.array([self.radii[identity].value_in_unit(_nanometer) for identity in self.cluster_specifications[cluster]["identity"]])
                 radius_matrix = radius_vector[:, np.newaxis] + radius_vector[np.newaxis, :]
 
                 min_lattice_vec = min(self.lattice_constant)
                 max_distance = np.max(distance_matrix + radius_matrix)
-                if max_distance + self.padding_distance.value_in_unit(unit.nanometer) > min_lattice_vec.value_in_unit(unit.nanometer):
+                if max_distance + self.padding_distance.value_in_unit(_nanometer) > min_lattice_vec.value_in_unit(_nanometer):
                     raise ValueError(f"The distance between the colloids plus the radii of the colloids must be less than the lattice constant for cluster {cluster}.")
 
+        else:
+            for cluster in self.cluster_specifications:
 
+                coordinates = np.array(self.cluster_specifications[cluster]["coordinates"].value_in_unit(_nanometer))
+                distance_matrix = np.linalg.norm(coordinates[:, np.newaxis, :] - coordinates[np.newaxis, :, :], axis=-1)
+
+                radius_vector = np.array([self.radii[identity].value_in_unit(_nanometer) for identity in self.cluster_specifications[cluster]["identity"]])
+                radius_matrix = radius_vector[:, np.newaxis] + radius_vector[np.newaxis, :]
+
+                clusters = self.cluster_specifications[cluster]["cluster"]
+                is_in_same_cluster = np.array([[clusters[i] == clusters[j] for j in range(len(clusters))] for i in range(len(clusters))])
+                min_distance = np.min((distance_matrix - radius_matrix)[~is_in_same_cluster])
+                if min_distance < self.padding_distance.value_in_unit(_nanometer):
+                    raise ValueError(f"The distance between the colloids minus the radii of the colloids must be greater than the padding disctance for unit cell.")

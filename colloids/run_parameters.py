@@ -8,7 +8,7 @@ import colloids.update_reporters as update_reporters
 from colloids.helper_functions import read_initial_file
 import warnings
 
-
+_nanometer = unit.nanometer
 @dataclass(order=True, frozen=True)
 class RunParameters(Parameters):
     """
@@ -92,17 +92,17 @@ class RunParameters(Parameters):
     :param brush_density:
         The polymer surface density in the Alexander-de Gennes polymer brush model [i.e., sigma in eq. (1)].
         The unit of the brush_density must be compatible with 1/nanometer^2 and the value must be greater than zero.
-        Defaults to 0.09 / ((unit.nano * unit.meter) ** 2).
+        Defaults to 0.09 / ((_nanometer) ** 2).
     :type brush_density: unit.Quantity
     :param brush_length:
         The thickness of the brush in the Alexander-de Gennes polymer brush model [i.e., L in eq. (1)].
         The unit of the brush_length must be compatible with nanometers and the value must be greater than zero.
-        Defaults to 10.6 * (unit.nano * unit.meter).
+        Defaults to 10.6 * (_nanometer).
     :type brush_length: unit.Quantity
     :param debye_length:
         The Debye screening length within DLVO theory [i.e., lambda_D].
         The unit of the debye_length must be compatible with nanometers and the value must be greater than zero.
-        Defaults to 5.726968 * (unit.nano * unit.meter).
+        Defaults to 5.726968 * (_nanometer).
     :type debye_length: unit.Quantity
     :param dielectric_constant:
         The dielectric constant of the solvent [i.e., epsilon].
@@ -266,9 +266,9 @@ class RunParameters(Parameters):
             "frictionCoeff": 0.001574074286750681 / (unit.pico * unit.second),
             "randomNumberSeed": None
         })
-    brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
-    brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
-    debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
+    brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((_nanometer) ** 2))
+    brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (_nanometer))
+    debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (_nanometer))
     dielectric_constant: float = 80.0
     cutoff_factor: float = 21.0
     use_log: bool = False
@@ -323,17 +323,17 @@ class RunParameters(Parameters):
             raise TypeError("The temperature must have a unit compatible with kelvin.")
         if self.potential_temperature <= 0.0 * unit.kelvin:
             raise ValueError("The temperature must be greater than zero.")
-        if not self.brush_density.unit.is_compatible((unit.nano * unit.meter) ** (-2)):
+        if not self.brush_density.unit.is_compatible((_nanometer) ** (-2)):
             raise TypeError("The brush density must have a unit compatible with 1/nanometer^2.")
-        if self.brush_density <= 0.0 * ((unit.nano * unit.meter) ** (-2)):
+        if self.brush_density <= 0.0 * ((_nanometer) ** (-2)):
             raise ValueError("The brush density must be greater than zero.")
-        if not self.brush_length.unit.is_compatible(unit.nano * unit.meter):
+        if not self.brush_length.unit.is_compatible(_nanometer):
             raise TypeError("The brush length must have a unit compatible with nanometers.")
-        if self.brush_length <= 0.0 * (unit.nano * unit.meter):
+        if self.brush_length <= 0.0 * (_nanometer):
             raise ValueError("The brush length must be greater than zero.")
-        if not self.debye_length.unit.is_compatible(unit.nano * unit.meter):
+        if not self.debye_length.unit.is_compatible(_nanometer):
             raise TypeError("The Debye length must have a unit compatible with nanometers.")
-        if self.debye_length <= 0.0 * (unit.nano * unit.meter):
+        if self.debye_length <= 0.0 * (_nanometer):
             raise ValueError("The Debye length must be greater than zero.")
         if self.dielectric_constant <= 0.0:
             raise ValueError("The dielectric constant must be greater than zero.")
@@ -386,16 +386,16 @@ class RunParameters(Parameters):
             if self.depletant_radius is None:
                 raise ValueError("Depletant radius must be specified if depletion is on.")
             if not self.depletant_radius.unit.is_compatible(
-                    unit.nano * unit.meter):
+                    _nanometer):
                 raise TypeError("Depletant radius must have a unit compatible with nanometers.")
-            if self.depletant_radius <= 0.0 * (unit.nano * unit.meter):
+            if self.depletant_radius <= 0.0 * (_nanometer):
                 raise ValueError("Depletant radius must be greater than zero.")
-            for t in self.radii:
+            """for t in self.radii:
                 if self.depletant_radius / self.radii[t] > 0.1547:
                     warnings.warn("Size ratio of depletant to colloid particles is too large. "
                                   "Analytical computation of depletion potential may be invalid."
                                   "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
-                                  "pp 10079 - 10106.")
+                                  "pp 10079 - 10106.")"""
         else:
             if self.depletion_phi is not None:
                 raise ValueError("Depletion phi must not be specified if depletion potential is not on.")

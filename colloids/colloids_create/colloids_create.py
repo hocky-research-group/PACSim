@@ -2,7 +2,6 @@ import argparse
 import gsd.hoomd
 import numpy as np
 from openmm import unit
-from colloids.run_parameters import RunParameters
 from colloids.colloids_create.configuration_parameters import ConfigurationParameters
 from colloids.colloids_create.cluster_generator import (CubicLattice,
                                                                               ClusterGenerator)
@@ -83,23 +82,19 @@ def check_frame_types(frame: gsd.hoomd.Frame, masses: dict[str, unit.Quantity], 
 def main():
     parser = argparse.ArgumentParser(description="Create an initial configuration for an OpenMM simulation of a "
                                                  "colloids system.")
-    parser.add_argument("simulation_parameters", help="YAML file with simulation parameters", type=str)
     parser.add_argument("configuration_parameters", help="YAML file with configuration parameters",
                         type=str)
+    parser.add_argument("save_file", help="file for the generated gsd to be saved under", type=str)
     parser.add_argument("--example", help="write an example configuration YAML file and exit",
                         action=ExampleAction)
     args = parser.parse_args()
 
-    if not args.simulation_parameters.endswith(".yaml"):
-        raise ValueError("The YAML file for the simulation parameters must have the .yaml extension.")
+    if not args.save_file.endswith(".gsd"):
+        raise ValueError("The initial configuration must have the .gsd extension.")
     if not args.configuration_parameters.endswith(".yaml"):
         raise ValueError("The YAML file for the configuration parameters must have the .yaml extension.")
 
-    run_parameters = RunParameters.from_yaml(args.simulation_parameters)
     configuration_parameters = ConfigurationParameters.from_yaml(args.configuration_parameters)
-
-    if not run_parameters.initial_configuration.endswith(".gsd"):
-        raise ValueError("The initial configuration must have the .gsd extension.")
 
     generator = ClusterGenerator(configuration_parameters)
 
@@ -147,7 +142,7 @@ def main():
     frame.constraints.value = np.array(constraints_values, dtype=np.float32)
     frame.constraints.group = np.array(constraints_groups, dtype=np.uint32)
 
-    with gsd.hoomd.open(name=run_parameters.initial_configuration, mode="w") as f:
+    with gsd.hoomd.open(name=args.save_file, mode="w") as f:
         f.append(frame)
 
 

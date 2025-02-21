@@ -111,7 +111,7 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame):
             radii[t] = frame.particles.diameter[particle_index] / 2.0 * nanometer
             surface_potentials[t] = frame.particles.charge[particle_index] * (millivolt)
         colloid_potentials = ColloidPotentialsTabulated(
-            radii=radii, surface_potentials=surface_potentials, colloid_potentials_parameters=potentials_parameters,
+            radii=radii, surface_potentials=surface_potentials, 
             colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
             cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls)
     else:

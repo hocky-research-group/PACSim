@@ -102,19 +102,16 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame):
 
     # ---------------------------------------- Create all forces. ------------------------------------------------------
     if parameters.use_tabulated:
-        # TODO: Maybe generalize tabulated potentials to more than two types.
-        # Use a dictionary instead of a set to preserve the order of the types.
-        # See https://stackoverflow.com/questions/1653970/does-python-have-an-ordered-set
-        # Works since Python 3.7.
-        set_of_types = list(dict.fromkeys(types))
-        if not len(set_of_types) == 2:
-            raise ValueError("Tabulated potentials only supports two types.")
-        first_type = set_of_types.pop()
-        second_type = set_of_types.pop()
+        surface_potentials = {}
+        radii = {}
+        for i, t in enumerate(frame.particles.types):
+            if i not in frame.particles.typeid:
+                continue
+            particle_index = frame.particles.typeid.index(i)
+            radii[t] = frame.particles.diameter[particle_index] / 2.0 * nanometer
+            surface_potentials[t] = frame.particles.charge[particle_index] * (millivolt)
         colloid_potentials = ColloidPotentialsTabulated(
-            radius_one=parameters.radii[first_type], radius_two=parameters.radii[second_type],
-            surface_potential_one=parameters.surface_potentials[first_type],
-            surface_potential_two=parameters.surface_potentials[second_type],
+            radii=radii, surface_potentials=surface_potentials, colloid_potentials_parameters=potentials_parameters,
             colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
             cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls)
     else:
@@ -272,7 +269,7 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
 
     simulation = set_up_simulation(parameters, frame)
     simulation.context.setPositions(frame.particles.position)
-    
+
     if parameters.velocity_seed is not None:
         simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
                                                       parameters.velocity_seed)

@@ -70,6 +70,17 @@ class ConfigurationParameters(Parameters):
         The inner dictionary has the identity of the atoms filed under "identity" and the positions of the atoms in the
         cluster filed under "coordinates". Must not be None.
     :type cluster_specifications: dict[str, dict[str, Union[str, list[list[unit.Quantity]]]]]
+    :param use_substrate:
+        A boolean that indicates whether a substrate should be added to the configuration.
+        Defaults to False.
+    :type use_substrate: bool
+    :param substrate_type:
+        The type of the substrate particles. Defaults to "S".
+    :type substrate_type: str
+    :param random_rotation:
+        A boolean that indicates whether the clusters should be randomly rotated.
+        Defaults to False.
+    :type random_rotation: bool
     """
     total_clusters: int
     lattice_constant: Union[unit.Quantity, tuple[unit.Quantity]]
@@ -82,6 +93,8 @@ class ConfigurationParameters(Parameters):
     masses: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 1.0 * _amu, "N": (95.0 / 105.0) ** 3 * _amu})
     radii: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 105.0 * (_nanometer), "N": 95.0 * (_nanometer)})
     surface_potentials: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 44.0 * (_millivolt), "N": -54.0 * (_millivolt)})
+    use_substrate: bool = False
+    substrate_type: str = "S"
 
 
     def __post_init__(self):
@@ -205,8 +218,29 @@ class ConfigurationParameters(Parameters):
             if t not in self.surface_potentials:
                 raise ValueError(f"Colloid type {t} in cluster_specifications is not in surface potentials dictionary.")
 
-        # Check the longest distance between colloids plus radii of those colloids is less than the (shortest) lattice constant.
+        # Check the substrate type.
+        if not isinstance(self.use_substrate, bool):
+            raise TypeError("The use substrate must be a boolean.")
+        if self.use_substrate and not isinstance(self.substrate_type, str):
+            raise TypeError("The substrate type must be a string.")
+        else:
+            self.masses["__substrate__"] = self.masses[self.substrate_type]
+            self.radii["__substrate__"] = self.radii[self.substrate_type]
+            self.surface_potentials["__substrate__"] = self.surface_potentials[self.substrate_type]
+        if self.use_substrate:
+            if self.substrate_type not in self.masses:
+                raise ValueError("The substrate type must be in the masses dictionary.")
+            elif self.masses[self.substrate_type] != 0.0 * _amu:
+                raise ValueError("The mass of the substrate type must be zero.")
+            if self.substrate_type not in self.radii:
+                raise ValueError("The substrate type must be in the radii dictionary.")
+            if self.substrate_type not in self.surface_potentials:
+                raise ValueError("The substrate type must be in the surface potentials dictionary.")
+        if "__substrate__" in colloids_in_specifications:
+            raise ValueError("The substrate type must not be in the cluster specifications. Restricted type name.")
 
+
+        # Check the longest distance between colloids plus radii of those colloids is less than the (shortest) lattice constant.
         if not unit_cell:
             for cluster in self.cluster_specifications:
                 coordinates = np.array(self.cluster_specifications[cluster]["coordinates"].value_in_unit(_nanometer))

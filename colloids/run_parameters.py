@@ -292,8 +292,6 @@ class RunParameters(Parameters):
     depletion_phi: Optional[float] = None
     depletant_radius: Optional[unit.Quantity] = None
     use_gravity: bool = False
-    use_substrate: bool = False
-    substrate_type: str = "S"
     gravitational_acceleration: Optional[unit.Quantity] = None
     water_density: Optional[unit.Quantity] = None
     particle_density: Optional[unit.Quantity] = None
@@ -444,11 +442,6 @@ class RunParameters(Parameters):
         else:
             if self.update_reporter_parameters is not None:
                 raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")
-        if self.use_substrate:
-            if not all(self.wall_directions):
-                raise ValueError("A substrate can only be used if all walls are active.")
-            if self.use_tabulated:
-                raise ValueError("A substrate can only be used with the algebraic colloid potentials.")
 
 
 if __name__ == '__main__':

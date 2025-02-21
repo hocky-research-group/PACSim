@@ -70,9 +70,6 @@ def check_frame_types(frame: gsd.hoomd.Frame, masses: dict[str, unit.Quantity], 
         If a type in the frame is not in the masses dictionary.
         If a type in the frame is not in the radii dictionary.
         If a type in the frame is not in the surface potentials dictionary.
-        If a type in the masses dictionary is not in the frame.
-        If a type in the radii dictionary is not in the frame.
-        If a type in the surface potentials dictionary is not in the frame.
     """
     for t in frame.particles.types:
         if t not in masses:
@@ -81,15 +78,6 @@ def check_frame_types(frame: gsd.hoomd.Frame, masses: dict[str, unit.Quantity], 
             raise ValueError(f"Type {t} of the frame is not in the radii dictionary.")
         if t not in surface_potentials:
             raise ValueError(f"Type {t} of the frame is not in the surface potentials dictionary.")
-    for t in masses:
-        if t not in frame.particles.types:
-            raise ValueError(f"Type {t} of the masses dictionary is not in the frame.")
-    for t in radii:
-        if t not in frame.particles.types:
-            raise ValueError(f"Type {t} of the radii dictionary is not in the frame.")
-    for t in surface_potentials:
-        if t not in frame.particles.types:
-            raise ValueError(f"Type {t} of the surface potentials dictionary is not in the frame.")
 
 
 def main():
@@ -118,10 +106,9 @@ def main():
     frame, constraints = generator.generate_configuration()
     _check_frame_changes(frame, generator.__class__.__name__)
 
-    if run_parameters.use_substrate:
-        substrate_modifier = SubstrateModifier(run_parameters.substrate_radius,
-                                               run_parameters.substrate_type)
-        substrate_modifier.modify_configuration(frame, constraints)
+    if configuration_parameters.use_substrate:
+        substrate_modifier = SubstrateModifier(configuration_parameters)
+        substrate_modifier.modify_configuration(frame)
         _check_frame_changes(frame, substrate_modifier.__class__.__name__)
 
     # Check if the frame has the necessary attributes.

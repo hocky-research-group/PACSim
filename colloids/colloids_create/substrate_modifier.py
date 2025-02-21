@@ -2,6 +2,7 @@ from gsd.hoomd import Frame
 import numpy as np
 import numpy.typing as npt
 from openmm import unit
+from colloids.colloids_create.configuration_parameters import ConfigurationParameters
 from colloids.colloids_create import ConfigurationModifier
 
 
@@ -24,25 +25,21 @@ class SubstrateModifier(ConfigurationModifier):
     """
     _nanometer = unit.nano * unit.meter
 
-    def __init__(self, substrate_radius: unit.Quantity, substrate_type: str) -> None:
+    def __init__(self,  configuration_parameters: ConfigurationParameters) -> None:
         """Constructor of the SubstrateModifier class."""
         super().__init__()
-        if not substrate_radius.unit.is_compatible(self._nanometer):
-            raise TypeError("The substrate radius must have a unit that is compatible with nanometers.")
-        if not substrate_radius > 0.0 * self._nanometer:
-            raise ValueError("The substrate radius must have a value greater than zero.")
-        self._substrate_radius = substrate_radius
-        self._substrate_type = substrate_type
 
-    @staticmethod
-    def _generate_substrate_positions_hexagonal(substrate_radius: float,
-                                                box: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        self._substrate_type = configuration_parameters.substrate_type
+        self._substrate_radius = configuration_parameters.radii[self._substrate_type]
+        self._substrate_charge = configuration_parameters.surface_potentials[self._substrate_type]
+        self._substrate_mass = configuration_parameters.masses[self._substrate_type]
+        self._substrate_type_private = f"__substrate__"
+        
+
+    def _generate_substrate_positions_hexagonal(self, box: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """
         Generate the positions of the substrate particles in a hexagonal lattice at the bottom of the simulation box.
 
-        :param substrate_radius:
-            The radius of the substrate particles (in nanometers without an explicit unit).
-        :type substrate_radius: unit.Quantity
         :param box:
             The box lengths (in nanometers without an explicit unit) and tilt factors (dimensionless) of the simulation
             box.
@@ -61,6 +58,8 @@ class SubstrateModifier(ConfigurationModifier):
         if not (box[3] == 0.0 and box[4] == 0.0 and box[5] == 0.0):
             raise ValueError("The box vectors must be orthogonal (all tilt factors zero) in order to allow for a "
                              "substrate.")
+
+        substrate_radius = self._substrate_radius.value_in_unit(self._nanometer)
 
         # The substrate is a hexagonal lattice of particles within the walls in the x and y directions.
         diameter_substrate = 2.0 * substrate_radius
@@ -106,7 +105,7 @@ class SubstrateModifier(ConfigurationModifier):
 
         return np.array(substrate_positions)
 
-    def modify_configuration(self, frame: Frame, constraints: dict[str, float]) -> None:
+    def modify_configuration(self, frame: Frame) -> None:
         """
         Modify the given configuration and constraints in-place by adding a substrate.
 
@@ -121,9 +120,6 @@ class SubstrateModifier(ConfigurationModifier):
         :param frame:
             The frame to modify.
         :type frame: gsd.hoomd.Frame
-        :param constraints:
-            The constraints to modify.
-        :type constraints: dict[str, float]
 
         :raises ValueError:
             If the substrate type is already in the given frame.
@@ -132,12 +128,13 @@ class SubstrateModifier(ConfigurationModifier):
         assert frame.particles.position is not None
         assert frame.particles.types is not None
         assert frame.particles.typeid is not None
-        if self._substrate_type in frame.particles.types:
-            raise ValueError(f"The substrate type {self._substrate_type} is already in the given frame.")
-        substrate_positions = self._generate_substrate_positions_hexagonal(
-            self._substrate_radius.value_in_unit(self._nanometer), frame.configuration.box).astype(np.float32)
-
-        frame.particles.types = frame.particles.types + (self._substrate_type,)
+        if self._substrate_type_private not in frame.particles.types:
+            frame.particles.types = frame.particles.types + (self._substrate_type_private,)
+        if frame.particles.types.index(self._substrate_type_private) in frame.particles.typeid:
+            raise ValueError(f"The substrate type {self._substrate_type_private} is already in the given frame.")
+        
+        substrate_positions = self._generate_substrate_positions_hexagonal(frame.configuration.box).astype(np.float32)
+        
         substrate_index = len(frame.particles.types) - 1
         frame.particles.N += len(substrate_positions)
         frame.particles.position = np.concatenate((frame.particles.position, substrate_positions), axis=0)

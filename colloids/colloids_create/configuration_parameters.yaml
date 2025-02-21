@@ -17,6 +17,9 @@ masses:
   C: !Quantity
     unit: dalton
     value: 1.0
+  S: !Quantity
+    unit: dalton
+    value: 0.0
 radii:
   A: !Quantity
     unit: nanometer
@@ -27,6 +30,9 @@ radii:
   C: !Quantity
     unit: nanometer
     value: 52.5
+  S: !Quantity
+    unit: nanometer
+    value: 105.0
 surface_potentials:
   A: !Quantity
     unit: millivolt
@@ -37,6 +43,9 @@ surface_potentials:
   C: !Quantity
     unit: millivolt
     value: -44.0
+  S: !Quantity
+    unit: millivolt
+    value: 20.0
 cluster_specifications:
   A:
     identity:
@@ -60,3 +69,5 @@ cluster_specifications:
       - [105.0, -105.0, -105.0]
       - [-105.0, 105.0, -105.0]
       - [0.0, 0.0, 0.0]
+use_substrate: true
+substrate_type: "S"

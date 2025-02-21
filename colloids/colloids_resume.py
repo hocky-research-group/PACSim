@@ -25,7 +25,7 @@ def colloids_resume(argv: Sequence[str]) -> app.Simulation:
     parameters = RunParameters.from_yaml(args.yaml_file)
     frame = read_gsd_file(parameters.initial_configuration)
 
-    simulation, _ = set_up_simulation(parameters, frame)
+    simulation = set_up_simulation(parameters, frame)
 
     simulation.loadCheckpoint(args.checkpoint_file)
 

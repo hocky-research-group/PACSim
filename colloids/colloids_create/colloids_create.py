@@ -101,10 +101,10 @@ def main():
                         action=ExampleAction)
     args = parser.parse_args()
 
-    if not args.save_file.endswith(".gsd"):
-        raise ValueError("The initial configuration must have the .gsd extension.")
     if not args.configuration_parameters.endswith(".yaml"):
         raise ValueError("The YAML file for the configuration parameters must have the .yaml extension.")
+    if not args.save_file.endswith(".gsd"):
+        raise ValueError("The initial configuration must have the .gsd extension.")
 
     configuration_parameters = ConfigurationParameters.from_yaml(args.configuration_parameters)
 

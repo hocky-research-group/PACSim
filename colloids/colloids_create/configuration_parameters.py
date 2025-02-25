@@ -94,7 +94,7 @@ class ConfigurationParameters(Parameters):
     radii: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 105.0 * (_nanometer), "N": 95.0 * (_nanometer)})
     surface_potentials: dict[str, unit.Quantity] = field(default_factory=lambda: {"P": 44.0 * (_millivolt), "N": -54.0 * (_millivolt)})
     use_substrate: bool = False
-    substrate_type: str = "S"
+    substrate_type: str = None
 
 
     def __post_init__(self):
@@ -221,13 +221,9 @@ class ConfigurationParameters(Parameters):
         # Check the substrate type.
         if not isinstance(self.use_substrate, bool):
             raise TypeError("The use substrate must be a boolean.")
-        if self.use_substrate and not isinstance(self.substrate_type, str):
-            raise TypeError("The substrate type must be a string.")
-        else:
-            self.masses["__substrate__"] = self.masses[self.substrate_type]
-            self.radii["__substrate__"] = self.radii[self.substrate_type]
-            self.surface_potentials["__substrate__"] = self.surface_potentials[self.substrate_type]
         if self.use_substrate:
+            if not isinstance(self.substrate_type, str):
+                raise TypeError("The substrate type must be a string.")
             if self.substrate_type not in self.masses:
                 raise ValueError("The substrate type must be in the masses dictionary.")
             elif self.masses[self.substrate_type] != 0.0 * _amu:
@@ -236,6 +232,12 @@ class ConfigurationParameters(Parameters):
                 raise ValueError("The substrate type must be in the radii dictionary.")
             if self.substrate_type not in self.surface_potentials:
                 raise ValueError("The substrate type must be in the surface potentials dictionary.")
+            
+            # Add the substrate to the colloids in the specifications. 
+            # Substrate should be a separate type from any fixed atoms of the same type in the cluster specifications.
+            self.masses["__substrate__"] = self.masses[self.substrate_type]
+            self.radii["__substrate__"] = self.radii[self.substrate_type]
+            self.surface_potentials["__substrate__"] = self.surface_potentials[self.substrate_type]
         if "__substrate__" in colloids_in_specifications:
             raise ValueError("The substrate type must not be in the cluster specifications. Restricted type name.")
 

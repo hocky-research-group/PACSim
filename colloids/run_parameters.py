@@ -5,10 +5,9 @@ from openmm import unit
 from colloids.abstracts import Parameters
 import colloids.integrators as integrators
 import colloids.update_reporters as update_reporters
-from colloids.helper_functions import read_initial_file
 import warnings
 
-_nanometer = unit.nanometer
+
 @dataclass(order=True, frozen=True)
 class RunParameters(Parameters):
     """
@@ -36,30 +35,21 @@ class RunParameters(Parameters):
                               particles and are interpreted as the substrate.
     - frame.configuration.box -> Box dimensions of the frame. The first three entries are the box lengths in x, y, and z
                                  directions in nanometers. The next three entries are the tilt factors xy, xz, and yz.
-    - frame.bonds.N -> Total number of fixed bonds in the frame.
-    - frame.bonds.types -> Possible types of all fixed bonds in the frame.
-    - frame.bonds.typeid -> Type index within the frame.bonds.types tuple of each fixed bond in the frame.
-    - frame.bonds.group -> Indices of the two particles that are connected by each fixed bond in the frame.
+    - frame.constraints.N -> Total number of constraints in the frame.
+    - frame.constraints.value -> Constraint lengths in nanometers of all constraints in the frame.
+    - frame.constraints.group -> Particle pairs for all constraints in the frame.
 
-    Note that gsd files can, in principle, store constraints directly in the frame.constraints attribute. However,
-    we store them in the frame.bonds attribute since Ovito ignores the frame.constraints attribute. This means that
-    one has to manually store the constraint distances. This is done by storing the bond distances in a separate
-    constraints file. The constraints file must contain two columns. The first column contains the bond name within the
-    frame.bonds.types tuple of the initial configuration. The second column contains the bond distance in nanometers.
+    Note that gsd files can store constraints directly in the frame.constraints attribute. One has to be careful,
+    however, that Ovito ignores the frame.constraints attribute. This means that one has to manually store the
+    constraint distances into the GSD file once a gsd file is exported from Ovito
 
-    TODO: Finish sentence, also store velocities in gsd file, add frame index argument.
+    TODO: Also store velocities in gsd file, add frame index argument.
 
     :param initial_configuration:
         The path to the initial configuration of the system in a gsd file.
         The filename must end with ".gsd".
         Defaults to "initial_configuration.gsd".
     :type initial_configuration: str
-    :param constraints:
-        The path to the constraints file that contains the bond distances of the fixed bonds in the system.
-        The filename must end with ".txt".
-        If None, no constraints are used.
-        Defaults to None.
-    :type constraints: Optional[str]
     :param frame_index:
         The index of the frame in the gsd file that is used as the initial configuration.
         It is also possible to use negative indices to count from the end of the file.
@@ -92,17 +82,17 @@ class RunParameters(Parameters):
     :param brush_density:
         The polymer surface density in the Alexander-de Gennes polymer brush model [i.e., sigma in eq. (1)].
         The unit of the brush_density must be compatible with 1/nanometer^2 and the value must be greater than zero.
-        Defaults to 0.09 / ((_nanometer) ** 2).
+        Defaults to 0.09 / ((unit.nano * unit.meter) ** 2).
     :type brush_density: unit.Quantity
     :param brush_length:
         The thickness of the brush in the Alexander-de Gennes polymer brush model [i.e., L in eq. (1)].
         The unit of the brush_length must be compatible with nanometers and the value must be greater than zero.
-        Defaults to 10.6 * (_nanometer).
+        Defaults to 10.6 * (unit.nano * unit.meter).
     :type brush_length: unit.Quantity
     :param debye_length:
         The Debye screening length within DLVO theory [i.e., lambda_D].
         The unit of the debye_length must be compatible with nanometers and the value must be greater than zero.
-        Defaults to 5.726968 * (_nanometer).
+        Defaults to 5.726968 * (unit.nano * unit.meter).
     :type debye_length: unit.Quantity
     :param dielectric_constant:
         The dielectric constant of the solvent [i.e., epsilon].
@@ -116,11 +106,6 @@ class RunParameters(Parameters):
         (Oxford University Press, 2001), 2nd edition].
         Defaults to False.
     :type use_log: bool
-    :param use_tabulated:
-        If True, the steric and electrostatic forces are computed based on tabulated functions.
-        If False, the steric and electrostatic forces are computed based on algebraic expressions.
-        Defaults to False.
-    :type use_tabulated: bool
     :param velocity_seed:
         The seed for the random number generator that is used to sample the initial velocities.
         If None, a random seed is used.
@@ -171,10 +156,6 @@ class RunParameters(Parameters):
         The filename must end with ".gsd".
         Defaults to "final_frame.gsd".
     :type final_configuration_gsd_filename: Optional[str]
-    :param use_clusters:
-        If True, the simulation uses clusters of colloids.
-        Defaults to False.
-    :type use_clusters: bool
     :param wall_directions:
         A list of three booleans indicating whether the walls in the x, y, and z directions are active for
         closed-wall simulations with shifted Lennard-Jones potential walls.
@@ -254,7 +235,6 @@ class RunParameters(Parameters):
     """
 
     initial_configuration: str = "initial_configuration.gsd"
-    constraints: Optional[str] = None
     frame_index: int = -1
     platform_name: str = "Reference"
     potential_temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
@@ -266,13 +246,12 @@ class RunParameters(Parameters):
             "frictionCoeff": 0.001574074286750681 / (unit.pico * unit.second),
             "randomNumberSeed": None
         })
-    brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((_nanometer) ** 2))
-    brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (_nanometer))
-    debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (_nanometer))
+    brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
+    brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
+    debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
     dielectric_constant: float = 80.0
     cutoff_factor: float = 21.0
     use_log: bool = False
-    use_tabulated: bool = False
     velocity_seed: Optional[int] = None
     run_steps: int = 100
     state_data_interval: int = 100
@@ -283,8 +262,6 @@ class RunParameters(Parameters):
     checkpoint_filename: str = "checkpoint.chk"
     minimize_energy_initially: bool = False
     final_configuration_gsd_filename: Optional[str] = "final_frame.gsd"
-    use_clusters: bool = False
-    constraints: Optional[str] = None
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
@@ -302,8 +279,6 @@ class RunParameters(Parameters):
         """Check if the parameters are valid after initialization."""
         if not self.initial_configuration.endswith(".gsd"):
             raise ValueError("The filename of the initial configuration must end with '.gsd'.")
-        if self.constraints is not None and not self.constraints.endswith(".txt"):
-            raise ValueError("The filename of the constraints file must end with '.txt'.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
         possible_integrators = [name for name, _ in inspect.getmembers(integrators, inspect.isfunction)]
@@ -321,17 +296,17 @@ class RunParameters(Parameters):
             raise TypeError("The temperature must have a unit compatible with kelvin.")
         if self.potential_temperature <= 0.0 * unit.kelvin:
             raise ValueError("The temperature must be greater than zero.")
-        if not self.brush_density.unit.is_compatible((_nanometer) ** (-2)):
+        if not self.brush_density.unit.is_compatible((unit.nano * unit.meter) ** (-2)):
             raise TypeError("The brush density must have a unit compatible with 1/nanometer^2.")
-        if self.brush_density <= 0.0 * ((_nanometer) ** (-2)):
+        if self.brush_density <= 0.0 * ((unit.nano * unit.meter) ** (-2)):
             raise ValueError("The brush density must be greater than zero.")
-        if not self.brush_length.unit.is_compatible(_nanometer):
+        if not self.brush_length.unit.is_compatible(unit.nano * unit.meter):
             raise TypeError("The brush length must have a unit compatible with nanometers.")
-        if self.brush_length <= 0.0 * (_nanometer):
+        if self.brush_length <= 0.0 * (unit.nano * unit.meter):
             raise ValueError("The brush length must be greater than zero.")
-        if not self.debye_length.unit.is_compatible(_nanometer):
+        if not self.debye_length.unit.is_compatible(unit.nano * unit.meter):
             raise TypeError("The Debye length must have a unit compatible with nanometers.")
-        if self.debye_length <= 0.0 * (_nanometer):
+        if self.debye_length <= 0.0 * (unit.nano * unit.meter):
             raise ValueError("The Debye length must be greater than zero.")
         if self.dielectric_constant <= 0.0:
             raise ValueError("The dielectric constant must be greater than zero.")
@@ -384,16 +359,10 @@ class RunParameters(Parameters):
             if self.depletant_radius is None:
                 raise ValueError("Depletant radius must be specified if depletion is on.")
             if not self.depletant_radius.unit.is_compatible(
-                    _nanometer):
+                    unit.nano * unit.meter):
                 raise TypeError("Depletant radius must have a unit compatible with nanometers.")
-            if self.depletant_radius <= 0.0 * (_nanometer):
+            if self.depletant_radius <= 0.0 * (unit.nano * unit.meter):
                 raise ValueError("Depletant radius must be greater than zero.")
-            """for t in self.radii:
-                if self.depletant_radius / self.radii[t] > 0.1547:
-                    warnings.warn("Size ratio of depletant to colloid particles is too large. "
-                                  "Analytical computation of depletion potential may be invalid."
-                                  "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
-                                  "pp 10079 - 10106.")"""
         else:
             if self.depletion_phi is not None:
                 raise ValueError("Depletion phi must not be specified if depletion potential is not on.")

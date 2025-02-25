@@ -31,18 +31,31 @@ def read_xyz_file(filename: str) -> tuple[list[str], npt.NDArray[float], npt.NDA
     return types, atoms.get_positions(), cell
 
 
-def read_gsd_file(filename: str) -> gsd.hoomd.Frame:
+def get_cell_from_box(box: npt.NDArray[float]) -> npt.NDArray[float]:
+    assert len(box) == 6
+    cell = np.zeros((3, 3), dtype=np.float64)
+    cell[0][0] = box[0]
+    cell[1][1] = box[1]
+    cell[2][2] = box[2]
+    cell[1][0] = box[1] * box[3]
+    cell[2][0] = box[2] * box[4]
+    cell[2][1] = box[2] * box[5]
+    return cell
+
+
+def read_gsd_file(filename: str, frame_index: int) -> gsd.hoomd.Frame:
     if not filename.endswith(".gsd"):
         raise ValueError("The file must have the .gsd extension.")
     with gsd.hoomd.open(filename) as f:
         if len(f) != 1:
             raise ValueError("The GSD file must contain exactly one frame.")
-        frame = f[0]
-        return frame
+        frame = f[frame_index]
+    return frame
 
 
 # noinspection PyUnresolvedReferences
-def write_gsd_file(filename: str, openmm_simulation: app.Simulation, frame0: gsd.hoomd.Frame) -> None:
+def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radii: npt.NDArray[unit.Quantity],
+                   surface_potentials: npt.NDArray[unit.Quantity], cell: npt.NDArray[unit.Quantity]) -> None:
     # TODO: WRITE VELOCITIES
 
     nanometer = unit.nano * unit.meter
@@ -54,6 +67,10 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, frame0: gsd
     assert topology.getNumChains() == 1
     assert topology.getNumResidues() == 1
     assert topology.getNumAtoms() == openmm_simulation.system.getNumParticles() == len(positions)
+    assert len(cell) == 3
+    assert cell[0][1].value_in_unit(nanometer) == 0.0
+    assert cell[0][2].value_in_unit(nanometer) == 0.0
+    assert cell[1][2].value_in_unit(nanometer) == 0.0
 
     frame = gsd.hoomd.Frame()
     frame.particles.N = topology.getNumAtoms()
@@ -61,18 +78,39 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, frame0: gsd
     # Use a dictionary instead of a set to preserve the order of the types.
     # See https://stackoverflow.com/questions/1653970/does-python-have-an-ordered-set
     # Works since Python 3.7.
-    types = frame0.particles.types
+    types_set = list(dict.fromkeys(atom.name for atom in topology.atoms()))
+    types = list(types_set)
     frame.particles.types = types
-    typeid = frame0.particles.typeid
+    typeid = [types.index(atom.name) for atom in topology.atoms()]
     frame.particles.typeid = typeid
-    frame.particles.diameter = frame0.particles.diameter
-    frame.particles.type_shapes = frame0.particles.type_shapes
-    frame.particles.charge = frame0.particles.charge
-    frame.particles.mass = frame0.particles.mass
+    frame.particles.diameter = [2.0 * r.value_in_unit(nanometer) for r in radii]
+    frame.particles.charge = [s.value_in_unit(millivolt) for s in surface_potentials]
+    frame.particles.mass = [openmm_simulation.system.getParticleMass(atom_index).value_in_unit(unit.amu)
+                            for atom_index in range(topology.getNumAtoms())]
     # See http://docs.openmm.org/7.6.0/userguide/theory/05_other_features.html
     # See https://hoomd-blue.readthedocs.io/en/v2.9.3/box.html
-    frame.configuration.box = frame0.configuration.box
-    
+    frame.configuration.box = [
+        cell[0][0].value_in_unit(nanometer),
+        cell[1][1].value_in_unit(nanometer),
+        cell[2][2].value_in_unit(nanometer),
+        cell[1][0] / cell[1][1],
+        cell[2][0] / cell[2][2],
+        cell[2][1] / cell[2][2]
+    ]
+
+    num_constraints = openmm_simulation.system.getNumConstraints()
+    if num_constraints > 0:
+        frame.constraints.N = num_constraints
+        constraint_lengths = np.empty((num_constraints,), dtype=np.float32)
+        constraint_groups = np.empty((num_constraints, 2), dtype=np.uint32)
+        for constraint_index in range(num_constraints):
+            (particle_index1, particle_index2, distance) = openmm_simulation.system.getConstraintParameters(
+                constraint_index)
+            constraint_lengths[constraint_index] = distance.value_in_unit(nanometer)
+            constraint_groups[constraint_index] = [particle_index1, particle_index2]
+        frame.constraints.value = constraint_lengths
+        frame.constraints.group = constraint_groups
+
     with gsd.hoomd.open(name=filename, mode="w") as f:
         f.append(frame)
 

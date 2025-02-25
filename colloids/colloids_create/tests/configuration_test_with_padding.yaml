@@ -7,3 +7,29 @@ lattice_type: sc
 orbit_factor: 1.3
 padding_factor: 4.0
 satellites_per_center: 1
+masses:
+  N: !Quantity
+    unit: dalton
+    value:  1.885
+  P: !Quantity
+    unit: dalton
+    value: 1.0
+radii:
+  N: !Quantity
+    unit: nanometer
+    value: 105.0
+  P: !Quantity
+    unit: nanometer
+    value: 85.0
+surface_potentials:
+  N: !Quantity
+    unit: millivolt
+    value: -50.0
+  P: !Quantity
+    unit: millivolt
+    value: 50.0
+use_substrate: false
+use_snowman: false
+snowman_seed: null
+snowman_bond_types: null
+snowman_distances: null

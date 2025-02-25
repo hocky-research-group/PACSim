@@ -115,8 +115,6 @@ class SubstrateModifier(ConfigurationModifier):
         - frame.particles.types
         - frame.particles.typeid
 
-        This method does not modify the constraints dictionary.
-
         :param frame:
             The frame to modify.
         :type frame: gsd.hoomd.Frame

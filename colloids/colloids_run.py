@@ -1,27 +1,21 @@
 import argparse
 import inspect
-import itertools
 import sys
 from typing import Sequence
-import MDAnalysis.analysis.distances
-import numpy as np
-import numpy.random as npr
-import numpy.typing as npt
-import openmm
+import warnings
 import gsd.hoomd
+import openmm
 from openmm import app
 from openmm import unit
-from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
-                      ShiftedLennardJonesWalls, DepletionPotential, Gravity)
+from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
+                      DepletionPotential, Gravity)
 from colloids.gsd_reporter import GSDReporter
-from colloids.helper_functions import (read_gsd_file, write_gsd_file, write_xyz_file)
+from colloids.helper_functions import get_cell_from_box, read_gsd_file, write_gsd_file
 import colloids.integrators as integrators
 from colloids.run_parameters import RunParameters
 from colloids.status_reporter import StatusReporter
 import colloids.update_reporters as update_reporters
 
-nanometer = unit.nano * unit.meter
-millivolt = unit.milli * unit.volt
 
 class ExampleAction(argparse.Action):
     def __init__(self, option_strings, dest, **kwargs):
@@ -35,41 +29,82 @@ class ExampleAction(argparse.Action):
         parser.exit()
 
 
-def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame):
+def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
+    """Check the frame and the run parameters."""
+    nanometer = unit.nano * unit.meter
+
+    for diameter in frame.particles.diameter:
+        if not diameter > 0.0:
+            raise ValueError("Every diameter must be greater than zero.")
+    for mass in frame.particles.mass:
+        if not mass >= 0.0:
+            raise ValueError("Every mass must be greater than or equal to zero.")
+    for constraint_value in frame.constraints.value:
+        if not constraint_value > 0.0:
+            raise ValueError("Every constraint distance must be greater than zero.")
+
+    if any(parameters.wall_directions):
+        # Check for orthogonal box vectors if walls should be included.
+        if not all(a == 0.0 for a in frame.configuration.box[3:]):
+            raise ValueError("If any wall is included, the box vectors must be parallel to the coordinate axes.")
+        # If not all walls are present, the box of OpenMM needs to be enlarged because OpenMM will use periodic
+        # boundaries and we do not want to let particles interact through the walls. The enlargement of the box does
+        # currently not consider the depletant radius, which is why it should be small enough.
+        if not all(parameters.wall_directions):
+            if parameters.use_depletion:
+                if (parameters.depletant_radius
+                        > (parameters.cutoff_factor * parameters.debye_length - 2.0 * parameters.brush_length) / 2.0):
+                    raise ValueError("The depletant radius is too large for the cutoff factor and brush length when "
+                                     "partial walls are included (r_d <= (cutoff_factor * lambda_D - 2 * L) / 2)")
+
+    if parameters.use_depletion:
+        assert (parameters.depletant_radius is not None and parameters.depletant_radius.value_in_unit(nanometer) > 0.0)
+        for diameter in frame.particles.diameter:
+            if parameters.depletant_radius.value_in_unit(nanometer) / (diameter / 2.0) > 0.1547:
+                warnings.warn("Size ratio of depletant to colloid particles is too large. "
+                              "Analytical computation of depletion potential may be invalid."
+                              "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
+                              "pp 10079 - 10106.")
+    use_substrate = any(mass == 0.0 for mass in frame.particles.mass)
+    if use_substrate:
+        if not all(parameters.wall_directions):
+            raise ValueError("A substrate can only be used if all walls are active.")
+
+
+def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.Simulation:
+    nanometer = unit.nano * unit.meter
+    radii = frame.particles.diameter / 2.0 * nanometer
+    surface_potentials = frame.particles.charge * (unit.milli * unit.volt)
+
     # ----------------------------------- Set up system and parameters. ------------------------------------------------
     topology = app.topology.Topology()
     chain = topology.addChain()
     residue = topology.addResidue("res", chain)
 
     atoms = []
-    for t in frame.particles.typeid:
-        atoms.append(topology.addAtom(frame.particles.types[t], None, residue))
+    for type_id in frame.particles.typeid:
+        atoms.append(topology.addAtom(frame.particles.types[type_id], None, residue))
 
     system = openmm.System()
 
+    cell = get_cell_from_box(frame.configuration.box)
     include_walls = any(parameters.wall_directions)
     all_walls = all(parameters.wall_directions)
-
-    box_vector_one = np.array([frame.configuration.box[0], 0.0, 0.0]) 
-    box_vector_two = np.array([0.0, frame.configuration.box[1], 0.0]) 
-    box_vector_three = np.array([0.0, 0.0, frame.configuration.box[2]]) 
-    final_cell = np.array([box_vector_one, box_vector_two, box_vector_three]) * (nanometer)
-
     if include_walls:
-        if not (box_vector_one[1] == 0.0 and box_vector_one[2] == 0.0 and
+        box_vector_one = cell[0]
+        box_vector_two = cell[1]
+        box_vector_three = cell[2]
+        assert (box_vector_one[1] == 0.0 and box_vector_one[2] == 0.0 and
                 box_vector_two[0] == 0.0 and box_vector_two[2] == 0.0 and
-                box_vector_three[0] == 0.0 and box_vector_three[1] == 0.0):
-            raise ValueError("If any wall is included, the box vectors must be parallel to the coordinate axes.")
-        wall_distances = (box_vector_one[0] * (nanometer) if parameters.wall_directions[0] else None,
-                          box_vector_two[1] * (nanometer) if parameters.wall_directions[1] else None,
-                          box_vector_three[2] * (nanometer) if parameters.wall_directions[2] else None)
-
+                box_vector_three[0] == 0.0 and box_vector_three[1] == 0.0)
+        wall_distances = (box_vector_one[0] * nanometer if parameters.wall_directions[0] else None,
+                          box_vector_two[1] * nanometer if parameters.wall_directions[1] else None,
+                          box_vector_three[2] * nanometer if parameters.wall_directions[2] else None)
+        final_cell = cell.copy()
         if not all_walls:
-            if parameters.use_depletion:
-                if (parameters.depletant_radius
-                        > (parameters.cutoff_factor * parameters.debye_length - 2.0 * parameters.brush_length) / 2.0):
-                    raise ValueError("the depletant radius is too large for the cutoff factor and brush length when "
-                                     "partial walls are included (r_d <= (cutoff_factor * lambda_D - 2 * L) / 2)")
+            assert (not parameters.use_depletion
+                    or parameters.depletant_radius
+                    > (parameters.cutoff_factor * parameters.debye_length - 2.0 * parameters.brush_length) / 2.0)
             for index, wall_direction in enumerate(parameters.wall_directions):
                 if wall_direction:
                     # The shifted Lennard Jones walls diverge at distance r = radius - 1 from the location of the wall,
@@ -80,49 +115,38 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame):
                     # through the walls, we thus increase the length of the periodic box vectors (not the wall) by
                     # 2 * (radius_max - radius_min) + 2 + cutoff_factor * debye_length.
                     final_cell[index][index] += \
-                        (2.0 * (max(parameters.radii.values()) - min(parameters.radii.values()))
-                         + 2.0 * (nanometer)
-                         + parameters.cutoff_factor * parameters.debye_length).value_in_unit(nanometer)
+                        (2.0 * (max(radii) - min(radii)) + 2.0 * (unit.nano * unit.meter)
+                         + parameters.cutoff_factor * parameters.debye_length).value_in_unit(unit.nano * unit.meter)
     else:
         wall_distances = None
+        final_cell = cell
 
     if not all_walls:
         topology.setPeriodicBoxVectors(final_cell)
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
+
+    # Substrate is detected by immobile particles with mass 0.0.
+    use_substrate = any(mass == 0.0 for mass in frame.particles.mass)
+
     # TODO: Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
     integrator = getattr(integrators, parameters.integrator)(**parameters.integrator_parameters)
+
     potentials_parameters = ColloidPotentialsParameters(
         brush_density=parameters.brush_density, brush_length=parameters.brush_length,
         debye_length=parameters.debye_length, temperature=parameters.potential_temperature,
-        dielectric_constant=parameters.dielectric_constant
-    )
+        dielectric_constant=parameters.dielectric_constant)
 
     # ---------------------------------------- Create all forces. ------------------------------------------------------
-    if parameters.use_tabulated:
-        surface_potentials = {}
-        radii = {}
-        for i, t in enumerate(frame.particles.types):
-            if i not in frame.particles.typeid:
-                continue
-            particle_index = frame.particles.typeid.index(i)
-            radii[t] = frame.particles.diameter[particle_index] / 2.0 * nanometer
-            surface_potentials[t] = frame.particles.charge[particle_index] * (millivolt)
-        colloid_potentials = ColloidPotentialsTabulated(
-            radii=radii, surface_potentials=surface_potentials, 
-            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
-            cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls)
-    else:
-        colloid_potentials = ColloidPotentialsAlgebraic(
-            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
-            cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls)
+    colloid_potentials = ColloidPotentialsAlgebraic(
+        colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
+        cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls)
 
-    use_substrate = "__substrate__" in frame.particles.types
     if include_walls:
         slj_walls = ShiftedLennardJonesWalls(wall_distances, parameters.epsilon, parameters.alpha,
-                                             parameters.wall_directions, use_substrate=use_substrate)
+                                             parameters.wall_directions, use_substrate)
     else:
         slj_walls = None
 
@@ -141,44 +165,32 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame):
     else:
         gravitational_potential = None
 
-    # ------------------------------------- Add all particles to the system. -------------------------------------------
+    # --------------------------- Add all particles and constraints to the system. -------------------------------------
     for mass in frame.particles.mass:
         system.addParticle(mass)
 
-    if parameters.use_clusters:
-        for constraint_indices in range(frame.constraints.N):
-            constraint = frame.constraints.group[constraint_indices]
-            distance = frame.constraints.value[constraint_indices]
-
-            i, j = constraint
-            system.addConstraint(i, j, distance)
+    for i in range(frame.constraints.N):
+        if not len(frame.constraints.group[i]) == 2:
+            raise ValueError("Every constraint must have exactly two particles.")
+        system.addConstraint(frame.constraints.group[i][0], frame.constraints.group[i][1], frame.constraints.value[i])
 
     # ------------------------------------- Add all particles to the forces. -------------------------------------------
     # Be careful to add the particles in the same order as to the system.
-    for i, t in enumerate(frame.particles.typeid):
-        colloid_potentials.add_particle(radius=frame.particles.diameter[i] / 2.0 * nanometer,
-                                        surface_potential=frame.particles.charge[i] * (millivolt),
-                                        substrate_flag=(frame.particles.types[t] == "__substrate__"))
-        if include_walls:
-            if t != "__substrate__":
-                slj_walls.add_particle(index=i, radius=frame.particles.diameter[i] / 2.0 * nanometer)
+    for i in range(frame.particles.N):
+        is_substrate = frame.particles.mass[i] == 0.0
+        colloid_potentials.add_particle(radius=radii[i], surface_potential=surface_potentials[i],
+                                        substrate_flag=is_substrate)
+        if include_walls and not is_substrate:
+            slj_walls.add_particle(index=i, radius=radii[i])
         if parameters.use_depletion:
-            depletion_potential.add_particle(radius=frame.particles.diameter[i] / 2.0 * nanometer,
-                                             substrate_flag=(frame.particles.types[t] == "__substrate__"))
-        if parameters.use_gravity:
-            if t != "__substrate__":
-                gravitational_potential.add_particle(index=i, radius=frame.particles.diameter[i] / 2.0 * nanometer,)
+            depletion_potential.add_particle(radius=radii[i], substrate_flag=is_substrate)
+        if parameters.use_gravity and not is_substrate:
+            gravitational_potential.add_particle(index=i, radius=radii[i])
 
-    if parameters.use_clusters:
-        # add exclusions
-        for constraint in frame.constraints.group:
-            i, j = constraint
-            colloid_potentials.add_exclusion(i, j)
-
+    for i in range(frame.constraints.N):
+        colloid_potentials.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
         if parameters.use_depletion:
-            for constraint in frame.constraints.group:
-                i, j = constraint
-                depletion_potential.add_exclusion(i, j)
+            depletion_potential.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
 
     # -------------------------------------- Add all forces to the system. ---------------------------------------------
     for force in colloid_potentials.yield_potentials():
@@ -210,8 +222,7 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame):
                 cutoff_distance = force.getCutoffDistance()
                 cutoff_distance_index = -1
                 for other_cutoff_index in range(len(cutoffs)):
-                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(
-                            nanometer)) < 1.0e-6:
+                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(nanometer)) < 1.0e-6:
                         cutoff_distance_index = other_cutoff_index
                 if cutoff_distance_index == -1:
                     cutoffs.append(cutoff_distance)
@@ -230,9 +241,13 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame):
 
 
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
-                     total_number_steps: int, frame: gsd.hoomd.Frame) -> None:
+                     total_number_steps: int, initial_frame: gsd.hoomd.Frame) -> None:
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
-                                            frame, simulation, append_file=append_file))
+                                            initial_frame.particles.diameter / 2.0 * (unit.nano * unit.meter),
+                                            initial_frame.particles.charge * (unit.milli * unit.volt), simulation,
+                                            append_file=append_file,
+                                            cell=get_cell_from_box(initial_frame.configuration.box)
+                                                 * (unit.nano * unit.meter)))
     simulation.reporters.append(StatusReporter(max(1, total_number_steps // 100), total_number_steps))
     simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
                                                       parameters.state_data_interval, time=True,
@@ -265,11 +280,13 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
 
     parameters = RunParameters.from_yaml(args.yaml_file)
 
-    frame = read_gsd_file(parameters.initial_configuration)
+    frame = read_gsd_file(parameters.initial_configuration, parameters.frame_index)
+
+    check_frame(parameters, frame)
 
     simulation = set_up_simulation(parameters, frame)
-    simulation.context.setPositions(frame.particles.position)
 
+    simulation.context.setPositions(frame.particles.position)
     if parameters.velocity_seed is not None:
         simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
                                                       parameters.velocity_seed)
@@ -290,7 +307,10 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
     # TODO: CHECK ALL SURFACE SEPARATIONS
 
     if parameters.final_configuration_gsd_filename is not None:
-        write_gsd_file(parameters.final_configuration_gsd_filename, simulation, frame)
+        write_gsd_file(parameters.final_configuration_gsd_filename, simulation,
+                       frame.particles.diameter / 2.0 * (unit.nano * unit.meter),
+                       frame.particles.charge * (unit.milli * unit.volt),
+                       get_cell_from_box(frame.configuration.box) * (unit.nano * unit.meter))
 
     return simulation
 

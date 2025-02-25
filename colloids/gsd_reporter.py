@@ -4,6 +4,7 @@ import numpy as np
 import numpy.typing as npt
 import openmm.app
 from openmm import unit
+from colloids.units import electric_potential_unit, energy_unit, length_unit, mass_unit, time_unit
 
 
 class GSDReporter(object):
@@ -81,9 +82,7 @@ class GSDReporter(object):
         If a surface potential does not have a unit compatible with millivolts.
     """
 
-    _nanometer = unit.nano * unit.meter
-    _nanometer_per_picosecond = (unit.nano * unit.meter) / (unit.pico * unit.second)
-    _millivolt = unit.milli * unit.volt
+    _velocity_unit = length_unit / time_unit
 
     def __init__(self, filename: str, report_interval: int, radii: npt.NDArray[unit.Quantity],
                  surface_potentials: npt.NDArray[unit.Quantity], simulation: openmm.app.Simulation,
@@ -97,12 +96,12 @@ class GSDReporter(object):
         assert simulation.topology.getNumResidues() == 1
         assert simulation.topology.getNumAtoms() == simulation.system.getNumParticles()
         self._report_interval = report_interval
-        if not all(r.unit.is_compatible(self._nanometer) for r in radii):
+        if not all(r.unit.is_compatible(length_unit) for r in radii):
             raise TypeError("All radii must have a unit compatible with nanometers.")
-        if not all(r > 0.0 * self._nanometer for r in radii):
+        if not all(r > 0.0 * length_unit for r in radii):
             raise ValueError("All radii must be greater than zero.")
         self._radii = radii
-        if not all(s.unit.is_compatible(self._millivolt) for s in surface_potentials):
+        if not all(s.unit.is_compatible(electric_potential_unit) for s in surface_potentials):
             raise TypeError("All surface potentials must have a unit compatible with millivolts.")
         self._surface_potentials = surface_potentials
         self._append_file = append_file
@@ -131,9 +130,9 @@ class GSDReporter(object):
                     == list(range(simulation.topology.getNumAtoms())))
             typeid = [types.index(atom.name) for atom in simulation.topology.atoms()]
             frame.particles.typeid = typeid
-            frame.particles.diameter = [2.0 * r.value_in_unit(self._nanometer) for r in self._radii]
-            frame.particles.charge = [s.value_in_unit(self._millivolt) for s in self._surface_potentials]
-            frame.particles.mass = [simulation.system.getParticleMass(atom_index).value_in_unit(unit.amu)
+            frame.particles.diameter = [2.0 * r.value_in_unit(length_unit) for r in self._radii]
+            frame.particles.charge = [s.value_in_unit(electric_potential_unit) for s in self._surface_potentials]
+            frame.particles.mass = [simulation.system.getParticleMass(atom_index).value_in_unit(mass_unit)
                                     for atom_index in range(simulation.topology.getNumAtoms())]
             frame.configuration.dimensions = 3
         else:
@@ -164,7 +163,6 @@ class GSDReporter(object):
         steps = self._report_interval - simulation.currentStep % self._report_interval
         return steps, True, True, False, True, False
 
-    # noinspection PyUnresolvedReferences
     def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
         """
         Generate a report by storing information about the trajectory in the GSD file.
@@ -180,30 +178,30 @@ class GSDReporter(object):
         self._frame.configuration.step = state.getStepCount()
         positions = state.getPositions(asNumpy=True)
         assert len(positions) == self._frame.particles.N
-        self._frame.particles.position = positions.value_in_unit(self._nanometer)
+        self._frame.particles.position = positions.value_in_unit(length_unit)
         velocities = state.getVelocities(asNumpy=True)
         assert len(velocities) == self._frame.particles.N
-        self._frame.particles.velocity = velocities.value_in_unit(self._nanometer_per_picosecond)
+        self._frame.particles.velocity = velocities.value_in_unit(self._velocity_unit)
         periodic_box_vectors = self._cell if self._cell is not None else state.getPeriodicBoxVectors()
         assert len(periodic_box_vectors) == 3
-        assert periodic_box_vectors[0][1].value_in_unit(self._nanometer) == 0.0
-        assert periodic_box_vectors[0][2].value_in_unit(self._nanometer) == 0.0
-        assert periodic_box_vectors[1][2].value_in_unit(self._nanometer) == 0.0
+        assert periodic_box_vectors[0][1].value_in_unit(length_unit) == 0.0
+        assert periodic_box_vectors[0][2].value_in_unit(length_unit) == 0.0
+        assert periodic_box_vectors[1][2].value_in_unit(length_unit) == 0.0
         # See http://docs.openmm.org/7.6.0/userguide/theory/05_other_features.html
         # See https://hoomd-blue.readthedocs.io/en/v2.9.3/box.html
         self._frame.configuration.box = [
-            periodic_box_vectors[0][0].value_in_unit(self._nanometer),
-            periodic_box_vectors[1][1].value_in_unit(self._nanometer),
-            periodic_box_vectors[2][2].value_in_unit(self._nanometer),
+            periodic_box_vectors[0][0].value_in_unit(length_unit),
+            periodic_box_vectors[1][1].value_in_unit(length_unit),
+            periodic_box_vectors[2][2].value_in_unit(length_unit),
             periodic_box_vectors[1][0] / periodic_box_vectors[1][1],
             periodic_box_vectors[2][0] / periodic_box_vectors[2][2],
             periodic_box_vectors[2][1] / periodic_box_vectors[2][2]
         ]
         # To prevent warnings about implicit data copies, the scalar values should be stored explicitly in a 1D array.
         self._frame.log = {
-            "time": np.array([state.getTime().value_in_unit(unit.picosecond)]),
-            "potential_energy": np.array([state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)]),
-            "kinetic_energy": np.array([state.getKineticEnergy().value_in_unit(unit.kilojoule_per_mole)])
+            "time": np.array([state.getTime().value_in_unit(time_unit)]),
+            "potential_energy": np.array([state.getPotentialEnergy().value_in_unit(energy_unit)]),
+            "kinetic_energy": np.array([state.getKineticEnergy().value_in_unit(energy_unit)])
         }
         self._file.append(self._frame)
         self._file.flush()

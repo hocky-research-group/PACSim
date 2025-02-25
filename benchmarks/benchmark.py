@@ -2,13 +2,16 @@ import argparse
 import time
 import subprocess
 import sys
+import ase.data
+import ase.io
+import ase.symbols
 import numpy as np
+import numpy.typing as npt
 import openmm
 from openmm import app
 from openmm import unit
 from colloids import (ColloidPotentialsParameters, ColloidPotentialsAbstract, ColloidPotentialsAlgebraic,
                       ColloidPotentialsTabulated)
-from colloids.helper_functions import read_xyz_file
 
 
 def benchmark_parameters():
@@ -31,6 +34,20 @@ def benchmark_parameters():
     parameters["mass_negative"] = (
             (parameters["radius_negative"] / parameters["radius_positive"]) ** 3 * parameters["mass_positive"])
     return parameters
+
+
+def read_xyz_file(filename: str) -> tuple[list[str], npt.NDArray[float], npt.NDArray[float]]:
+    if not filename.endswith(".xyz"):
+        raise ValueError("The file must have the .xyz extension.")
+    original_numbers = ase.symbols.atomic_numbers
+    types = np.loadtxt(filename, skiprows=2, dtype=str, usecols=0)
+    # Hack because ase could complain about non-existing elements.
+    ase.symbols.atomic_numbers = {t.capitalize(): i for i, t in enumerate(set(types))}
+    atoms = ase.io.read(filename, format="extxyz")
+    ase.symbols.atomic_numbers = original_numbers
+    cell = atoms.get_cell()[:]
+    assert cell.shape == (3, 3)
+    return types, atoms.get_positions(), cell
 
 
 def benchmark_openmm(platform_name: str = "Reference", potentials: str = "algebraic", use_log: bool = False,

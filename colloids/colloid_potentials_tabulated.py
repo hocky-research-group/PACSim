@@ -5,6 +5,7 @@ import numpy.typing as npt
 from openmm import Continuous1DFunction, CustomNonbondedForce, unit
 from colloids.abstracts import ColloidPotentialsAbstract
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
+from colloids.units import electric_potential_unit, energy_unit, length_unit
 
 
 class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
@@ -71,6 +72,8 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         If the cutoff factor is not greater than zero.
     """
 
+    _millivolt_squared = electric_potential_unit ** 2
+
     def __init__(self, radii: dict[str, unit.Quantity], surface_potentials: dict[str, unit.Quantity],
                  colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
                  use_log: bool = True, cutoff_factor: float = 21.0, periodic_boundary_conditions: bool = True) -> None:
@@ -78,15 +81,15 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         super().__init__(colloid_potentials_parameters, periodic_boundary_conditions)
         if not cutoff_factor > 0.0:
             raise ValueError("The cutoff factor must be greater than zero.")
-        if not all([radius.unit.is_compatible(self._nanometer) for radius in radii.values()]):
+        if not all([radius.unit.is_compatible(length_unit) for radius in radii.values()]):
             raise TypeError("All radii must have a unit that is compatible with nanometer")
-        if not all([radii > 0.0 * unit.nanometer for radii in radii.values()]):
+        if not all([radii > 0.0 * length_unit for radii in radii.values()]):
             raise ValueError("All radii must have a value greater than zero")
-        if not all([surface_potential.unit.is_compatible(self._millivolt) for surface_potential in surface_potentials.values()]):
+        if not all([surface_potential.unit.is_compatible(electric_potential_unit) for surface_potential in surface_potentials.values()]):
             raise TypeError("All surface potentials must have a unit that is compatible with millivolts")
 
-        self._radii = {key: value.in_units_of(self._nanometer) for key, value in radii.items()}
-        self._surface_potentials = {key: value.in_units_of(self._millivolt) for key, value in surface_potentials.items()}
+        self._radii = {key: value.in_units_of(length_unit) for key, value in radii.items()}
+        self._surface_potentials = {key: value.in_units_of(electric_potential_unit) for key, value in surface_potentials.items()}
         self._use_log = use_log
         self._cutoff_factor = cutoff_factor
         self._maximum_surface_separation = self._cutoff_factor * self._parameters.debye_length
@@ -102,7 +105,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         Return the steric potential from the Alexander-de Gennes polymer brush model for the given surface-to-surface
         separations.
         """
-        double_brush_length = 2.0 * self._parameters.brush_length.value_in_unit(self._nanometer)
+        double_brush_length = 2.0 * self._parameters.brush_length.value_in_unit(length_unit)
         h_over_double_brush_length = h_values / double_brush_length
         double_brush_length_over_h = double_brush_length / h_values
         return prefactor * np.where(h_values <= double_brush_length,
@@ -113,7 +116,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
     def _electrostatic_potential(self, prefactor: float, h_values: npt.NDArray[float]) -> npt.NDArray[float]:
         """Return the electrostatic potential from DLVO theory for the given surface-to-surface separations."""
-        debye_length = self._parameters.debye_length.value_in_unit(self._nanometer)
+        debye_length = self._parameters.debye_length.value_in_unit(length_unit)
         if self._use_log:
             return prefactor * np.log(1.0 + np.exp(-h_values / debye_length))
         else:
@@ -123,9 +126,9 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         """Set up the CustomNonbondedForce instances based on tabulated functions."""
         n_potentials = int((len(self._radii) ** 2 + len(self._radii)) / 2)
         r_values = np.zeros((n_potentials, self._number_samples))
-        radii_sums = np.zeros((n_potentials))
-        inverted_radii_sums = np.zeros((n_potentials))
-        surface_potential_prod = np.zeros((n_potentials))
+        radii_sums = np.zeros(n_potentials)
+        inverted_radii_sums = np.zeros(n_potentials)
+        surface_potential_prod = np.zeros(n_potentials)
         keys = []
         rind = 0
         for i, radius_one in enumerate(self._radii.values()):
@@ -133,13 +136,13 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
                 if i <= j:
                     keys.append((i, j))
                     r_values[rind, :] = np.linspace(
-                        (1.00005 * (radius_one + radius_two)).value_in_unit(self._nanometer),
-                        ((radius_one + radius_two) + self._maximum_surface_separation).value_in_unit(self._nanometer),
+                        (1.00005 * (radius_one + radius_two)).value_in_unit(length_unit),
+                        ((radius_one + radius_two) + self._maximum_surface_separation).value_in_unit(length_unit),
                         num=self._number_samples)
                     surface_potential_prod[rind] = (self._surface_potentials[list(self._radii.keys())[i]] *
-                                                    self._surface_potentials[list(self._radii.keys())[j]]).value_in_unit(self._millivolt ** 2)
-                    radii_sums[rind] = (radius_one + radius_two).value_in_unit(self._nanometer)
-                    inverted_radii_sums[rind] = (2.0 / ((1.0 / radius_one) + (1.0 / radius_two))).value_in_unit(self._nanometer)
+                                                    self._surface_potentials[list(self._radii.keys())[j]]).value_in_unit(self._millivolt_squared)
+                    radii_sums[rind] = (radius_one + radius_two).value_in_unit(length_unit)
+                    inverted_radii_sums[rind] = (2.0 / ((1.0 / radius_one) + (1.0 / radius_two))).value_in_unit(length_unit)
                     rind += 1
 
         h_values = r_values - radii_sums[:, np.newaxis]
@@ -147,16 +150,16 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         steric_prefactors = (
                 unit.BOLTZMANN_CONSTANT_kB * self._parameters.temperature * 16.0 * math.pi * (radii_sums / 2) *
                 (self._parameters.brush_length ** 2) * (self._parameters.brush_density ** (3 / 2)) / 35.0
-                * unit.AVOGADRO_CONSTANT_NA * self._nanometer).value_in_unit(unit.kilojoule_per_mole)
+                * unit.AVOGADRO_CONSTANT_NA * length_unit).value_in_unit(energy_unit)
 
         steric_potentials = [self._steric_potential(prefactor, h_values[ind, :]) for ind, prefactor in
                              enumerate(steric_prefactors)]
 
 
         electrostatic_prefactors = (
-            2.0 * math.pi * self._parameters.VACUUM_PERMITTIVITY * self._parameters.dielectric_constant
-            * inverted_radii_sums * (self._nanometer) * surface_potential_prod * (self._millivolt ** 2)
-            * unit.AVOGADRO_CONSTANT_NA ).value_in_unit(unit.kilojoule_per_mole)
+                2.0 * math.pi * self._parameters.VACUUM_PERMITTIVITY * self._parameters.dielectric_constant
+                * inverted_radii_sums * length_unit * surface_potential_prod * self._millivolt_squared
+                * unit.AVOGADRO_CONSTANT_NA ).value_in_unit(energy_unit)
 
         electrostatic_potentials = [self._electrostatic_potential(prefactor, h_values[ind, :]) for ind, prefactor in
                                     enumerate(electrostatic_prefactors)]
@@ -177,7 +180,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
                 potential.setNonbondedMethod(potential.CutoffNonPeriodic)
                 potential.setCutoffDistance(r_values[ind, -1])
                 potential.setUseSwitchingFunction(True)
-                potential.setSwitchingDistance(self._switch_off_distance.value_in_unit(self._nanometer))
+                potential.setSwitchingDistance(self._switch_off_distance.value_in_unit(length_unit))
                 potential.setUseLongRangeCorrection(False)
                 potentials.append(potential)
 
@@ -260,8 +263,8 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
 
 if __name__ == '__main__':
-    ColloidPotentialsTabulated(radii={"colloid_one": 1.0 * unit.nanometer, "colloid_two": 2.0 * unit.nanometer},
-                                 surface_potentials={"colloid_one": 44.0 * unit.volt,
-                                                    "colloid_two": -54.0 * unit.volt},
-                                 colloid_potentials_parameters=ColloidPotentialsParameters(),
-                                 use_log=True, cutoff_factor=21.0, periodic_boundary_conditions=True)
+    ColloidPotentialsTabulated(radii={"colloid_one": 1.0 * length_unit, "colloid_two": 2.0 * length_unit},
+                               surface_potentials={"colloid_one": 44.0 * electric_potential_unit,
+                                                   "colloid_two": -54.0 * electric_potential_unit},
+                               colloid_potentials_parameters=ColloidPotentialsParameters(),
+                               use_log=True, cutoff_factor=21.0, periodic_boundary_conditions=True)

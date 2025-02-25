@@ -2,6 +2,7 @@ import math
 from typing import Iterator
 from openmm import CustomExternalForce, unit
 from colloids.abstracts import OpenMMPotentialAbstract
+from colloids.units import length_unit, mass_unit, time_unit
 
 
 class Gravity(OpenMMPotentialAbstract):
@@ -35,26 +36,26 @@ class Gravity(OpenMMPotentialAbstract):
         If gravitational_acceleration, water_density, or particle_density is not greater than zero.
     """
 
-    _centimeter = unit.centi * unit.meter
-    _nanometer = unit.nano * unit.meter
+    _acceleration_unit = length_unit / time_unit ** 2
+    _density_unit = mass_unit / length_unit ** 3
 
     def __init__(self, gravitational_acceleration: unit.Quantity, water_density: unit.Quantity,
                  particle_density: unit.Quantity) -> None:
         """Constructor of the Gravity class."""
         super().__init__()
 
-        if not gravitational_acceleration.unit.is_compatible(unit.meter / unit.second ** 2):
+        if not gravitational_acceleration.unit.is_compatible(self._acceleration_unit):
             raise TypeError(
                 "argument gravitational constant must have a unit that is compatible with meters per second squared")
-        if not gravitational_acceleration.value_in_unit(unit.meter / unit.second ** 2) > 0.0:
+        if not gravitational_acceleration.value_in_unit(self._acceleration_unit) > 0.0:
             raise ValueError("argument gravitational constant must have a value greater than zero")
-        if not water_density.unit.is_compatible(unit.gram / self._centimeter ** 3):
+        if not water_density.unit.is_compatible(self._density_unit):
             raise TypeError("argument water_density must have a unit compatible with grams per centimeter cubed.")
-        if not water_density.value_in_unit(unit.gram / self._centimeter ** 3) > 0.0:
+        if not water_density.value_in_unit(self._density_unit) > 0.0:
             raise ValueError("argument water_density must have a value greater than zero")
-        if not particle_density.unit.is_compatible(unit.gram / self._centimeter ** 3):
+        if not particle_density.unit.is_compatible(self._density_unit):
             raise TypeError("argument particle_density must have a unit compatible with grams per centimeter cubed.")
-        if not particle_density.value_in_unit(unit.gram / self._centimeter ** 3) > 0.0:
+        if not particle_density.value_in_unit(self._density_unit) > 0.0:
             raise ValueError("argument particle_density must have a value greater than zero")
 
         self._gravitational_acceleration = gravitational_acceleration
@@ -68,7 +69,7 @@ class Gravity(OpenMMPotentialAbstract):
 
         gravitational_potential.addGlobalParameter(
             "gravitational_acceleration",
-            self._gravitational_acceleration.value_in_unit(self._nanometer / unit.picosecond ** 2))
+            self._gravitational_acceleration.value_in_unit(self._acceleration_unit))
         gravitational_potential.addPerParticleParameter("particle_mass")
 
         return gravitational_potential
@@ -95,14 +96,14 @@ class Gravity(OpenMMPotentialAbstract):
             If this method is called after the yield_potentials method (via the abstract base class).
         """
         super().add_particle()
-        if not radius.unit.is_compatible(self._nanometer):
+        if not radius.unit.is_compatible(length_unit):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
-        if not radius.value_in_unit(self._nanometer) > 0.0:
+        if not radius.value_in_unit(length_unit) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
         self._gravitational_potential.addParticle(
             index,
             [((self._particle_density - self._water_density)
-              * 4.0 / 3.0 * math.pi * (radius ** 3) * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.amu)])
+              * 4.0 / 3.0 * math.pi * (radius ** 3) * unit.AVOGADRO_CONSTANT_NA).value_in_unit(mass_unit)])
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """

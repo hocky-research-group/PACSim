@@ -6,7 +6,6 @@ import warnings
 import gsd.hoomd
 import openmm
 from openmm import app
-from openmm import unit
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
                       DepletionPotential, Gravity)
 from colloids.gsd_reporter import GSDReporter
@@ -15,6 +14,7 @@ import colloids.integrators as integrators
 from colloids.run_parameters import RunParameters
 from colloids.status_reporter import StatusReporter
 import colloids.update_reporters as update_reporters
+from colloids.units import electric_potential_unit, length_unit
 
 
 class ExampleAction(argparse.Action):
@@ -31,8 +31,6 @@ class ExampleAction(argparse.Action):
 
 def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
     """Check the frame and the run parameters."""
-    nanometer = unit.nano * unit.meter
-
     for diameter in frame.particles.diameter:
         if not diameter > 0.0:
             raise ValueError("Every diameter must be greater than zero.")
@@ -58,9 +56,9 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
                                      "partial walls are included (r_d <= (cutoff_factor * lambda_D - 2 * L) / 2)")
 
     if parameters.use_depletion:
-        assert (parameters.depletant_radius is not None and parameters.depletant_radius.value_in_unit(nanometer) > 0.0)
+        assert (parameters.depletant_radius is not None and parameters.depletant_radius.value_in_unit(length_unit) > 0.0)
         for diameter in frame.particles.diameter:
-            if parameters.depletant_radius.value_in_unit(nanometer) / (diameter / 2.0) > 0.1547:
+            if parameters.depletant_radius.value_in_unit(length_unit) / (diameter / 2.0) > 0.1547:
                 warnings.warn("Size ratio of depletant to colloid particles is too large. "
                               "Analytical computation of depletion potential may be invalid."
                               "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
@@ -72,9 +70,8 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
 
 
 def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.Simulation:
-    nanometer = unit.nano * unit.meter
-    radii = frame.particles.diameter / 2.0 * nanometer
-    surface_potentials = frame.particles.charge * (unit.milli * unit.volt)
+    radii = frame.particles.diameter / 2.0 * length_unit
+    surface_potentials = frame.particles.charge * electric_potential_unit
 
     # ----------------------------------- Set up system and parameters. ------------------------------------------------
     topology = app.topology.Topology()
@@ -97,9 +94,9 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         assert (box_vector_one[1] == 0.0 and box_vector_one[2] == 0.0 and
                 box_vector_two[0] == 0.0 and box_vector_two[2] == 0.0 and
                 box_vector_three[0] == 0.0 and box_vector_three[1] == 0.0)
-        wall_distances = (box_vector_one[0] * nanometer if parameters.wall_directions[0] else None,
-                          box_vector_two[1] * nanometer if parameters.wall_directions[1] else None,
-                          box_vector_three[2] * nanometer if parameters.wall_directions[2] else None)
+        wall_distances = (box_vector_one[0] * length_unit if parameters.wall_directions[0] else None,
+                          box_vector_two[1] * length_unit if parameters.wall_directions[1] else None,
+                          box_vector_three[2] * length_unit if parameters.wall_directions[2] else None)
         final_cell = cell.copy()
         if not all_walls:
             assert (not parameters.use_depletion
@@ -115,8 +112,8 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
                     # through the walls, we thus increase the length of the periodic box vectors (not the wall) by
                     # 2 * (radius_max - radius_min) + 2 + cutoff_factor * debye_length.
                     final_cell[index][index] += \
-                        (2.0 * (max(radii) - min(radii)) + 2.0 * (unit.nano * unit.meter)
-                         + parameters.cutoff_factor * parameters.debye_length).value_in_unit(unit.nano * unit.meter)
+                        (2.0 * (max(radii) - min(radii)) + 2.0 * length_unit
+                         + parameters.cutoff_factor * parameters.debye_length).value_in_unit(length_unit)
     else:
         wall_distances = None
         final_cell = cell
@@ -222,7 +219,7 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
                 cutoff_distance = force.getCutoffDistance()
                 cutoff_distance_index = -1
                 for other_cutoff_index in range(len(cutoffs)):
-                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(nanometer)) < 1.0e-6:
+                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(length_unit)) < 1.0e-6:
                         cutoff_distance_index = other_cutoff_index
                 if cutoff_distance_index == -1:
                     cutoffs.append(cutoff_distance)
@@ -243,11 +240,10 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
                      total_number_steps: int, initial_frame: gsd.hoomd.Frame) -> None:
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
-                                            initial_frame.particles.diameter / 2.0 * (unit.nano * unit.meter),
-                                            initial_frame.particles.charge * (unit.milli * unit.volt), simulation,
+                                            initial_frame.particles.diameter / 2.0 * length_unit,
+                                            initial_frame.particles.charge * electric_potential_unit, simulation,
                                             append_file=append_file,
-                                            cell=get_cell_from_box(initial_frame.configuration.box)
-                                                 * (unit.nano * unit.meter)))
+                                            cell=get_cell_from_box(initial_frame.configuration.box) * length_unit))
     simulation.reporters.append(StatusReporter(max(1, total_number_steps // 100), total_number_steps))
     simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
                                                       parameters.state_data_interval, time=True,
@@ -308,9 +304,9 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
 
     if parameters.final_configuration_gsd_filename is not None:
         write_gsd_file(parameters.final_configuration_gsd_filename, simulation,
-                       frame.particles.diameter / 2.0 * (unit.nano * unit.meter),
-                       frame.particles.charge * (unit.milli * unit.volt),
-                       get_cell_from_box(frame.configuration.box) * (unit.nano * unit.meter))
+                       frame.particles.diameter / 2.0 * length_unit,
+                       frame.particles.charge * electric_potential_unit,
+                       get_cell_from_box(frame.configuration.box) * length_unit)
 
     return simulation
 

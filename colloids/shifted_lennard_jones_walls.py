@@ -2,6 +2,7 @@ from typing import Iterator, Optional, Sequence
 from openmm import CustomExternalForce, unit
 from colloids.abstracts import OpenMMPotentialAbstract
 import warnings
+from colloids.units import energy_unit, length_unit
 
 
 class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
@@ -66,8 +67,6 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         If not all wall directions are active if a substrate is used.
     """
 
-    _nanometer = unit.nano * unit.meter
-
     def __init__(self, wall_distances: Sequence[Optional[unit.Quantity]], epsilon: unit.Quantity, alpha: float,
                  wall_directions: Sequence[bool] = (True, True, True), use_substrate: bool = False) -> None:
         """Constructor of the ShiftedLennardJonesWalls class."""
@@ -83,16 +82,16 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             if wdir:
                 if wdist is None:
                     raise ValueError("wall distance must be specified for any active wall direction")
-                if not wdist.unit.is_compatible(self._nanometer):
+                if not wdist.unit.is_compatible(length_unit):
                     raise TypeError("any wall distance must have a unit that is compatible with nanometers")
-                if not wdist.value_in_unit(self._nanometer) > 0.0:
+                if not wdist.value_in_unit(length_unit) > 0.0:
                     raise ValueError("any wall distance must have a value greater than zero")
             else:
                 if wdist is not None:
                     raise ValueError("wall distance must not be specified for inactive wall direction")
-        if not epsilon.unit.is_compatible(unit.kilojoule_per_mole):
+        if not epsilon.unit.is_compatible(energy_unit):
             raise TypeError("argument epsilon must have a unit that is compatible with kilojoules per mole")
-        if not epsilon.value_in_unit(unit.kilojoule_per_mole) > 0.0:
+        if not epsilon.value_in_unit(energy_unit) > 0.0:
             raise ValueError("argument epsilon must have a value greater than zero")
         if not 0.0 <= alpha <= 1.0:
             raise ValueError("argument alpha must satisfy 0 <= alpha <= 1")
@@ -143,7 +142,7 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
 
         slj_potential = CustomExternalForce(slj_string)
         slj_potential.addGlobalParameter("four_epsilon",
-                                         4.0 * self._epsilon.value_in_unit(unit.kilojoule_per_mole))
+                                         4.0 * self._epsilon.value_in_unit(energy_unit))
         slj_potential.addGlobalParameter("alpha", self._alpha)
         slj_potential.addPerParticleParameter("radius")
         slj_potential.addPerParticleParameter("shift")
@@ -182,47 +181,47 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             If this method is called after the yield_potentials method (via the abstract base class).
         """
         super().add_particle()
-        if not radius.unit.is_compatible(self._nanometer):
+        if not radius.unit.is_compatible(length_unit):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
-        if not radius.value_in_unit(self._nanometer) > 0.0:
+        if not radius.value_in_unit(length_unit) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
         for wall_distance in self._wall_distances:
             if wall_distance is not None:
-                if not wall_distance / 2.0 > radius * 2 ** (1 / 6) + radius - 1.0 * self._nanometer:
+                if not wall_distance / 2.0 > radius * 2 ** (1 / 6) + radius - 1.0 * length_unit:
                     raise ValueError("The colloid radius leads to a cutoff radius * 2^(1/6) + radius - 1 in the "
                                      "shifted Lennard-Jones wall that exceeds half of the wall distance.")
         rcut = (2.0 ** (1.0 / 6.0)) * radius
         per_particle_parameters = [
-            radius.value_in_unit(self._nanometer),  # radius
+            radius.value_in_unit(length_unit),  # radius
             (-4.0 * self._epsilon * ((radius / rcut) ** 12 - self._alpha * (radius / rcut) ** 6)).value_in_unit(
-                unit.kilojoule_per_mole)  # shift
+                energy_unit)  # shift
         ]
         if self._wall_directions[0]:
             per_particle_parameters.append(
-                (self._wall_distances[0] / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # wall_distance_x_over_two_minus_delta
+                (self._wall_distances[0] / 2.0 - radius + 1.0 * length_unit).value_in_unit(
+                    length_unit)  # wall_distance_x_over_two_minus_delta
             )
             per_particle_parameters.append(
-                (self._wall_distances[0] / 2.0 - rcut - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # cutoff_x
+                (self._wall_distances[0] / 2.0 - rcut - radius + 1.0 * length_unit).value_in_unit(
+                    length_unit)  # cutoff_x
             )
         if self._wall_directions[1]:
             per_particle_parameters.append(
-                (self._wall_distances[1] / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # wall_distance_y_over_two_minus_delta
+                (self._wall_distances[1] / 2.0 - radius + 1.0 * length_unit).value_in_unit(
+                    length_unit)  # wall_distance_y_over_two_minus_delta
             )
             per_particle_parameters.append(
-                (self._wall_distances[1] / 2.0 - rcut - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # cutoff_y
+                (self._wall_distances[1] / 2.0 - rcut - radius + 1.0 * length_unit).value_in_unit(
+                    length_unit)  # cutoff_y
             )
         if self._wall_directions[2]:
             per_particle_parameters.append(
-                (self._wall_distances[2] / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # wall_distance_z_over_two_minus_delta
+                (self._wall_distances[2] / 2.0 - radius + 1.0 * length_unit).value_in_unit(
+                    length_unit)  # wall_distance_z_over_two_minus_delta
             )
             per_particle_parameters.append(
-                (self._wall_distances[2] / 2.0 - rcut - radius + 1.0 * self._nanometer).value_in_unit(
-                    self._nanometer)  # cutoff_z
+                (self._wall_distances[2] / 2.0 - rcut - radius + 1.0 * length_unit).value_in_unit(
+                    length_unit)  # cutoff_z
             )
 
         self._slj_potential.addParticle(index, per_particle_parameters)

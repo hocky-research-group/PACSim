@@ -5,6 +5,7 @@ from typing import Any, Iterator
 from openmm import CustomNonbondedForce, unit
 import yaml
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
+from colloids.units import electric_potential_unit, length_unit
 
 
 class OpenMMPotentialAbstract(ABC):
@@ -126,9 +127,6 @@ class ColloidPotentialsAbstract(OpenMMNonbondedPotentialAbstract):
     :type periodic_boundary_conditions: bool
     """
 
-    _nanometer = unit.nano * unit.meter
-    _millivolt = unit.milli * unit.volt
-
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters,
                  periodic_boundary_conditions: bool) -> None:
         """Constructor of the ColloidPotentialsAbstract class."""
@@ -171,11 +169,11 @@ class ColloidPotentialsAbstract(OpenMMNonbondedPotentialAbstract):
             If the method yield_potentials was called before this method (via the OpenMMPotentialAbstract base class).
         """
         super().add_particle()
-        if not radius.unit.is_compatible(self._nanometer):
+        if not radius.unit.is_compatible(length_unit):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
-        if not radius.value_in_unit(self._nanometer) > 0.0:
+        if not radius.value_in_unit(length_unit) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
-        if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
+        if not surface_potential.unit.is_compatible(electric_potential_unit):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts")
 
 

@@ -2,10 +2,10 @@ import argparse
 import sys
 from typing import Sequence
 from openmm import app
-from openmm import unit
 from colloids.colloids_run import set_up_simulation, set_up_reporters, check_frame, get_cell_from_box
 from colloids.helper_functions import read_gsd_file, write_gsd_file
 from colloids.run_parameters import RunParameters
+from colloids.units import electric_potential_unit, length_unit
 
 
 def colloids_resume(argv: Sequence[str]) -> app.Simulation:
@@ -38,9 +38,9 @@ def colloids_resume(argv: Sequence[str]) -> app.Simulation:
 
     if parameters.final_configuration_gsd_filename is not None:
         write_gsd_file(parameters.final_configuration_gsd_filename, simulation,
-                       frame.particles.diameter / 2.0 * (unit.nano * unit.meter),
-                       frame.particles.charge * (unit.milli * unit.volt),
-                       get_cell_from_box(frame.configuration.box) * (unit.nano * unit.meter))
+                       frame.particles.diameter / 2.0 * length_unit,
+                       frame.particles.charge * electric_potential_unit,
+                       get_cell_from_box(frame.configuration.box) * length_unit)
 
     return simulation
 

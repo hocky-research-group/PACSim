@@ -1,11 +1,12 @@
 from dataclasses import dataclass, field
 import inspect
 from typing import Any, Optional
+import warnings
 from openmm import unit
 from colloids.abstracts import Parameters
 import colloids.integrators as integrators
 import colloids.update_reporters as update_reporters
-import warnings
+from colloids.units import energy_unit, length_unit, temperature_unit, time_unit, mass_unit
 
 
 @dataclass(order=True, frozen=True)
@@ -237,18 +238,18 @@ class RunParameters(Parameters):
     initial_configuration: str = "initial_configuration.gsd"
     frame_index: int = -1
     platform_name: str = "Reference"
-    potential_temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
+    potential_temperature: unit.Quantity = field(default_factory=lambda: 298.0 * temperature_unit)
     integrator: str = "LangevinIntegrator"
     integrator_parameters: dict[str, Any] = field(
         default_factory=lambda: {
-            "temperature": 298.0 * unit.kelvin,
-            "stepSize": 0.00317647015905543 * (unit.pico * unit.second),
-            "frictionCoeff": 0.001574074286750681 / (unit.pico * unit.second),
+            "temperature": 298.0 * temperature_unit,
+            "stepSize": 0.00317647015905543 * time_unit,
+            "frictionCoeff": 0.001574074286750681 / time_unit,
             "randomNumberSeed": None
         })
-    brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / ((unit.nano * unit.meter) ** 2))
-    brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * (unit.nano * unit.meter))
-    debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * (unit.nano * unit.meter))
+    brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / (length_unit ** 2))
+    brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * length_unit)
+    debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * length_unit)
     dielectric_constant: float = 80.0
     cutoff_factor: float = 21.0
     use_log: bool = False
@@ -292,21 +293,21 @@ class RunParameters(Parameters):
             raise TypeError(f"Integrator {self.integrator} does not accept the given arguments "
                             f"{self.integrator_parameters}. The expected signature is "
                             f"{inspect.signature(integrator_getter)}")
-        if not self.potential_temperature.unit.is_compatible(unit.kelvin):
+        if not self.potential_temperature.unit.is_compatible(temperature_unit):
             raise TypeError("The temperature must have a unit compatible with kelvin.")
-        if self.potential_temperature <= 0.0 * unit.kelvin:
+        if self.potential_temperature <= 0.0 * temperature_unit:
             raise ValueError("The temperature must be greater than zero.")
-        if not self.brush_density.unit.is_compatible((unit.nano * unit.meter) ** (-2)):
+        if not self.brush_density.unit.is_compatible(length_unit ** (-2)):
             raise TypeError("The brush density must have a unit compatible with 1/nanometer^2.")
-        if self.brush_density <= 0.0 * ((unit.nano * unit.meter) ** (-2)):
+        if self.brush_density <= 0.0 * (length_unit ** (-2)):
             raise ValueError("The brush density must be greater than zero.")
-        if not self.brush_length.unit.is_compatible(unit.nano * unit.meter):
+        if not self.brush_length.unit.is_compatible(length_unit):
             raise TypeError("The brush length must have a unit compatible with nanometers.")
-        if self.brush_length <= 0.0 * (unit.nano * unit.meter):
+        if self.brush_length <= 0.0 * length_unit:
             raise ValueError("The brush length must be greater than zero.")
-        if not self.debye_length.unit.is_compatible(unit.nano * unit.meter):
+        if not self.debye_length.unit.is_compatible(length_unit):
             raise TypeError("The Debye length must have a unit compatible with nanometers.")
-        if self.debye_length <= 0.0 * (unit.nano * unit.meter):
+        if self.debye_length <= 0.0 * length_unit:
             raise ValueError("The Debye length must be greater than zero.")
         if self.dielectric_constant <= 0.0:
             raise ValueError("The dielectric constant must be greater than zero.")
@@ -338,9 +339,9 @@ class RunParameters(Parameters):
         if any(self.wall_directions):
             if self.epsilon is None:
                 raise ValueError("Epsilon must be specified if walls are active.")
-            if not self.epsilon.unit.is_compatible(unit.kilojoule_per_mole):
+            if not self.epsilon.unit.is_compatible(energy_unit):
                 raise TypeError("Epsilon must have a unit compatible with kilojoules per mole.")
-            if self.epsilon <= 0.0 * unit.kilojoule_per_mole:
+            if self.epsilon <= 0.0 * energy_unit:
                 raise ValueError("epsilon must be greater than zero.")
             if self.alpha is None:
                 raise ValueError("Alpha must be specified if walls are active.")
@@ -358,10 +359,9 @@ class RunParameters(Parameters):
                 raise ValueError("Depletion phi must be between zero and one.")
             if self.depletant_radius is None:
                 raise ValueError("Depletant radius must be specified if depletion is on.")
-            if not self.depletant_radius.unit.is_compatible(
-                    unit.nano * unit.meter):
+            if not self.depletant_radius.unit.is_compatible(length_unit):
                 raise TypeError("Depletant radius must have a unit compatible with nanometers.")
-            if self.depletant_radius <= 0.0 * (unit.nano * unit.meter):
+            if self.depletant_radius <= 0.0 * length_unit:
                 raise ValueError("Depletant radius must be greater than zero.")
         else:
             if self.depletion_phi is not None:
@@ -371,22 +371,22 @@ class RunParameters(Parameters):
         if self.use_gravity:
             if self.gravitational_acceleration is None:
                 raise ValueError("Gravitational acceleration must be specified if gravity is on.")
-            if not self.gravitational_acceleration.unit.is_compatible(unit.meter / unit.second ** 2):
+            if not self.gravitational_acceleration.unit.is_compatible(length_unit / time_unit ** 2):
                 raise TypeError(
                     "The gravitational acceleration must have a unit compatible with meters per second squared.")
-            if self.gravitational_acceleration <= 0.0 * (unit.meter / unit.second ** 2):
+            if self.gravitational_acceleration <= 0.0 * (length_unit / time_unit ** 2):
                 raise ValueError("The gravitational acceleration must be greater than zero.")
             if self.water_density is None:
                 raise ValueError("Density of water must be specified if gravity is on.")
-            if not self.water_density.unit.is_compatible(unit.gram / (unit.centi * unit.meter)**3):
+            if not self.water_density.unit.is_compatible(mass_unit / length_unit ** 3):
                 raise TypeError("The water density must have a unit compatible with grams per centimeter cubed.")
-            if self.water_density <= 0.0 * (unit.gram / (unit.centi * unit.meter)**3):
+            if self.water_density <= 0.0 * (mass_unit / length_unit ** 3):
                 raise ValueError("The water density must be greater than zero.")
             if self.particle_density is None:
                 raise ValueError("Density of particle must be specified if gravity is on.")
-            if not self.particle_density.unit.is_compatible(unit.gram / (unit.centi * unit.meter)**3):
+            if not self.particle_density.unit.is_compatible(mass_unit / length_unit ** 3):
                 raise TypeError("The particle density must have a unit compatible with grams per centimeter cubed.")
-            if self.particle_density <= 0.0 * (unit.gram / (unit.centi * unit.meter)**3):
+            if self.particle_density <= 0.0 * (mass_unit / length_unit ** 3):
                 raise ValueError("The particle density must be greater than zero.")
             if not all(self.wall_directions):
                 raise ValueError("Gravity can only be turned on if all walls are active and, hence, no periodic "

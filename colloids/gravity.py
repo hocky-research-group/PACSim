@@ -37,7 +37,7 @@ class Gravity(OpenMMPotentialAbstract):
     """
 
     _acceleration_unit = length_unit / time_unit ** 2
-    _density_unit = mass_unit / length_unit ** 3
+    _density_unit = unit.gram / length_unit ** 3
 
     def __init__(self, gravitational_acceleration: unit.Quantity, water_density: unit.Quantity,
                  particle_density: unit.Quantity) -> None:

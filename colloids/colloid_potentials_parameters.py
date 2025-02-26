@@ -44,7 +44,7 @@ class ColloidPotentialsParameters(object):
     """
 
     VACUUM_PERMITTIVITY = 8.8541878128e-12 * unit.joule / (unit.volt ** 2 * unit.meter)
-    _brush_density_unit = 1.0 / length_unit ** 2
+    _brush_density_unit = length_unit ** (-2)
 
     def __init__(self, brush_density: unit.Quantity = 0.09 * _brush_density_unit,
                  brush_length: unit.Quantity = 10.0 * length_unit,

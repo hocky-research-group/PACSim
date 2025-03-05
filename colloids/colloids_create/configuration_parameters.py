@@ -21,6 +21,8 @@ class ConfigurationParameters(Parameters):
     file together with lattice vectors. The cluster is then repeated in all three directions of the lattice
     vectors to create the base configuration. Every replica of the cluster can optionally be randomly rotated.
 
+    All colloid positions in the cluster definition must lie in the unit cell defined by the lattice vectors.
+
     This dataclass assumes that the style of units in the lammps-data file is "nano" (see
     https://docs.lammps.org/units.html).
 
@@ -88,6 +90,21 @@ class ConfigurationParameters(Parameters):
         Defaults to None.
     :type substrate_type: Optional[Union[str, int]]
 
+    :raises TypeError:
+        If the lattice repeats are not an integer or a list of three integers.
+        If the padding distance does not have a unit compatible with nanometers.
+        If the masses, radii, or surface potentials do not have the correct units.
+    :raises ValueError:
+        If the number of lattice repeats is not positive.
+        If the padding distance is negative.
+        If the masses are not greater than or equal to zero.
+        If the radii are not greater than zero.
+        If a non-substrate type of the masses, radii, or surface potentials dictionaries is not in the lammps-data file.
+        If a type of the lammps-data file is not in the masses, radii, or surface potentials dictionaries.
+        If the substrate type is not in the radii, masses, or surface potentials dictionaries.
+        If the mass of the substrate type is not zero.
+        If the substrate type is not specified when a substrate is used.
+        If a position in the lammps-data file is outside the unit cell.
     """
     cluster_specification: str = "cluster.lmp"
     lattice_repeats: Union[int, list[int]] = 8
@@ -118,6 +135,10 @@ class ConfigurationParameters(Parameters):
         if np.equal(atoms.get_cell(), [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]).all():
             warnings.warn("The lattice vectors of the cluster are probably not set in the lammps-data file."
                           "The identity matrix is used as lattice vectors.")
+        unwrapped_positions = atoms.get_positions(wrap=False)
+        wrapped_positions = atoms.get_positions(wrap=True)
+        if not np.equal(unwrapped_positions, wrapped_positions).all():
+            raise ValueError("Some positions in the lammps-data file are outside of the unit cell.")
 
         if isinstance(self.lattice_repeats, int):
             if self.lattice_repeats <= 0:

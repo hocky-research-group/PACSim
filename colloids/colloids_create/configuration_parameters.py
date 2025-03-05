@@ -121,8 +121,8 @@ class ConfigurationParameters(Parameters):
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
-        atoms = read_lammps_data(units="nano")
-        types = set(str(atom.number) for atom in atoms)
+        atoms = read_lammps_data(self.cluster_specification, units="nano")
+        types = set(atom.number for atom in atoms)
         for t in types:
             if t not in self.masses:
                 raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in masses dictionary.")
@@ -137,7 +137,7 @@ class ConfigurationParameters(Parameters):
                           "The identity matrix is used as lattice vectors.")
         unwrapped_positions = atoms.get_positions(wrap=False)
         wrapped_positions = atoms.get_positions(wrap=True)
-        if not np.equal(unwrapped_positions, wrapped_positions).all():
+        if not np.allclose(unwrapped_positions, wrapped_positions):
             raise ValueError("Some positions in the lammps-data file are outside of the unit cell.")
 
         if isinstance(self.lattice_repeats, int):

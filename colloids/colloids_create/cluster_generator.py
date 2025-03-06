@@ -1,362 +1,206 @@
-from enum import auto, Enum
-from typing import Union
-from ase import Atom, build, Atoms
-
+from math import acos, pi
+from random import uniform
+import re
+from typing import Sequence, Union
+from ase import Atoms
 from gsd.hoomd import Frame
 import numpy as np
-import numpy.typing as npt
-from scipy.spatial.transform import Rotation
-from math import pi
-
-import warnings
-from openmm import unit
 from colloids.colloids_create import ConfigurationGenerator
 
 
-class CubicLattice(Enum):
-    # TODO: Add docstrings.
-    SC = auto()
-    FCC = auto()
-    BCC = auto()
+class ClusterGenerator(ConfigurationGenerator):
+    """
+    Generator for an initial configuration in a gsd.hoomd.Frame instance for a colloid simulation based on a cluster
+    of colloids.
 
-    def to_ase_string(self):
-        return self.name.lower()
+    To generate the initial configuration, the given single cluster of colloids is centered and repeated in all three
+    directions of its lattice vectors. Every replica of the cluster can optionally be randomly rotated.
+
+    To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors. Additionally,
+    one can increase a padding factor that scales to overall box size and thus increases the distance between the
+    outwards facing colloids and the walls.
+
+    This dataclass assumes that the distances in the cluster are in units of nanometers.
+
+    Any bonds in the cluster are added as constraints, with the constraint distance equal to the current bond length in
+    the cluster definition. The bond lengths are not modified during the simulation.
+
+    :param cluster:
+        The cluster of colloids that is repeated in all three directions of its lattice vectors.
+        All colloid positions in the centered cluster should lie in the unit cell defined by the lattice vectors.
+    :type cluster: Atoms
+    :param lattice_repeats:
+        The number of repeats of the lattice in the three directions of the lattice vectors of the cluster.
+        If only a single integer is given, the same number of repeats is used in all directions.
+        Every repeat should be positive.
+    :type lattice_repeats: Union[int, list[int]]
+    :param cluster_padding_factor:
+        The factor by which the lattice vectors of every replicated cluster are scaled to space out the clusters.
+        The cluster padding factor should be greater than zero.
+    :type cluster_padding_factor: float
+    :param padding_factor:
+        The factor by which the overall lattice vectors are scaled to increase the distance between the outwards facing
+        colloids and the walls.
+        The padding factor should be greater than zero.
+    :type padding_factor: float
+
+    :raises ValueError:
+        If the cluster padding factor is not greater than zero.
+        If the padding factor is not greater than zero.
+    """
+
+    def __init__(self, cluster: Atoms, lattice_repeats: Union[int, Sequence[int]], cluster_padding_factor: float,
+                 padding_factor: float, random_rotation: bool) -> None:
+        """Constructor of the ClusterGenerator class."""
+        super().__init__()
+        # The format of these arguments is already checked in configuration_parameters.py.
+        self._cluster = cluster
+        self._lattice_repeats = lattice_repeats
+        self._cluster_padding_factor = cluster_padding_factor
+        self._padding_factor = padding_factor
+        self._random_rotation = random_rotation
+        if self._cluster_padding_factor <= 0.0:
+            raise ValueError("The cluster padding factor must be greater than zero.")
+        if self._padding_factor <= 0.0:
+            raise ValueError("The padding factor must be greater than zero.")
 
     @staticmethod
-    def from_string(string: str):
-        return CubicLattice[string.upper()]
-
-
-class ClusterGenerator(ConfigurationGenerator):
-    _nanometer = unit.nano * unit.meter
-
-    def __init__(self, configuration_parameters: ConfigurationGenerator) -> None:
-        super().__init__()
-
+    def _extract_bonded_indices(bond_string: str) -> list[int]:
         """
-        :param lattice_constant:
-            The lattice constant of the lattice.
-        :type lattice_constant: unit.Quantity
-        :param total_clusters:
-            The number of clusters to generate.
-        :type total_clusters: int
-        :param cluster_order:
-            The order of the clusters to be placed in a simple cubic latice.
-        :type cluster_order: Union[str, list[str]]
-        :param box_size:
-            The size of the box in each dimension or for a square box the length of a side.
-        :type box_size: unit.Quantity
-        :param cluster_specifications:
-            The specifications of the clusters. A dictionary with the cluster name as the key and the value: a dictionary with the
-            identity of the atoms in the cluster as the key and the positions of the atoms in the cluster.
-        :type cluster_specifications: dict[str, dict[str, Union[list[str], list[unit.Quantity]]]
-        :param colloid_radii:
-            A dictionary of the radii of the colloids.
-        :type colloid_radii: dict[str, unit.Quantity]
-        :param masses:
-            A dictionary of the masses of the colloids.
-        :type masses: dict[str, unit.Quantity]
-        :param random_rotation:
-            Whether to rotate the cluster randomly.
-        :type random_rotation: bool
+        Extract the bonded indices from a bond string in the format of the ASE Atoms.arrays["bonds"] attribute.
+
+        The bond string in ASE that was constructed from a lammps-data file looks like '1(1),2(1),3(1)',
+        '2(1)', or '_'. If the string is '_', no bonds are present and an empty list is returned. Otherwise, the bonded
+        indices are given by the integers in front of the parentheses (with the ignored bond type within the
+        parentheses). These are extracted and returned as a list of integers.
+
+        :param bond_string:
+            The bond string in the format of the ASE Atoms.arrays["bonds"] attribute.
+        :type bond_string: str
+
+        :return:
+            The bonded indices.
+        :rtype: list[int]
         """
-        box_size: unit.Quantity = configuration_parameters.box_size
-        lattice_constant: unit.Quantity = configuration_parameters.lattice_constant
-        total_clusters: int = configuration_parameters.total_clusters
-        cluster_order: Union[str, list[str]] = configuration_parameters.cluster_order
-        padding_distance: unit.Quantity = configuration_parameters.padding_distance
-        padding_factor: float = configuration_parameters.padding_factor
-        cluster_specifications: dict[str, dict[str, Union[list[str], list[unit.Quantity]]]] = configuration_parameters.cluster_specifications
-        colloid_radii: dict[str, unit.Quantity] = configuration_parameters.radii
-        masses: dict[str, unit.Quantity] = configuration_parameters.masses
-        random_rotation: bool = configuration_parameters.random_rotation
+        if bond_string == "_":
+            return []
+        return [int(num) for num in re.findall(r"(\d+)\(", bond_string)]
 
-        self.masses = masses
-        self.box_size = box_size
-        self._lattice_constant = lattice_constant
-        self._total_clusters = total_clusters
-        self._padding_distance = padding_distance
-        self._padding_factor = padding_factor
-        self._cluster_order = cluster_order
-        self._cluster_specifications = cluster_specifications
-        self._colloid_radii = colloid_radii
-        self._random_rotation = random_rotation
+    def generate_configuration(self) -> Frame:
+        """
+        Generate the initial positions of the colloids in a gsd.hoomd.Frame instance together with constraints.
 
-    def generate_configuration(self) -> tuple[Frame, list[tuple[int]]]:
-        # Build the cluster ids.
-        if not isinstance(self._cluster_order, list):
-            self.unitcell = True
-            self.build_cluster_ids_unit_cells()
+        The generated frame should contain the following attributes:
+        - frame.particles.N
+        - frame.particles.position
+        - frame.particles.types
+        - frame.particles.typeid
+        - frame.configuration.box
+        - frame.constraints.N (optionally if constraints are present)
+        - frame.constraints.value (optionally if constraints are present)
+        - frame.constraints.group (optionally if constraints are present)
+
+        The generated frame should not populate the following attributes:
+        - frame.particles.type_shapes
+        - frame.particles.diameter
+        - frame.particles.charge
+        - frame.particles.mass attributes
+
+        :return:
+            The initial configuration of the colloids.
+        :rtype: gsd.hoomd.Frame
+
+        :raises ValueError:
+            If some positions in the centered and padded cluster are outside the unit cell.
+        """
+        centered_padded_cluster = self._cluster.copy()
+        centered_padded_cluster.set_cell(np.array([self._cluster_padding_factor * self._cluster.cell[c]
+                                                   for c in range(3)]))
+        # Do not use the vacuum argument of the center method, as it does not simply add vacuum but can also decrease
+        # the size of the cell to get the desired vaccum.
+        centered_padded_cluster.center()
+        unwrapped_positions = centered_padded_cluster.get_positions(wrap=False)
+        wrapped_positions = centered_padded_cluster.get_positions(wrap=True)
+        if not np.allclose(unwrapped_positions, wrapped_positions):
+            raise ValueError("Some positions in the centered and padded cluster are outside of the unit cell.")
+        if not self._random_rotation:
+            repeated_cluster = centered_padded_cluster.repeat(self._lattice_repeats)
         else:
-            self.unitcell = False
-            self.build_cluster_ids_clusters()
-        # Create the lattice.
-        self.build_positions()
-        # Tags are a linear combination of the intracluster ids, the cluster ids, and the cluster numbers. They can 
-        # be decomposed into the intracluster ids by taking the floor after dividing by number of cluster types times the
-        # total number of clusters, cluster numbers by taking the floor after dividing by the number of cluster types mod
-        # the total number of clusters, and cluster ids by taking the modulo base the total number of clusters and modulo
-        # base the number of cluster types.
+            # Adapted from ase's repeat function.
+            if isinstance(self._lattice_repeats, int):
+                r = (self._lattice_repeats, self._lattice_repeats, self._lattice_repeats)
+            else:
+                r = self._lattice_repeats
+            repeated_cluster = centered_padded_cluster.copy()
+            for name, a in repeated_cluster.arrays.items():
+                repeated_cluster.arrays[name] = np.tile(a, (np.prod(r),) + (1,) * (len(a.shape) - 1))
+            i0 = 0
+            for r0 in range(r[0]):
+                for r1 in range(r[1]):
+                    for r2 in range(r[2]):
+                        copied_cluster = centered_padded_cluster.copy()
+                        # Generate uniformly randomized rotations.
+                        # See Properties section here: https://en.wikipedia.org/wiki/Euler_angles
+                        random_phi_deg = uniform(0.0, 2.0 * pi) * 180.0 / pi  # alpha on Wikipedia.
+                        random_theta_deg = acos(uniform(-1.0, 1.0)) * 180.0 / pi  # beta on Wikipedia.
+                        random_psi_deg = uniform(0.0, 2.0 * pi) * 180.0 / pi  # gamma on Wikipedia.
+                        copied_cluster.euler_rotate(phi=random_phi_deg, theta=random_theta_deg, psi=random_psi_deg,
+                                                    center="COP")
+                        unwrapped_positions = copied_cluster.get_positions(wrap=False)
+                        wrapped_positions = copied_cluster.get_positions(wrap=True)
+                        if not np.allclose(wrapped_positions, unwrapped_positions):
+                            raise ValueError("Parts of the rotated cluster lie outside the original box, increase the "
+                                             "rotation padding distance to allow for rotations.")
+                        repeated_cluster.arrays["positions"][i0:i0 + len(centered_padded_cluster)] = unwrapped_positions
+                        repeated_cluster.arrays["positions"][i0:i0 + len(centered_padded_cluster)] += np.dot(
+                            (r0, r1, r2), centered_padded_cluster.get_cell())
+                        i0 += len(centered_padded_cluster)
+            repeated_cluster.set_cell(np.array([r[c] * centered_padded_cluster.cell[c] for c in range(3)]))
 
-        # cluster_numbers = [(tag // n_cluster_types) % n_clusters for tag in tags]
-        # cluster_ids = [(tag % n_cluster_types) % n_clusters for tag in tags]
-        # intracluster_ids = [(tag // n_cluster_types) // n_clusters for tag in tags]
+        old_cell = repeated_cluster.get_cell()
+        repeated_cluster.set_cell(np.array([self._padding_factor * old_cell[c] for c in range(3)]))
+        repeated_cluster.center(about=(0.0, 0.0, 0.0))
 
-        """
-        n_clusters = np.max(self.cluster_numbers) + 1
-        n_cluster_types = len(set(self._cluster_order))
-        tags = self.cluster_ids  + np.array(self.intracluster_ids) * n_cluster_types * n_clusters + self.cluster_numbers * n_cluster_types
-        """
-        
-        self.get_constraint_dict()
-        self.get_constraint_map()
-        self.get_constraint_dists()
-
-        # Create the frame.
         frame = Frame()
-        frame.particles.N = len(self.positions)
-        frame.particles.position = self.positions
-        
+        frame.particles.N = len(repeated_cluster)
+        frame.particles.types = tuple(set(str(atom.number) for atom in repeated_cluster))
+        frame.particles.typeid = np.array([frame.particles.types.index(str(atom.number))
+                                           for atom in repeated_cluster], dtype=np.uint32)
+        frame.particles.position = repeated_cluster.positions.astype(np.float32)
         # See http://docs.openmm.org/7.6.0/userguide/theory/05_other_features.html
         # See https://hoomd-blue.readthedocs.io/en/v2.9.3/box.html
-        frame.configuration.box = np.array([self.box_size[0].value_in_unit(self._nanometer), self.box_size[1].value_in_unit(self._nanometer), 
-                                            self.box_size[2].value_in_unit(self._nanometer), 0, 0, 0], dtype=np.float32)
-        
-        frame.particles.types = tuple(self.colloid_id_dict.keys())
-        frame.particles.typeid = [self.colloid_id_dict[colloid_type] for colloid_type in self.colloid_types]
+        frame.configuration.box = np.array(
+            [repeated_cluster.cell[0][0], repeated_cluster.cell[1][1], repeated_cluster.cell[2][2],
+             repeated_cluster.cell[1][0] / repeated_cluster.cell[1][1],
+             repeated_cluster.cell[2][0] / repeated_cluster.cell[2][2],
+             repeated_cluster.cell[2][1] / repeated_cluster.cell[2][2]], dtype=np.float32)
 
-        return frame, list(zip(self.constraint_map, self.constraint_dists))
+        if "bonds" in centered_padded_cluster.arrays:
+            # Note that the replication of the bonds does not work correctly so we have to use only the original ones.
+            original_bonds = centered_padded_cluster.arrays["bonds"]
+            # By sorting and converting to a set we remove duplicates.
+            bond_pairs = set(tuple(sorted((first_index, second_index)))
+                             for first_index, bonds in enumerate(original_bonds)
+                             for second_index in self._extract_bonded_indices(bonds))
+            assert len(repeated_cluster) % len(centered_padded_cluster) == 0
+            number_repetitions = len(repeated_cluster) // len(centered_padded_cluster)
 
-    def write_positions(self) -> None:
-        # Save positions as xyz
-        with open("positions.xyz", "w") as f:
-            f.write(f"{len(self.atoms)}\n")
-            f.write("Lattice\n")
-            for i, atom in enumerate(self.atoms):
-                f.write(f"{atom.symbol} {atom.position[0]} {atom.position[1]} {atom.position[2]}\n")
+            all_constraints = np.array(
+                [[first_index + i * len(centered_padded_cluster),
+                  second_index + i * len(centered_padded_cluster)]
+                 for i in range(number_repetitions) for first_index, second_index in bond_pairs], dtype=np.uint32)
+            all_distances = repeated_cluster.get_all_distances()
+            # Distances within all replicas should be the same.
+            assert all(np.allclose(all_distances[i * len(centered_padded_cluster):(i + 1) * len(centered_padded_cluster),
+                                                 i * len(centered_padded_cluster):(i + 1) * len(centered_padded_cluster)],
+                                   centered_padded_cluster.get_all_distances()) for i in range(number_repetitions))
+            all_values = np.array(
+                [all_distances[first_index + i * len(centered_padded_cluster),
+                               second_index + i * len(centered_padded_cluster)]
+                for i in range(number_repetitions) for first_index, second_index in bond_pairs], dtype=np.float32)
 
-    def build_cluster_ids_unit_cells(self) -> None:
-        """
-        Build the positions of the clusters from the unit cells.
-        some of the variable names need to be reworked since now the unit cell is specified
-        and the clusters are specified by the cluster specifications "cluster" key. 
-        """
-        self._cluster_order = list(self._cluster_specifications.keys())
+            frame.constraints.N = len(bond_pairs) * number_repetitions
+            frame.constraints.group = all_constraints
+            frame.constraints.value = all_values
 
-        # the number of clusters total
-        key = list(self._cluster_specifications.keys())[0]
-        cluster_names = list(dict.fromkeys(self._cluster_specifications[key]["cluster"]))
-        n_clusters_per_unit_cell = len(cluster_names)
-        self._total_clusters = self._total_clusters - (self._total_clusters % n_clusters_per_unit_cell)
-
-        colloid_id_dict = {colloid: i for i, colloid in enumerate(list(dict.fromkeys(self._cluster_specifications[key]["identity"])))}
-        cluster_id_dict = {cluster: i for i, cluster in enumerate(cluster_names)}
-        cluster_sizes = {cluster: sum(1 for is_cluster in self._cluster_specifications[key]["cluster"] if is_cluster == cluster) for cluster in cluster_names}
-
-        # create the cluster ids (dict method is used to remove duplicates and keep the order)
-        self.colloid_id_dict = colloid_id_dict
-        self.cluster_id_dict = cluster_id_dict
-
-        # the number of times the unit cell is repeated
-        self.n_repeats = self._total_clusters // n_clusters_per_unit_cell
-        
-        self.n_colloids_per_repeat = sum(cluster_sizes.values())
-        self.box_numbers = np.arange(self._total_clusters)
-
-        # total number of colloids
-        self.n_colloids_total = self.n_colloids_per_repeat * self.n_repeats
-
-        # the cluster ids are a one hot encoding of the colloid types
-        cluster_ids = np.array(self._cluster_specifications[key]["cluster"] * self.n_repeats)
-
-        # the intracluster ids are the identity of the colloids in the cluster
-        intracluster_ids = np.zeros(self.n_colloids_per_repeat)
-        for cluster in cluster_names:   
-            intracluster_ids[cluster_ids[:self.n_colloids_per_repeat] == cluster_id_dict[cluster]] = np.arange(cluster_sizes[cluster])
-        intracluster_ids = np.tile(intracluster_ids, self.n_repeats)
-
-        # the cluster numbers are a unique number for each cluster based on genertation order
-        cluster_numbers = cluster_ids + np.repeat(np.arange(self.n_repeats), self.n_colloids_per_repeat) * n_clusters_per_unit_cell
-
-        # the colloids types are the identity of the colloids in the cluster
-        colloid_types = self._cluster_specifications[key]["identity"] * self.n_repeats
-
-        self.cluster_numbers = cluster_numbers
-        self.cluster_ids = cluster_ids
-        self.intracluster_ids = intracluster_ids
-        self.colloid_types = colloid_types
-
-        self.box_numbers = np.repeat(np.arange(self.n_repeats), self.n_colloids_per_repeat)
-
-    def build_cluster_ids_clusters(self) -> None:
-        """
-        Build the positions of the clusters
-
-        :param total_clusters:
-            The number of clusters to generate
-        :type number_points: int
-        :param lattice_constant:
-            The lattice constant in each dimension.
-        :type lattice_constant: tuple[float]
-        :param cluster_order:
-            The order of the clusters to be placed in a simple cubic latice.
-        :type cluster_order: list[str]
-        :param cluster_specifications:
-            The specifications of the clusters. A dictionary with the cluster name as the key and a dictionary with the
-            identity of the atoms in the cluster as the key and the positions of the atoms in the cluster as the value.
-        :type cluster_specifications: dict[str, dict[str, Union[str, list[list[float]]]]
-        :param random_rotation:
-            Whether to rotate the cluster randomly.
-        """
-        # the number of clusters total
-        self._total_clusters = self._total_clusters - (self._total_clusters % len(self._cluster_order))
-        # the number of times the order of the clusters is repeated
-        self.n_repeats = self._total_clusters // len(self._cluster_order)
-
-        # the colloids types are the identity of the colloids in the cluster
-        colloid_types = []
-        for cluster in self._cluster_order:
-            colloid_types += self._cluster_specifications[cluster]["identity"]
-        colloid_types = colloid_types * self.n_repeats
-
-        # create the cluster ids (dict method is used to remove duplicates and keep the order)
-        cluster_id_dict = {cluster: i for i, cluster in enumerate(list(dict.fromkeys(self._cluster_order)))}
-        colloid_id_dict = {colloid: i for i, colloid in enumerate(list(dict.fromkeys(colloid_types)))}
-
-        self.colloid_id_dict = colloid_id_dict
-        self.cluster_id_dict = cluster_id_dict
-
-        n_colloids = {}
-        for cluster in set(self._cluster_order):
-            n_colloids[cluster] = len(self._cluster_specifications[cluster]["identity"])
-        self.n_colloids_per_repeat = sum([n_colloids[cluster] for cluster in self._cluster_order])
-
-        self.n_colloids_total = self.n_colloids_per_repeat * self.n_repeats
-
-        # the intracluster ids are the identity of the colloids in the cluster
-        intracluster_ids = []
-        for cluster in self._cluster_order:
-            intracluster_ids += list(range(len(self._cluster_specifications[cluster]["identity"])))
-        intracluster_ids = intracluster_ids * self.n_repeats
-
-        # the cluster ids are a one hot encoding of the colloid types
-        cluster_ids = []
-        for cluster in self._cluster_order:
-            cluster_ids += [cluster_id_dict[cluster]] * n_colloids[cluster]
-        cluster_ids = np.tile(np.array(cluster_ids), self.n_repeats)
-
-        # the cluster numbers are a unique number for each cluster based on genertation order
-        cluster_numbers = []
-        for i, cluster in enumerate(self._cluster_order * self.n_repeats):
-            cluster_numbers += [i] * n_colloids[cluster]
-        cluster_numbers = np.array(cluster_numbers)
-
-        self.cluster_numbers = cluster_numbers.squeeze()
-        self.cluster_ids = cluster_ids
-        self.intracluster_ids = intracluster_ids
-        self.colloid_types = colloid_types
-
-        self.box_numbers = cluster_numbers
-
-
-    def build_positions(self) -> None:
-        # the number of repeats in each dimension
-        number_repeats_per_dimension = np.array([self.box_size[i].value_in_unit(unit.nanometer) // self._lattice_constant[i].value_in_unit(unit.nanometer) 
-                                                 for i in range(3)], dtype=int) - 1 
-
-        repeat_index = np.repeat(np.arange(self.n_repeats), self.n_colloids_per_repeat)
-
-        # create the positions
-        lattice_displacements_x = np.tile(np.arange(number_repeats_per_dimension[0]), number_repeats_per_dimension[1] * number_repeats_per_dimension[2])
-        lattice_displacements_y = np.repeat(np.tile(np.arange(number_repeats_per_dimension[1]), number_repeats_per_dimension[2]), number_repeats_per_dimension[0])
-        lattice_displacements_z = np.repeat(np.arange(number_repeats_per_dimension[2]), number_repeats_per_dimension[0] * number_repeats_per_dimension[1])
-        lattice_displacements = np.array([lattice_displacements_x, lattice_displacements_y, lattice_displacements_z]).T
-
-        # sort the lattice displacements by the minimum displacement
-        lattice_displacements = lattice_displacements[np.argsort(np.max(lattice_displacements, axis=1))]
-
-        positions = np.zeros((self.n_colloids_total, 3))
-        for box_index in range(self.n_repeats * len(self._cluster_order)):
-            lattice_displacement = lattice_displacements[box_index]
-            # the index of the cluster in the cluster order
-            relative_cluster_index = box_index % len(self._cluster_order)
-            # the number of times the cluster (of this specific index in the order) has been repeated
-            n_repeat = box_index // len(self._cluster_order)
-            # use above to find where to insert the cluster in the positions tensor
-
-            positions_mask = (self.box_numbers == box_index) * (repeat_index == n_repeat)
-
-            # the cluster name
-            cluster = self._cluster_order[relative_cluster_index]
-
-            # create the positions of the cluster
-            relative_positions = self._cluster_specifications[cluster]["coordinates"].value_in_unit(unit.nanometer)
-            if self._random_rotation:
-                rotation = Rotation.from_euler("xyz", np.random.uniform(0, 2*pi, 3))
-                relative_positions = rotation.apply(relative_positions)
-            offset = lattice_displacement * self._lattice_constant.value_in_unit(unit.nanometer)
-            positions[positions_mask] = relative_positions + offset[None]
-            
-        positions = positions - np.array(self.box_size.value_in_unit(unit.nanometer)) / 2 + np.array(self._lattice_constant.value_in_unit(unit.nanometer)) * self._padding_factor
-
-        self.positions = positions
-
-
-    def get_constraint_dict(self) -> dict[str, dict[int, npt.NDArray[np.floating]]]:
-        """
-        Get the positions of the colloids in the cluster.
-
-        :param cluster_specifications:
-            The specifications of the clusters. A dictionary with the cluster name as the key and a dictionary with the
-            identity of the atoms in the cluster as the key and the positions of the atoms in the cluster as the value.
-        :type cluster_specifications: dict[str, dict[str, Union[str, list[list[float]]]]
-        """
-        constraints = {}
-
-        for cluster in self.cluster_id_dict.keys():
-            coordinates = self.positions[:self.n_colloids_per_repeat]
-            coordinates = coordinates[self.cluster_ids[:self.n_colloids_per_repeat] == self.cluster_id_dict[cluster]]
-            distance_matrix = np.linalg.norm(coordinates[:, np.newaxis, :] - coordinates[np.newaxis, :, :], axis=-1)
-
-            constraints[cluster] = {}
-            for i in range(len(coordinates)):
-                constraints[cluster][i] = distance_matrix[i]
-
-        self.constraint_dist_dict = constraints
-
-    def get_constraint_map(self) -> list[npt.NDArray[np.int32]]:
-        """
-        Get the constraint map for the clusters.
-
-        :param cluster_numbers:
-            The number of the cluster.
-        :type cluster_numbers: npt.NDArray[np.int32]
-        """
-        n_colloids = len(self.cluster_numbers)
-        constraint_map = []
-
-        for i in range(n_colloids):
-            cluster_number = self.cluster_numbers[i]
-            current_index_onehot = np.zeros(n_colloids)
-            current_index_onehot[i] = 1
-
-            in_cluster = np.where(np.logical_and(self.cluster_numbers == cluster_number, current_index_onehot == 0))
-
-            constraint_map.append(in_cluster[0])
-        self.constraint_map = constraint_map
-
-    def get_constraint_dists(self) -> list[npt.NDArray[np.floating]]:
-        constraint_dists = []
-        reverse_cluster_id_dict = {v: k for k, v in self.cluster_id_dict.items()}
-        for i in range(len(self.constraint_map)):
-            cluster_id = self.cluster_ids[i]
-            intracluster_id = self.intracluster_ids[i]
-            
-            # the distances between colloids in the cluster type specified by the cluster_id and containing the colloid specified by intracluster_id
-            dists = self.constraint_dist_dict[reverse_cluster_id_dict[cluster_id]][intracluster_id]
-            dists = np.delete(dists, int(intracluster_id))
-
-            constraint_dists.append(dists)
-
-        self.constraint_dists = constraint_dists
-
+        return frame

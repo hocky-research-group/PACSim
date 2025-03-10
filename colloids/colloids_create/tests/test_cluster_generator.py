@@ -51,6 +51,7 @@ class TestClusterGenerator(object):
             assert np.allclose(frame_new.particles.mass, frame_ref.particles.mass)
             assert np.allclose(frame_new.particles.charge, frame_ref.particles.charge)
             assert np.allclose(frame_new.particles.diameter, frame_ref.particles.diameter)
+        os.remove(initial_configuration_filename)
 
 
 if __name__ == '__main__':

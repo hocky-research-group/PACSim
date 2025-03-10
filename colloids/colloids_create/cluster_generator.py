@@ -203,4 +203,10 @@ class ClusterGenerator(ConfigurationGenerator):
             frame.constraints.group = all_constraints
             frame.constraints.value = all_values
 
+            # Useful for visualization although not necessary for the simulation.
+            frame.bonds.N = len(bond_pairs) * number_repetitions
+            frame.bonds.types = ["b"]
+            frame.bonds.typeid = np.zeros(frame.bonds.N, dtype=np.uint32)
+            frame.bonds.group = all_constraints
+
         return frame

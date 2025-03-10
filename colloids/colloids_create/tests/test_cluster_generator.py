@@ -1,10 +1,8 @@
 import os
 import subprocess
-import ase.io
 import gsd.hoomd
 import numpy as np
 import pytest
-from colloids.helper_functions import write_xyz_file_from_gsd_frame
 
 
 class TestClusterGenerator(object):

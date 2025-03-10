@@ -2,8 +2,8 @@ from gsd.hoomd import Frame
 import numpy as np
 import numpy.typing as npt
 from openmm import unit
-from colloids.colloids_create.configuration_parameters import ConfigurationParameters
 from colloids.colloids_create import ConfigurationModifier
+from colloids.units import length_unit
 
 
 class SubstrateModifier(ConfigurationModifier):
@@ -23,23 +23,26 @@ class SubstrateModifier(ConfigurationModifier):
     :raises ValueError:
         If the substrate_radius is not greater than zero.
     """
-    _nanometer = unit.nano * unit.meter
 
-    def __init__(self,  configuration_parameters: ConfigurationParameters) -> None:
+    def __init__(self, substrate_radius: unit.Quantity, substrate_type: str) -> None:
         """Constructor of the SubstrateModifier class."""
         super().__init__()
+        if not substrate_radius.unit.is_compatible(length_unit):
+            raise TypeError("The substrate radius must have a unit that is compatible with nanometers.")
+        if not substrate_radius > 0.0 * length_unit:
+            raise ValueError("The substrate radius must have a value greater than zero.")
+        self._substrate_radius = substrate_radius
+        self._substrate_type = substrate_type
 
-        self._substrate_type = configuration_parameters.substrate_type
-        self._substrate_radius = configuration_parameters.radii[self._substrate_type]
-        self._substrate_charge = configuration_parameters.surface_potentials[self._substrate_type]
-        self._substrate_mass = configuration_parameters.masses[self._substrate_type]
-        self._substrate_type_private = f"__substrate__"
-        
-
-    def _generate_substrate_positions_hexagonal(self, box: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    @staticmethod
+    def _generate_substrate_positions_hexagonal(substrate_radius: float,
+                                                box: npt.NDArray[float]) -> npt.NDArray[float]:
         """
         Generate the positions of the substrate particles in a hexagonal lattice at the bottom of the simulation box.
 
+        :param substrate_radius:
+            The radius of the substrate particles (in nanometers without an explicit unit).
+        :type substrate_radius: unit.Quantity
         :param box:
             The box lengths (in nanometers without an explicit unit) and tilt factors (dimensionless) of the simulation
             box.
@@ -58,8 +61,6 @@ class SubstrateModifier(ConfigurationModifier):
         if not (box[3] == 0.0 and box[4] == 0.0 and box[5] == 0.0):
             raise ValueError("The box vectors must be orthogonal (all tilt factors zero) in order to allow for a "
                              "substrate.")
-
-        substrate_radius = self._substrate_radius.value_in_unit(self._nanometer)
 
         # The substrate is a hexagonal lattice of particles within the walls in the x and y directions.
         diameter_substrate = 2.0 * substrate_radius
@@ -126,13 +127,13 @@ class SubstrateModifier(ConfigurationModifier):
         assert frame.particles.position is not None
         assert frame.particles.types is not None
         assert frame.particles.typeid is not None
-        if self._substrate_type_private not in frame.particles.types:
-            frame.particles.types = frame.particles.types + (self._substrate_type_private,)
-        if frame.particles.types.index(self._substrate_type_private) in frame.particles.typeid:
-            raise ValueError(f"The substrate type {self._substrate_type_private} is already in the given frame.")
-        
-        substrate_positions = self._generate_substrate_positions_hexagonal(frame.configuration.box).astype(np.float32)
-        
+        if self._substrate_type in frame.particles.types:
+            raise ValueError(f"The substrate type {self._substrate_type} is already in the given frame.")
+        substrate_positions = self._generate_substrate_positions_hexagonal(
+            self._substrate_radius.value_in_unit(length_unit), frame.configuration.box).astype(np.float32)
+
+        frame.particles.types = frame.particles.types + (self._substrate_type,)
+        assert frame.particles.types.index(self._substrate_type) not in frame.particles.typeid
         substrate_index = len(frame.particles.types) - 1
         frame.particles.N += len(substrate_positions)
         frame.particles.position = np.concatenate((frame.particles.position, substrate_positions), axis=0)

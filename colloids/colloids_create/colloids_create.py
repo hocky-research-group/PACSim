@@ -1,11 +1,12 @@
 import argparse
+from ase.io.lammpsdata import read_lammps_data
 import gsd.hoomd
 import numpy as np
 from openmm import unit
 from colloids.colloids_create.configuration_parameters import ConfigurationParameters
-from colloids.colloids_create.cluster_generator import (CubicLattice,
-                                                                              ClusterGenerator)
+from colloids.colloids_create.cluster_generator import ClusterGenerator
 from colloids.colloids_create.substrate_modifier import SubstrateModifier
+from colloids.units import electric_potential_unit, length_unit, mass_unit
 
 
 class ExampleAction(argparse.Action):
@@ -108,65 +109,39 @@ def main():
 
     configuration_parameters = ConfigurationParameters.from_yaml(args.configuration_parameters)
 
-    if not run_parameters.initial_configuration.endswith(".gsd"):
-        raise ValueError("The initial configuration must have the .gsd extension.")
+    # We assume that the lammps-data file uses "nano" units where distances are measured in nanometers.
+    # However, ase would transform the distances in the lammps-data file to Angstroms by multiplying them by 10 if
+    # we specify units="nano". For units="metal", the ase distances are equal to the distances in the lammps-data
+    # file. We then just pretend that the distances are in nanometers.
+    cluster = read_lammps_data(configuration_parameters.cluster_specification, units="metal")
+    generator = ClusterGenerator(cluster, configuration_parameters.lattice_repeats,
+                                 configuration_parameters.cluster_padding_factor,
+                                 configuration_parameters.padding_factor,
+                                 configuration_parameters.random_rotation)
 
-    relevant_radii = {k: v for k, v in configuration_parameters.radii.items()
-                      if k != configuration_parameters.substrate_type
-                      and (k not in configuration_parameters.snowman_bond_types.values()
-                           if configuration_parameters.snowman_bond_types is not None else True)}
-
-    if not len(relevant_radii) == 2:
-        raise ValueError("This script can only generate an initial configuration for two types of particles "
-                         "(excluding substrate and snowman heads).")
-    generator = ClusterGenerator(configuration_parameters)
-
-    # Sort entries in dictionary by value in descending order.
-    radii = sorted(relevant_radii.items(), key=lambda r: r[1], reverse=True)
-
-    lattice_spacing = 2.0 * radii[0][1] * configuration_parameters.lattice_spacing_factor
-    orbit_distance = ((radii[0][1] + radii[1][1] + 2.0 * run_parameters.brush_length)
-                      * configuration_parameters.orbit_factor)
-    padding_distance = radii[0][1] * configuration_parameters.padding_factor
-    generator = CubicLatticeWithSatellitesGenerator(
-        CubicLattice.from_string(configuration_parameters.lattice_type),
-        lattice_spacing, configuration_parameters.lattice_repeats, orbit_distance, padding_distance,
-        configuration_parameters.satellites_per_center, radii[0][0], radii[1][0])
     frame = generator.generate_configuration()
-    frame, constraints = generator.generate_configuration()
     _check_frame_changes(frame, generator.__class__.__name__)
 
     if configuration_parameters.use_substrate:
         substrate_modifier = SubstrateModifier(configuration_parameters.radii[configuration_parameters.substrate_type],
                                                configuration_parameters.substrate_type)
         substrate_modifier.modify_configuration(frame)
-        substrate_modifier = SubstrateModifier(configuration_parameters)
-        substrate_modifier.modify_configuration(frame)
         _check_frame_changes(frame, substrate_modifier.__class__.__name__)
-
-    if configuration_parameters.use_snowman:
-        snowman_modifier = SnowmanModifier(configuration_parameters.snowman_bond_types,
-                                           configuration_parameters.snowman_distances,
-                                           configuration_parameters.snowman_seed)
-        snowman_modifier.modify_configuration(frame)
-        _check_frame_changes(frame, snowman_modifier.__class__.__name__)
 
     # Check if the frame has the necessary attributes.
     check_frame_types(frame, configuration_parameters.masses, configuration_parameters.radii,
                       configuration_parameters.surface_potentials)
 
-    frame.particles.mass = np.array([configuration_parameters.masses[frame.particles.types[i]].value_in_unit(unit.amu)
+    frame.particles.mass = np.array([configuration_parameters.masses[frame.particles.types[i]].value_in_unit(mass_unit)
                                      for i in frame.particles.typeid], dtype=np.float32)
-    millivolt = unit.milli * unit.volt
     frame.particles.charge = np.array(
-        [configuration_parameters.surface_potentials[frame.particles.types[i]].value_in_unit(millivolt)
+        [configuration_parameters.surface_potentials[frame.particles.types[i]].value_in_unit(electric_potential_unit)
          for i in frame.particles.typeid], dtype=np.float32)
-    nanometer = unit.nano * unit.meter
     frame.particles.diameter = np.array(
-        [2.0 * configuration_parameters.radii[frame.particles.types[i]].value_in_unit(nanometer)
+        [2.0 * configuration_parameters.radii[frame.particles.types[i]].value_in_unit(length_unit)
          for i in frame.particles.typeid], dtype=np.float32)
 
-    with gsd.hoomd.open(name=run_parameters.initial_configuration, mode="w") as f:
+    with gsd.hoomd.open(name=args.save_file, mode="w") as f:
         f.append(frame)
 
 

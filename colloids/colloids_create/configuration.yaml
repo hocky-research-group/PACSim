@@ -1,32 +1,37 @@
-lattice_repeats: 15
-lattice_spacing_factor: 4.03
-lattice_type: sc
-orbit_factor: 1.3
-padding_factor: 0.0
-satellites_per_center: 1
+cluster_specification: "test.lammps-data-bonds"
+lattice_repeats: 2
+cluster_padding_factor: 3.0
+padding_factor: 1.5
 masses:
-  N: !Quantity
+  "1": !Quantity
     unit: dalton
-    value:  1.885
-  P: !Quantity
+    value: 1.0
+  "2": !Quantity
+    unit: dalton
+    value: 1.0
+  "3": !Quantity
     unit: dalton
     value: 1.0
 radii:
-  N: !Quantity
-    unit: nanometer
-    value: 105.0
-  P: !Quantity
-    unit: nanometer
-    value: 85.0
+  "1": !Quantity
+      unit: nanometer
+      value: 1.0
+  "2": !Quantity
+      unit: nanometer
+      value: 1.0
+  "3": !Quantity
+      unit: nanometer
+      value: 1.0
 surface_potentials:
-  N: !Quantity
-    unit: millivolt
-    value: -50.0
-  P: !Quantity
-    unit: millivolt
-    value: 50.0
+  "1": !Quantity
+      unit: millivolt
+      value: 0.0
+  "2": !Quantity
+      unit: millivolt
+      value: 0.0
+  "3": !Quantity
+      unit: millivolt
+      value: 0.0
 use_substrate: false
-use_snowman: false
-snowman_seed: null
-snowman_bond_types: null
-snowman_distances: null
+substrate_type: null
+random_rotation: true

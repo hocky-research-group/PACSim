@@ -3,6 +3,7 @@ from typing import Iterator
 from openmm import CustomNonbondedForce, unit
 from colloids.abstracts import ColloidPotentialsAbstract
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
+from colloids.units import electric_potential_unit, energy_unit, length_unit
 
 
 class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
@@ -59,6 +60,9 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         If the cutoff factor is not greater than zero.
     """
 
+    _steric_prefactor_unit = energy_unit / (length_unit ** 3)
+    _electrostatic_prefactor_unit = energy_unit / (length_unit * electric_potential_unit ** 2)
+
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
                  use_log: bool = True, cutoff_factor: float = 21.0, periodic_boundary_conditions: bool = True) -> None:
         """Constructor of the ColloidPotentialsAlgebraic class."""
@@ -69,7 +73,7 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         self._use_log = use_log
         self._steric_potential = self.set_up_steric_potential()
         self._electrostatic_potential = self.set_up_electrostatic_potential()
-        self._max_radius = -math.inf * self._nanometer
+        self._max_radius = -math.inf * length_unit
         self._cutoff_factor = cutoff_factor
 
     def set_up_steric_potential(self) -> CustomNonbondedForce:
@@ -90,11 +94,11 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             "steric_prefactor",
             (unit.BOLTZMANN_CONSTANT_kB * self._parameters.temperature
              * 16.0 * math.pi * (self._parameters.brush_density ** (3 / 2)) / 35.0
-             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole / (self._nanometer ** 3))
+             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(self._steric_prefactor_unit)
         )
         # Brush length L (see Hocky paper)
         steric_potential.addGlobalParameter("brush_length",
-                                            self._parameters.brush_length.value_in_unit(self._nanometer))
+                                            self._parameters.brush_length.value_in_unit(length_unit))
         steric_potential.addPerParticleParameter("radius")
         steric_potential.addPerParticleParameter("flag")
         return steric_potential
@@ -121,10 +125,9 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         electrostatic_potential.addGlobalParameter(
             "electrostatic_prefactor",
             (2.0 * math.pi * self._parameters.VACUUM_PERMITTIVITY * self._parameters.dielectric_constant
-             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(
-                unit.kilojoule_per_mole / (self._nanometer * self._millivolt ** 2)))
+             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(self._electrostatic_prefactor_unit))
         electrostatic_potential.addGlobalParameter("debye_length",
-                                                   self._parameters.debye_length.value_in_unit(self._nanometer))
+                                                   self._parameters.debye_length.value_in_unit(length_unit))
         electrostatic_potential.addPerParticleParameter("radius")
         # Psi should be given in millivolts.
         electrostatic_potential.addPerParticleParameter("psi")
@@ -165,12 +168,12 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         """
         super().add_particle(radius, surface_potential, substrate_flag)
 
-        if radius.in_units_of(self._nanometer) > self._max_radius:
-            self._max_radius = radius.in_units_of(self._nanometer)
+        if radius.in_units_of(length_unit) > self._max_radius:
+            self._max_radius = radius.in_units_of(length_unit)
 
-        self._steric_potential.addParticle([radius.value_in_unit(self._nanometer), int(substrate_flag)])
-        self._electrostatic_potential.addParticle([radius.value_in_unit(self._nanometer),
-                                                   surface_potential.value_in_unit(self._millivolt),
+        self._steric_potential.addParticle([radius.value_in_unit(length_unit), int(substrate_flag)])
+        self._electrostatic_potential.addParticle([radius.value_in_unit(length_unit),
+                                                   surface_potential.value_in_unit(electric_potential_unit),
                                                    int(substrate_flag)])
 
     def add_exclusion(self, particle_one: int, particle_two: int) -> None:
@@ -202,14 +205,14 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             If the method add_particle was not called before this method (via the abstract base class).
         """
         super().yield_potentials()
-        assert not math.isinf(self._max_radius.value_in_unit(self._nanometer))
+        assert not math.isinf(self._max_radius.value_in_unit(length_unit))
 
         if self._periodic_boundary_conditions:
             self._steric_potential.setNonbondedMethod(self._steric_potential.CutoffPeriodic)
         else:
             self._steric_potential.setNonbondedMethod(self._steric_potential.CutoffNonPeriodic)
         self._steric_potential.setCutoffDistance(
-            (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(self._nanometer))
+            (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(length_unit))
         self._steric_potential.setUseLongRangeCorrection(False)
         self._steric_potential.setUseSwitchingFunction(False)
 
@@ -219,12 +222,12 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffNonPeriodic)
         self._electrostatic_potential.setCutoffDistance(
             (2.0 * self._max_radius
-             + self._cutoff_factor * self._parameters.debye_length).value_in_unit(self._nanometer))
+             + self._cutoff_factor * self._parameters.debye_length).value_in_unit(length_unit))
         self._electrostatic_potential.setUseLongRangeCorrection(False)
         self._electrostatic_potential.setUseSwitchingFunction(True)
         self._electrostatic_potential.setSwitchingDistance(
             (2.0 * self._max_radius
-             + (self._cutoff_factor - 1.0) * self._parameters.debye_length).value_in_unit(self._nanometer))
+             + (self._cutoff_factor - 1.0) * self._parameters.debye_length).value_in_unit(length_unit))
 
         yield self._steric_potential
         yield self._electrostatic_potential

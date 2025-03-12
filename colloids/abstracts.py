@@ -5,6 +5,7 @@ from typing import Any, Iterator
 from openmm import CustomNonbondedForce, unit
 import yaml
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
+from colloids.units import electric_potential_unit, length_unit
 
 
 class OpenMMPotentialAbstract(ABC):
@@ -126,9 +127,6 @@ class ColloidPotentialsAbstract(OpenMMNonbondedPotentialAbstract):
     :type periodic_boundary_conditions: bool
     """
 
-    _nanometer = unit.nano * unit.meter
-    _millivolt = unit.milli * unit.volt
-
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters,
                  periodic_boundary_conditions: bool) -> None:
         """Constructor of the ColloidPotentialsAbstract class."""
@@ -171,11 +169,11 @@ class ColloidPotentialsAbstract(OpenMMNonbondedPotentialAbstract):
             If the method yield_potentials was called before this method (via the OpenMMPotentialAbstract base class).
         """
         super().add_particle()
-        if not radius.unit.is_compatible(self._nanometer):
+        if not radius.unit.is_compatible(length_unit):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
-        if not radius.value_in_unit(self._nanometer) > 0.0:
+        if not radius.value_in_unit(length_unit) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
-        if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
+        if not surface_potential.unit.is_compatible(electric_potential_unit):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts")
 
 
@@ -383,6 +381,23 @@ class Parameters(object):
         """
         with open(filename, "r") as f:
             params = yaml.load(f, Loader=yaml.FullLoader)
+        return cls.from_dict(params)
+
+    @classmethod
+    def from_dict(cls, params: dict[str, Any]) -> "Parameters":
+        """
+        Read the parameters of this dataclass from a dictionary.
+
+        Instances of the _Quantity class are converted to OpenMM quantities.
+
+        :param params:
+            The dictionary with the parameters.
+        :type params: dict[str, Any]
+
+        :return:
+            The parameters.
+        :rtype: RunParameters
+        """
         for key, value in params.items():
             params[key] = cls._resolve_reference_values(params, value)
         for key, value in params.items():
@@ -416,10 +431,16 @@ class Parameters(object):
         :type filename: str
         """
         with open(filename, "w") as f:
-            yaml.dump(self._as_dictionary(), f, default_flow_style=False)
+            yaml.dump(self.to_dict(), f, default_flow_style=False)
 
-    def _as_dictionary(self):
-        """Represent this dataclass as a dictionary while converting all OpenMM quantities to _Quantity objects."""
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Represent this dataclass as a dictionary while converting all OpenMM quantities to _Quantity objects.
+
+        :return:
+            The dictionary with the parameters.
+        :rtype: dict[str, Any]
+        """
         result_dict = {}
         for f in fields(self):
             assert f.name not in result_dict

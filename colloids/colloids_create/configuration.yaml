@@ -1,6 +1,37 @@
-lattice_repeats: 15
-lattice_spacing_factor: 4.03
-lattice_type: sc
-orbit_factor: 1.3
-padding_factor: 0.0
-satellites_per_center: 1
+cluster_specification: "cluster.lmp"
+lattice_repeats: 2
+cluster_padding_factor: 3.0
+padding_factor: 1.5
+masses:
+  "1": !Quantity
+    unit: dalton
+    value: 1.0
+  "2": !Quantity
+    unit: dalton
+    value: 1.0
+  "3": !Quantity
+    unit: dalton
+    value: 1.0
+radii:
+  "1": !Quantity
+    unit: nanometer
+    value: 1.0
+  "2": !Quantity
+    unit: nanometer
+    value: 1.0
+  "3": !Quantity
+    unit: nanometer
+    value: 1.0
+surface_potentials:
+  "1": !Quantity
+    unit: millivolt
+    value: 50.0
+  "2": !Quantity
+    unit: millivolt
+    value: -30.0
+  "3": !Quantity
+    unit: millivolt
+    value: 40.0
+use_substrate: false
+substrate_type: null
+random_rotation: true

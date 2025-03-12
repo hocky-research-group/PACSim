@@ -82,5 +82,11 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radii: npt.
         frame.constraints.value = constraint_lengths
         frame.constraints.group = constraint_groups
 
+        # Useful for visualization although not necessary for the simulation.
+        frame.bonds.N = num_constraints
+        frame.bonds.types = ["b"]
+        frame.bonds.typeid = np.zeros(frame.bonds.N, dtype=np.uint32)
+        frame.bonds.group = constraint_groups
+
     with gsd.hoomd.open(name=filename, mode="w") as f:
         f.append(frame)

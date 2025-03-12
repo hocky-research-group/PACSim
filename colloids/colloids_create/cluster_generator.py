@@ -17,7 +17,7 @@ class ClusterGenerator(ConfigurationGenerator):
     directions of its lattice vectors. Every replica of the cluster can optionally be randomly rotated.
 
     To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors. Additionally,
-    one can increase a padding factor that scales to overall box size and thus increases the distance between the
+    one can increase a padding factor that scales the overall box size and thus increases the distance between the
     outwards facing colloids and the walls.
 
     This dataclass assumes that the distances in the cluster are in units of nanometers.

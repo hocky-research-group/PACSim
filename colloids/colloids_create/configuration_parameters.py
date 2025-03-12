@@ -24,7 +24,7 @@ class ConfigurationParameters(Parameters):
     All colloid positions in the centered cluster must lie in the unit cell defined by the lattice vectors.
 
     To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors. Additionally,
-    one can increase a padding factor that scales to overall box size and thus increases the distance between the
+    one can increase a padding factor that scales the overall box size and thus increases the distance between the
     outwards facing colloids and the walls.
 
     This dataclass assumes that the style of units in the lammps-data file is "nano" (see

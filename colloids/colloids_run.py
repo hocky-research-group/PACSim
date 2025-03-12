@@ -46,7 +46,7 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
         if not all(a == 0.0 for a in frame.configuration.box[3:]):
             raise ValueError("If any wall is included, the box vectors must be parallel to the coordinate axes.")
         # If not all walls are present, the box of OpenMM needs to be enlarged because OpenMM will use periodic
-        # boundaries and we do not want to let particles interact through the walls. The enlargement of the box does
+        # boundaries, and we do not want to let particles interact through the walls. The enlargement of the box does
         # currently not consider the depletant radius, which is why it should be small enough.
         if not all(parameters.wall_directions):
             if parameters.use_depletion:

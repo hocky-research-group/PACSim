@@ -44,7 +44,7 @@ class RunParameters(Parameters):
     however, that Ovito ignores the frame.constraints attribute. This means that one has to manually store the
     constraint distances into the GSD file once a gsd file is exported from Ovito
 
-    TODO: Also store velocities in gsd file, add frame index argument.
+    TODO: Also store velocities in gsd file.
 
     :param initial_configuration:
         The path to the initial configuration of the system in a gsd file.

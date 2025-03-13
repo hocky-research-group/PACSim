@@ -115,9 +115,11 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             if parameters.snowman_seed is not None and parameters.snowman_seed > 0:
                 npr.seed(parameters.snowman_seed)
             nanometer = unit.nano * unit.meter
-            s_sizes = [10.0, 30.0, 50.0]
-            s_masses = [0.0980392, 0.294118, 0.490196]
-            s_types = ["NN", "NNN", "NNNN"]
+            s_sizes = parameters.snowman_sizes
+            s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
+                        / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
+                        for r in s_sizes]
+            s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
             current_size_index = 0
             for i, t in enumerate(types):
                 if t in parameters.snowman_bond_types:
@@ -228,9 +230,11 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
 
     if parameters.use_snowman and not snowman_in_initial_configuration:
         assert len(types) == len(snowman_positions)
-        s_sizes = [10.0, 30.0, 50.0]
-        s_masses = [0.0980392, 0.294118, 0.490196]
-        s_types = ["NN", "NNN", "NNNN"]
+        s_sizes = parameters.snowman_sizes
+        s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
+                    / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
+                    for r in s_sizes]
+        s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
         current_size_index = 0
         for i, (t, snowman_position) in enumerate(zip(types, snowman_positions)):
             if snowman_position is not None:
@@ -279,9 +283,11 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
 
     if parameters.use_snowman and not snowman_in_initial_configuration:
         assert len(types) == len(snowman_positions) == len(snowman_indices)
-        s_sizes = [10.0, 30.0, 50.0]
-        s_masses = [0.0980392, 0.294118, 0.490196]
-        s_types = ["NN", "NNN", "NNNN"]
+        s_sizes = parameters.snowman_sizes
+        s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
+                    / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
+                    for r in s_sizes]
+        s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
         current_size_index = 0
         for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
             if snowman_position is not None:
@@ -299,9 +305,11 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         print("FINAL CURRENT INDEX", current_size_index)
 
         if include_walls:
-            s_sizes = [10.0, 30.0, 50.0]
-            s_masses = [0.0980392, 0.294118, 0.490196]
-            s_types = ["NN", "NNN", "NNNN"]
+            s_sizes = parameters.snowman_sizes
+            s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
+                        / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
+                        for r in s_sizes]
+            s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
             current_size_index = 0
             for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
                 if snowman_position is not None:
@@ -316,9 +324,11 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             print("FINAL CURRENT INDEX", current_size_index)
 
         if parameters.use_depletion:
-            s_sizes = [10.0, 30.0, 50.0]
-            s_masses = [0.0980392, 0.294118, 0.490196]
-            s_types = ["NN", "NNN", "NNNN"]
+            s_sizes = parameters.snowman_sizes
+            s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
+                        / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
+                        for r in s_sizes]
+            s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
             current_size_index = 0
             for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
                 if snowman_position is not None:
@@ -334,9 +344,11 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             print("FINAL CURRENT INDEX", current_size_index)
 
         if parameters.use_gravity:
-            s_sizes = [10.0, 30.0, 50.0]
-            s_masses = [0.0980392, 0.294118, 0.490196]
-            s_types = ["NN", "NNN", "NNNN"]
+            s_sizes = parameters.snowman_sizes
+            s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
+                        / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
+                        for r in s_sizes]
+            s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
             current_size_index = 0
             for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
                 if snowman_position is not None:
@@ -413,9 +425,15 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
 
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
                      total_number_steps: int, cell: npt.NDArray[float]) -> None:
+    s_sizes = parameters.snowman_sizes
+    s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
+                / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
+                for r in s_sizes]
+    s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
-                                            parameters.radii | {"NNN": 30.0 * unit.nanometer, "NNNN": 50.0 * unit.nanometer},
-                                            parameters.surface_potentials | {"NNN": parameters.surface_potentials["NN"], "NNNN": parameters.surface_potentials["NN"]}, simulation,
+                                            parameters.radii | {t: r * unit.nanometer for t, r in zip(s_types, s_sizes)},
+                                            parameters.surface_potentials | {t: parameters.surface_potentials["NN"]
+                                                                             for t in s_types}, simulation,
                                             append_file=append_file,
                                             cell=cell * (unit.nano * unit.meter)))
     simulation.reporters.append(StatusReporter(max(1, total_number_steps // 100), total_number_steps))
@@ -471,14 +489,24 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
 
     set_up_reporters(parameters, simulation, False, parameters.run_steps, cell)
 
+    s_sizes = parameters.snowman_sizes
+    s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
+                / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
+                for r in s_sizes]
+    s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
+
+    print(f"{s_sizes=}")
+    print(f"{s_masses=}")
+    print(f"{s_types=}")
+
     simulation.step(parameters.run_steps)
 
     # TODO: Automatically plot energies etc.
     # TODO: CHECK ALL SURFACE SEPARATIONS
 
     if parameters.final_configuration_gsd_filename is not None:
-        write_gsd_file(parameters.final_configuration_gsd_filename, simulation, parameters.radii | {"NNN": 30.0 * unit.nanometer, "NNNN": 50.0 * unit.nanometer},
-                       parameters.surface_potentials | {"NNN": parameters.surface_potentials["NN"], "NNNN": parameters.surface_potentials["NN"]}, cell * (unit.nano * unit.meter))
+        write_gsd_file(parameters.final_configuration_gsd_filename, simulation, parameters.radii | {t: r * unit.nanometer for t, r in zip(s_types, s_sizes)},
+                       parameters.surface_potentials | {t: parameters.surface_potentials["NN"] for t in s_types}, cell * (unit.nano * unit.meter))
 
     if parameters.final_configuration_xyz_filename is not None:
         write_xyz_file(parameters.final_configuration_xyz_filename, simulation, cell * (unit.nano * unit.meter))

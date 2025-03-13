@@ -101,6 +101,12 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     )
 
     # ------------------------------------ Create additional particles. ------------------------------------------------
+    s_sizes = parameters.snowman_sizes
+    s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
+                / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
+                for r in s_sizes]
+    s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
+
     snowman_positions = []
     snowman_in_initial_configuration = False
     if parameters.use_snowman:
@@ -115,11 +121,6 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             if parameters.snowman_seed is not None and parameters.snowman_seed > 0:
                 npr.seed(parameters.snowman_seed)
             nanometer = unit.nano * unit.meter
-            s_sizes = parameters.snowman_sizes
-            s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
-                        / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
-                        for r in s_sizes]
-            s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
             current_size_index = 0
             for i, t in enumerate(types):
                 if t in parameters.snowman_bond_types:
@@ -230,11 +231,6 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
 
     if parameters.use_snowman and not snowman_in_initial_configuration:
         assert len(types) == len(snowman_positions)
-        s_sizes = parameters.snowman_sizes
-        s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
-                    / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
-                    for r in s_sizes]
-        s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
         current_size_index = 0
         for i, (t, snowman_position) in enumerate(zip(types, snowman_positions)):
             if snowman_position is not None:
@@ -283,11 +279,6 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
 
     if parameters.use_snowman and not snowman_in_initial_configuration:
         assert len(types) == len(snowman_positions) == len(snowman_indices)
-        s_sizes = parameters.snowman_sizes
-        s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
-                    / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
-                    for r in s_sizes]
-        s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
         current_size_index = 0
         for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
             if snowman_position is not None:
@@ -305,11 +296,6 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         print("FINAL CURRENT INDEX", current_size_index)
 
         if include_walls:
-            s_sizes = parameters.snowman_sizes
-            s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
-                        / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
-                        for r in s_sizes]
-            s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
             current_size_index = 0
             for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
                 if snowman_position is not None:
@@ -324,11 +310,6 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             print("FINAL CURRENT INDEX", current_size_index)
 
         if parameters.use_depletion:
-            s_sizes = parameters.snowman_sizes
-            s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
-                        / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
-                        for r in s_sizes]
-            s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
             current_size_index = 0
             for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
                 if snowman_position is not None:
@@ -344,11 +325,6 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
             print("FINAL CURRENT INDEX", current_size_index)
 
         if parameters.use_gravity:
-            s_sizes = parameters.snowman_sizes
-            s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
-                        / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
-                        for r in s_sizes]
-            s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
             current_size_index = 0
             for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
                 if snowman_position is not None:
@@ -420,16 +396,11 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         simulation = app.Simulation(topology, system, integrator, platform)
 
     extra_positions = np.array([p for p in itertools.chain(snowman_positions, substrate_positions) if p is not None])
-    return simulation, extra_positions
+    return simulation, extra_positions, s_sizes, s_masses, s_types
 
 
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
-                     total_number_steps: int, cell: npt.NDArray[float]) -> None:
-    s_sizes = parameters.snowman_sizes
-    s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
-                / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
-                for r in s_sizes]
-    s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
+                     total_number_steps: int, cell: npt.NDArray[float], s_sizes, s_masses, s_types) -> None:
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
                                             parameters.radii | {t: r * unit.nanometer for t, r in zip(s_types, s_sizes)},
                                             parameters.surface_potentials | {t: parameters.surface_potentials["NN"]
@@ -471,7 +442,7 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
 
     types, positions, cell = read_initial_file(parameters.initial_configuration)
 
-    simulation, extra_positions = set_up_simulation(parameters, types, cell, positions)
+    simulation, extra_positions, s_sizes, s_masses, s_types = set_up_simulation(parameters, types, cell, positions)
 
     simulation.context.setPositions(np.concatenate((positions, extra_positions)) if len(extra_positions) > 0
                                     else positions)
@@ -487,13 +458,7 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
         # See https://openmm.github.io/openmm-cookbook/dev/notebooks/cookbook/report_minimization.html
         simulation.minimizeEnergy()
 
-    set_up_reporters(parameters, simulation, False, parameters.run_steps, cell)
-
-    s_sizes = parameters.snowman_sizes
-    s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
-                / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
-                for r in s_sizes]
-    s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
+    set_up_reporters(parameters, simulation, False, parameters.run_steps, cell, s_sizes, s_masses, s_types)
 
     print(f"{s_sizes=}")
     print(f"{s_masses=}")

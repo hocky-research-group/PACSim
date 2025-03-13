@@ -1,6 +1,7 @@
 import argparse
 import inspect
 import itertools
+from random import uniform
 import sys
 from typing import Sequence
 import MDAnalysis.analysis.distances
@@ -101,11 +102,21 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     )
 
     # ------------------------------------ Create additional particles. ------------------------------------------------
-    s_sizes = parameters.snowman_sizes
-    s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
-                / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
-                for r in s_sizes]
-    s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
+    if not parameters.random_snowman_sizes:
+        s_sizes = parameters.snowman_sizes
+        s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
+                    / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
+                    for r in s_sizes]
+        s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
+    else:
+        print(f"Sampling snowmen head sizes from a uniform distribution between {min(parameters.snowman_sizes)} and "
+              f"{max(parameters.snowman_sizes)}.")
+        s_sizes = [uniform(min(parameters.snowman_sizes), max(parameters.snowman_sizes))
+                   for _ in range(len([t for t in types if t in parameters.snowman_bond_types]))]
+        s_masses = [parameters.masses["P"].value_in_unit(unit.dalton)
+                    / (parameters.radii["P"].value_in_unit(unit.nanometer) / r) ** 1
+                    for r in s_sizes]
+        s_types = ["N" * (i + 2) for i in range(len(s_sizes))]
 
     snowman_positions = []
     snowman_in_initial_configuration = False
@@ -122,6 +133,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
                 npr.seed(parameters.snowman_seed)
             nanometer = unit.nano * unit.meter
             current_size_index = 0
+            iters = 0
             for i, t in enumerate(types):
                 if t in parameters.snowman_bond_types:
                     snowman_type = parameters.snowman_bond_types[t]
@@ -136,9 +148,15 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
                     current_size_index += 1
                     if current_size_index == len(s_sizes):
                         current_size_index = 0
+                        iters += 1
                 else:
                     snowman_positions.append(None)
             print("FINAL CURRENT INDEX", current_size_index)
+            if parameters.random_snowman_sizes:
+                assert iters == 1
+            else:
+                assert iters > 1
+            print("FINAL ITERATION", iters)
 
     substrate_positions = []
     substrate_in_initial_configuration = False

@@ -328,6 +328,7 @@ class RunParameters(Parameters):
     snowman_bond_types: Optional[dict[str, str]] = None
     snowman_distances: Optional[dict[str, unit.Quantity]] = None
     snowman_sizes: Optional[list[float]] = None
+    random_snowman_sizes: bool = False
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""

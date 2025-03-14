@@ -137,7 +137,7 @@ class ColloidPotentialsAbstract(OpenMMNonbondedPotentialAbstract):
         self._periodic_boundary_conditions = periodic_boundary_conditions
 
     @abstractmethod
-    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity, substrate_flag: bool) -> None:
+    def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity, substrate_flag: bool, type_flag: bool) -> None:
         """
         Add a colloid with a given radius and surface potential to the system.
 
@@ -452,3 +452,4 @@ class Parameters(object):
             return obj.to_openmm_quantity()
         else:
             return deepcopy(obj)
+        

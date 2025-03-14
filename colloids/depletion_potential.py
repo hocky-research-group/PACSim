@@ -73,7 +73,7 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
         depletion_potential = CustomNonbondedForce(
             "select(flag1 * flag2, 0, "
             "step(depletion_q1 + depletion_q2 + 2 - n) * "
-            "depletion_prefactor * (depletion_q1 + depletion_q2 + 2 - n)^2 "
+            "depletion_prefactor * depletion_phi * (depletion_q1 + depletion_q2 + 2 - n)^2 "
             "* (n + 2 * (depletion_q1 + depletion_q2 + 2) "
             "- 3.0 / n * (depletion_q1^2 + depletion_q2^2 - 2.0 * depletion_q1 * depletion_q2)));"
             "n = r / depletant_radius;"
@@ -81,7 +81,11 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
         depletion_potential.addGlobalParameter(
             "depletion_prefactor",
             (-unit.BOLTZMANN_CONSTANT_kB * self._temperature * unit.AVOGADRO_CONSTANT_NA
-             * self._depletion_phi / 16.0).value_in_unit(unit.kilojoule_per_mole))
+             * 1.0 / 16.0).value_in_unit(unit.kilojoule_per_mole))
+             
+        depletion_potential.addGlobalParameter(
+            "depletion_phi", self._depletion_phi)
+        
         depletion_potential.addGlobalParameter("depletant_radius",
                                                self._depletant_radius.value_in_unit(self._nanometer))
         depletion_potential.addPerParticleParameter("depletion_q")

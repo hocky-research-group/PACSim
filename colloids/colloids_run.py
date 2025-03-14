@@ -203,7 +203,8 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     for i, t in enumerate(types):
         colloid_potentials.add_particle(radius=parameters.radii[t],
                                         surface_potential=parameters.surface_potentials[t],
-                                        substrate_flag=False)
+                                        substrate_flag=(t == parameters.substrate_type),
+                                        type_flag=(t == 'P'))
         if include_walls:
             slj_walls.add_particle(index=i, radius=parameters.radii[t])
         if add_implicit_substrate:

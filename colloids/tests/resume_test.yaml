@@ -16,6 +16,7 @@ depletant_radius: !Quantity
     value: 5.0
 depletion_phi: 0.5
 dielectric_constant: 80.0
+electrostatic_radius_average: harmonic
 epsilon: !Quantity
     unit: kilojoule/mole
     value: 2.477709860209665  # 1 k_B T
@@ -46,6 +47,7 @@ potential_temperature: !Quantity
 run_steps: 50
 state_data_filename: test_run_and_resume/state_data_resume.csv
 state_data_interval: 10
+steric_radius_average: harmonic
 trajectory_filename: test_run_and_resume/trajectory_resume.gsd
 trajectory_interval: 10
 update_reporter: RampUpdateReporter

@@ -1,9 +1,25 @@
+from enum import auto, Enum
 import math
 from typing import Iterator
 from openmm import CustomNonbondedForce, unit
 from colloids.abstracts import ColloidPotentialsAbstract
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 from colloids.units import electric_potential_unit, energy_unit, length_unit
+
+
+class AverageType(Enum):
+    """
+    Enum for the possible radius average types in the steric and electrostatic pair potentials.
+    """
+
+    ARITHMETIC = auto()
+    """
+    Arithmetic mean (r1 + r2) / 2.0.
+    """
+    HARMONIC = auto()
+    """
+    Harmonic mean 2.0 / (1.0 / r1 + 1.0 / r2).
+    """
 
 
 class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
@@ -55,36 +71,62 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
     :param periodic_boundary_conditions:
         Whether this force should use periodic cutoffs for the steric and electrostatic potentials.
     :type periodic_boundary_conditions: bool
+    :param steric_radius_average:
+        The type of radius average to use for the steric potential.
+        Can be either "harmonic" or "arithmetic".
+        Defaults to "harmonic".
+    :type steric_radius_average: str
+    :param electrostatic_radius_average:
+        The type of radius average to use for the electrostatic potential.
+        Can be either "harmonic" or "arithmetic".
+        Defaults to "harmonic".
+    :type electrostatic_radius_average: str
 
     :raises ValueError:
         If the cutoff factor is not greater than zero.
+        If the steric or electrostatic radius average type is not "harmonic" or "arithmetic".
     """
 
     _steric_prefactor_unit = energy_unit / (length_unit ** 3)
     _electrostatic_prefactor_unit = energy_unit / (length_unit * electric_potential_unit ** 2)
 
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
-                 use_log: bool = True, cutoff_factor: float = 21.0, periodic_boundary_conditions: bool = True) -> None:
+                 use_log: bool = True, cutoff_factor: float = 21.0, periodic_boundary_conditions: bool = True,
+                 steric_radius_average: str = "harmonic", electrostatic_radius_average: str = "harmonic") -> None:
         """Constructor of the ColloidPotentialsAlgebraic class."""
         super().__init__(colloid_potentials_parameters, periodic_boundary_conditions)
         if not cutoff_factor > 0.0:
             raise ValueError("The cutoff factor must be greater than zero.")
 
         self._use_log = use_log
-        self._steric_potential = self.set_up_steric_potential()
-        self._electrostatic_potential = self.set_up_electrostatic_potential()
+        try:
+            self._steric_radius_average = AverageType[steric_radius_average.upper()]
+        except AttributeError:
+            raise ValueError(f"Unknown average type f{steric_radius_average} for the steric potential.")
+        try:
+            self._electrostatic_radius_average = AverageType[electrostatic_radius_average.upper()]
+        except AttributeError:
+            raise ValueError(f"Unknown average type f{electrostatic_radius_average} for the electrostatic potential.")
         self._max_radius = -math.inf * length_unit
         self._cutoff_factor = cutoff_factor
+        self._steric_potential = self.set_up_steric_potential()
+        self._electrostatic_potential = self.set_up_electrostatic_potential()
 
     def set_up_steric_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""
+        if self._steric_radius_average == AverageType.HARMONIC:
+            radius_average_str = "2.0 / (1.0 / radius1 + 1.0 / radius2)"
+        else:
+            assert self._steric_radius_average == AverageType.ARITHMETIC
+            radius_average_str = "(radius1 + radius2) / 2.0"
         steric_potential = CustomNonbondedForce(
             "select(flag1 * flag2, 0, "
             "step(two_l - h) * "
-            "steric_prefactor * rs / 2.0 * brush_length * brush_length * ("
+            "steric_prefactor * radius_average * brush_length * brush_length * ("
             "28.0 * ((two_l / h)^0.25 - 1.0) "
             "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
             "+ 12.0 * (h / two_l - 1.0))); "
+            f"radius_average = {radius_average_str};"
             "h = r - rs;"
             "rs = radius1 + radius2;"
             "two_l = 2.0 * brush_length"
@@ -105,11 +147,16 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
 
     def set_up_electrostatic_potential(self) -> CustomNonbondedForce:
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""
+        if self._electrostatic_radius_average == AverageType.HARMONIC:
+            radius_average_str = "2.0 / (1.0 / radius1 + 1.0 / radius2)"
+        else:
+            assert self._electrostatic_radius_average == AverageType.ARITHMETIC
+            radius_average_str = "(radius1 + radius2) / 2.0"
         if self._use_log:
             electrostatic_potential = CustomNonbondedForce(
                 "select(flag1 * flag2, 0, "
-                "electrostatic_prefactor * radius * psi1 * psi2 * log(1.0 + exp(-h / debye_length))); "
-                "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
+                "electrostatic_prefactor * radius_average * psi1 * psi2 * log(1.0 + exp(-h / debye_length))); "
+                f"radius_average = {radius_average_str};"
                 "h = r - rs;"
                 "rs = radius1 + radius2"
             )

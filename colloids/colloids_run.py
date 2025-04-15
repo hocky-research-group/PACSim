@@ -139,7 +139,9 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     # ---------------------------------------- Create all forces. ------------------------------------------------------
     colloid_potentials = ColloidPotentialsAlgebraic(
         colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
-        cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls)
+        cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls,
+        steric_radius_average=parameters.steric_radius_average,
+        electrostatic_radius_average=parameters.electrostatic_radius_average)
 
     if include_walls:
         slj_walls = ShiftedLennardJonesWalls(wall_distances, parameters.epsilon, parameters.alpha,

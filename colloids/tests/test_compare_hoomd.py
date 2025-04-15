@@ -65,7 +65,8 @@ class TestCompareHoomd(object):
                                                parameters["collision_rate"], parameters["timestep"])
         if request.param == "algebraic":
             colloid_potentials = ColloidPotentialsAlgebraic(
-                colloid_potentials_parameters=parameters["colloid_potentials_parameters"], use_log=False)
+                colloid_potentials_parameters=parameters["colloid_potentials_parameters"], use_log=False,
+                steric_radius_average="arithmetic", electrostatic_radius_average="harmonic")
         else:
             assert request.param == "tabulated"
             colloid_potentials = ColloidPotentialsTabulated(

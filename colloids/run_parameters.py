@@ -107,6 +107,16 @@ class RunParameters(Parameters):
         (Oxford University Press, 2001), 2nd edition].
         Defaults to False.
     :type use_log: bool
+    :param steric_radius_average:
+        The type of radius average to use for the steric potential.
+        Can be either "harmonic" or "arithmetic".
+        Defaults to "harmonic".
+    :type steric_radius_average: str
+    :param electrostatic_radius_average:
+        The type of radius average to use for the electrostatic potential.
+        Can be either "harmonic" or "arithmetic".
+        Defaults to "harmonic".
+    :type electrostatic_radius_average: str
     :param velocity_seed:
         The seed for the random number generator that is used to sample the initial velocities.
         If None, a random seed is used.
@@ -253,6 +263,8 @@ class RunParameters(Parameters):
     dielectric_constant: float = 80.0
     cutoff_factor: float = 21.0
     use_log: bool = False
+    steric_radius_average: str = "harmonic"
+    electrostatic_radius_average: str = "harmonic"
     velocity_seed: Optional[int] = None
     run_steps: int = 100
     state_data_interval: int = 100

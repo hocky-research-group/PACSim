@@ -283,7 +283,8 @@ class RunParameters(Parameters):
         default_factory=lambda: {"P": 105.0 * (unit.nano * unit.meter), "N": 95.0 * (unit.nano * unit.meter)})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"P": 44.0 * (unit.milli * unit.volt), "N": -54.0 * (unit.milli * unit.volt)})
-    psi_scale: float = 1.0
+    psi1_scale: float = 1.0
+    psi2_scale: float = 1.0
     platform_name: str = "Reference"
     potential_temperature: unit.Quantity = field(default_factory=lambda: 298.0 * unit.kelvin)
     integrator: str = "LangevinIntegrator"

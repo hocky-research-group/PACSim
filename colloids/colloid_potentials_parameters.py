@@ -49,7 +49,7 @@ class ColloidPotentialsParameters(object):
                  debye_length: unit.Quantity = 5.0 * (unit.nano * unit.meter),
                  temperature: unit.Quantity = 298.0 * unit.kelvin,
                  dielectric_constant: float = 80.0,
-                 psi_scale: float = 1.0):
+                 psi1_scale: float = 1.0, psi2_scale: float = 1.0):
         """Constructor of the ColloidPotentialsParameters class."""
         if not brush_density.unit.is_compatible((unit.nano * unit.meter) ** -2):
             raise TypeError("argument brush_density must have a unit that is compatible with 1/nanometer^2")
@@ -74,7 +74,8 @@ class ColloidPotentialsParameters(object):
         self._debye_length = debye_length.in_units_of(unit.nano * unit.meter)
         self._temperature = temperature.in_units_of(unit.kelvin)
         self._dielectric_constant = dielectric_constant
-        self._psi_scale = psi_scale
+        self._psi1_scale = psi1_scale
+        self._psi2_scale = psi2_scale
 
     @property
     def brush_density(self) -> unit.Quantity:
@@ -97,8 +98,12 @@ class ColloidPotentialsParameters(object):
         return self._dielectric_constant
         
     @property
-    def psi_scale(self) -> float:
-        return self._psi_scale
+    def psi1_scale(self) -> float:
+        return self._psi1_scale
+
+     @property
+    def psi2_scale(self) -> float:
+        return self._psi2_scale
 
 
 if __name__ == '__main__':

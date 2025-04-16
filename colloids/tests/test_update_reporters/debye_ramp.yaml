@@ -66,21 +66,21 @@ potential_temperature: !Quantity
   value: 298.0
 trajectory_filename: trajectory.gsd
 trajectory_interval: 10
-update_reporter: RampUpdateReporter
-update_reporter_parameters:
-  filename: update_reporter.csv
-  update_interval: !Copy
-    key: state_data_interval
-  print_interval: !Copy
-    key: state_data_interval
-  final_update_step: !Copy
-    key: run_steps
-  global_parameter_name: debye_length
-  start_value: !Copy
-    key: debye_length
-  end_value: !Quantity
-    unit: nanometer
-    value: 6.0
+update_reporters: 
+  RampUpdateReporter:
+    filename: update_reporter.csv
+    update_interval: !Copy
+      key: state_data_interval
+    print_interval: !Copy
+      key: state_data_interval
+    final_update_step: !Copy
+      key: run_steps
+    global_parameter_name: debye_length
+    start_value: !Copy
+      key: debye_length
+    end_value: !Quantity
+      unit: nanometer
+      value: 6.0
 use_depletion: false
 use_gravity: false
 use_log: false

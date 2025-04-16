@@ -114,8 +114,7 @@ class TestRunParameters(object):
         assert parameters.gravitational_acceleration == yaml_parameters.gravitational_acceleration
         assert parameters.water_density == yaml_parameters.water_density
         assert parameters.particle_density == yaml_parameters.particle_density
-        assert parameters.update_reporter == yaml_parameters.update_reporter
-        assert parameters.update_reporter_parameters == yaml_parameters.update_reporter_parameters
+        assert parameters.update_reporters == yaml_parameters.update_reporters
         assert parameters.substrate_type == yaml_parameters.substrate_type
         assert parameters.substrate_particle_type == yaml_parameters.substrate_particle_type
         assert parameters.use_snowman == yaml_parameters.use_snowman

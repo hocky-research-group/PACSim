@@ -42,6 +42,8 @@ masses:
 minimize_energy_initially: false
 particle_density: null
 platform_name: Reference
+psi1_scale: 1.0
+psi2_scale: 1.0
 radii:
   N: !Quantity
     unit: nanometer
@@ -52,7 +54,7 @@ radii:
 run_steps: 100
 state_data_filename: state_data.csv
 state_data_interval: 10
-substrate_particle_type: null
+#substrate_particle_type: null
 substrate_type: null
 surface_potentials:
   N: !Quantity
@@ -67,19 +69,32 @@ potential_temperature: !Quantity
 trajectory_filename: trajectory.gsd
 trajectory_interval: 10
 update_reporters: 
-  SquaredSinusoidalUpdateReporter:
-    filename: update_reporter.csv
+  psi1_reporter: 
+    reporter_type: SquaredSinusoidalUpdateReporter
+    filename: update_reporter_psi1.csv
     update_interval: 1
     print_interval: 1
     final_update_step: !Copy
       key: run_steps
-    global_parameter_name: debye_length
+    global_parameter_name: psi1_scale
     start_value: !Copy
-      key: debye_length
-    end_value: !Quantity
-      unit: nanometer
-      value: 6.0
-    switch_step: 10
+      key: psi1_scale
+    end_value: -1.0
+    switch_step: !Copy
+      key: run_steps
+  psi2_reporter:
+    reporter_type: SquaredSinusoidalUpdateReporter
+    filename: update_reporter_psi2.csv
+    update_interval: 1
+    print_interval: 1
+    final_update_step: !Copy
+      key: run_steps
+    global_parameter_name: psi2_scale
+    start_value: !Copy
+      key: psi2_scale
+    end_value: -1.0
+    switch_step:  !Copy
+      key: run_steps
 use_depletion: false
 use_gravity: false
 use_log: false

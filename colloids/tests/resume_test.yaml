@@ -80,7 +80,7 @@ snowman_distances:
 snowman_seed: 3
 state_data_filename: test_run_and_resume/state_data_resume.csv
 state_data_interval: 10
-substrate_particle_type: S
+#substrate_particle_type: S
 substrate_type: explicit
 surface_potentials:
   N: !Quantity

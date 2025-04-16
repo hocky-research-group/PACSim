@@ -158,6 +158,7 @@ class UpdateReporterAbstract(ABC):
         simulation.context.setParameter(self._global_parameter_name, new_value)
         if step % self._print_interval == 0:
             print(f"{step},{new_value}", file=self._file)
+            print(f"{step},{new_value}") # file=self._file)
 
     def __del__(self) -> None:
         """Destructor of the UpdateReporter class."""

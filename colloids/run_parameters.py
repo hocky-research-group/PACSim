@@ -489,9 +489,10 @@ class RunParameters(Parameters):
         if self.update_reporters is not None:
             possible_update_reporters = [name for name, _ in inspect.getmembers(update_reporters, inspect.isclass)
                                          if name != "ABC" and "Abstract" not in name]
-            for update_reporter, update_reporter_parameters in self.update_reporters.items():
-                if update_reporter not in possible_update_reporters:
-                    raise ValueError(f"Update reporter {update_reporter} not available, the update reporter must be one of the following:",
+            for update_reporter_name, update_reporter_parameters in self.update_reporters.items():
+                reporter_type = update_reporter_parameters["reporter_type"]
+                if reporter_type not in possible_update_reporters:
+                    raise ValueError(f"Update reporter {reporter_type} not available, the update reporter must be one of the following:",
                                     f"{', '.join(possible_update_reporters)}.")
                 if update_reporter_parameters is None:
                     raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")

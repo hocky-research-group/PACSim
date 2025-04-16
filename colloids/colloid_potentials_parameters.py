@@ -101,7 +101,7 @@ class ColloidPotentialsParameters(object):
     def psi1_scale(self) -> float:
         return self._psi1_scale
 
-     @property
+    @property
     def psi2_scale(self) -> float:
         return self._psi2_scale
 

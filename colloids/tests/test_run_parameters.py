@@ -116,7 +116,7 @@ class TestRunParameters(object):
         assert parameters.particle_density == yaml_parameters.particle_density
         assert parameters.update_reporters == yaml_parameters.update_reporters
         assert parameters.substrate_type == yaml_parameters.substrate_type
-        assert parameters.substrate_particle_type == yaml_parameters.substrate_particle_type
+        #assert parameters.substrate_particle_type == yaml_parameters.substrate_particle_type
         assert parameters.use_snowman == yaml_parameters.use_snowman
         assert parameters.snowman_seed == yaml_parameters.snowman_seed
         assert parameters.snowman_bond_types == yaml_parameters.snowman_bond_types

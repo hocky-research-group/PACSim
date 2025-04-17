@@ -179,9 +179,9 @@ class ImplicitSubstrate(OpenMMPotentialAbstract):
         steric_potential = (
             "step(two_l - h) * "
             "steric_prefactor * 2 * radius * brush_length * brush_length * ("
-            "28.0 * ((two_l / h)^0.25 - 1.0) "
+            "28.0 * ((two_l / h)^0.25 - 1.0)"
             "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
-            "+ 12.0 * (h / two_l - 1.0)) "
+            "+ 12.0 * (h / two_l - 1.0));"
         )
 
         """Set up the basic functional form of the electrostatic potential from DLVO theory."""

@@ -1,6 +1,6 @@
 from openmm import Context, LangevinIntegrator, OpenMMException, Platform, System, unit, Vec3
 import pytest
-from colloids import ColloidPotentialsParameters, SubstrateWall
+from colloids import ColloidPotentialsParameters, ImplicitSubstrate #, SubstrateWall
 
 
 class TestSubstrateWallParameters(object):
@@ -64,7 +64,7 @@ class TestSubstrateWallParameters(object):
 
     @pytest.fixture
     def substrate_wall_potential(self, colloid_potentials_parameters, wall_distance, wall_charge):
-        return SubstrateWall(colloid_potentials_parameters, wall_distance, wall_charge, False)
+        return ImplicitSubstrate(colloid_potentials_parameters, wall_distance, wall_charge, False)
 
 
 class TestSubstrateWallExceptions(TestSubstrateWallParameters):

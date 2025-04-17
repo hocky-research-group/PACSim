@@ -51,7 +51,7 @@ class TestRunParameters(object):
     def test_run_parameters(self, parameters, yaml_parameters):
         # Because we cannot compare openmm quantities directly (see above), we have to compare all fields explicitly.
         # When new fields are added to the RunParameters dataclass, this test must be updated accordingly.
-        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 45
+        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 44
         assert parameters.initial_configuration == yaml_parameters.initial_configuration
         assert len(parameters.masses) == len(yaml_parameters.masses)
         assert len(parameters.radii) == len(yaml_parameters.radii)
@@ -116,7 +116,7 @@ class TestRunParameters(object):
         assert parameters.particle_density == yaml_parameters.particle_density
         assert parameters.update_reporters == yaml_parameters.update_reporters
         assert parameters.substrate_type == yaml_parameters.substrate_type
-        #assert parameters.substrate_particle_type == yaml_parameters.substrate_particle_type
+        assert parameters.substrate_particle_type == yaml_parameters.substrate_particle_type
         assert parameters.use_snowman == yaml_parameters.use_snowman
         assert parameters.snowman_seed == yaml_parameters.snowman_seed
         assert parameters.snowman_bond_types == yaml_parameters.snowman_bond_types

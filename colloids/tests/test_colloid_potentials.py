@@ -124,18 +124,19 @@ class TestColloidPotentialsExceptions(TestParameters):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
             colloid_potentials.add_particle(
-                radius=radius_one / ((unit.nano * unit.meter) ** 2), surface_potential=surface_potential_one)
+                radius=radius_one / ((unit.nano * unit.meter) ** 2), surface_potential=surface_potential_one, type_flag=1)
         # Test exception on negative radius.
         with pytest.raises(ValueError):
             # noinspection PyTypeChecker
             colloid_potentials.add_particle(
-                radius=-radius_one, surface_potential=surface_potential_one)
+                radius=-radius_one, surface_potential=surface_potential_one, type_flag=1)
 
     def test_exception_surface_potential(self, colloid_potentials, radius_one, surface_potential_one):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
             colloid_potentials.add_particle(radius=radius_one,
-                                            surface_potential=surface_potential_one / (unit.milli * unit.volt) ** 2)
+                                            surface_potential=surface_potential_one / (unit.milli * unit.volt) ** 2,
+                                            type_flag=1)
 
     def test_exception_no_particles_added(self, colloid_potentials):
         with pytest.raises(RuntimeError):
@@ -143,11 +144,11 @@ class TestColloidPotentialsExceptions(TestParameters):
                 pass
 
     def test_exception_add_particle_after_yield_potentials(self, colloid_potentials, radius_one, surface_potential_one):
-        colloid_potentials.add_particle(radius=radius_one, surface_potential=surface_potential_one)
+        colloid_potentials.add_particle(radius=radius_one, surface_potential=surface_potential_one, type_flag=1)
         for _ in colloid_potentials.yield_potentials():
             pass
         with pytest.raises(RuntimeError):
-            colloid_potentials.add_particle(radius=radius_one, surface_potential=surface_potential_one)
+            colloid_potentials.add_particle(radius=radius_one, surface_potential=surface_potential_one, type_flag=1)
 
     def test_exception_colloid_potentials_tabulated_same_surface_potential(
             self, radius_one, radius_two, surface_potential_one, colloid_potentials_parameters):

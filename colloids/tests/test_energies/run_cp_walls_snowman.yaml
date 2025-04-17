@@ -68,7 +68,7 @@ snowman_distances:
 snowman_seed: 3
 state_data_filename: state_data.csv
 state_data_interval: 5000
-#substrate_particle_type: null
+substrate_particle_type: null
 substrate_type: null
 surface_potentials:
   N: !Quantity

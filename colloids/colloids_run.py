@@ -10,7 +10,7 @@ import openmm
 from openmm import app
 from openmm import unit
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
-                      ShiftedLennardJonesWalls, DepletionPotential, Gravity)
+                      ShiftedLennardJonesWalls, DepletionPotential, Gravity, ImplicitSubstrate)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import (generate_fibonacci_sphere_grid_points, read_xyz_file, write_gsd_file,
                                        write_xyz_file)
@@ -158,7 +158,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         slj_walls = None
 
     if add_implicit_substrate:
-        substrate_wall = SubstrateWall(colloid_potentials_parameters=potentials_parameters, 
+        substrate_wall = ImplicitSubstrate(colloid_potentials_parameters=potentials_parameters, 
                                        wall_distance=wall_distances[2],
                                        wall_charge=parameters.surface_potentials[parameters.substrate_type], 
                                        use_log=parameters.use_log)

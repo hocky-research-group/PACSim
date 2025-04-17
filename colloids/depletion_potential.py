@@ -87,7 +87,7 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
         depletion_potential.addPerParticleParameter("flag")
         return depletion_potential
     
-    def add_particle(self, radius: unit.Quantity, substrate_flag: bool = False) -> None:
+    def add_particle(self, radius: unit.Quantity, substrate_flag: bool = False, type_flag: bool = True) -> None:
         """
         Add a colloid with a given radius to the system.
 
@@ -106,6 +106,9 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
         :param substrate_flag:
             Whether the colloid is a substrate particle.
         :type substrate_flag: bool
+        :param type_flag:
+            Whether the colloid is a type 1 or type 2 particle.
+        :type type_flag: bool
 
         :raises TypeError:
             If the radius is not a Quantity with a proper unit.

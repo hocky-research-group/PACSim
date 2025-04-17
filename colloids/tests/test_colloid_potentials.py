@@ -187,10 +187,10 @@ class TestColloidPotentialsForTwoParticles(TestParameters):
                           surface_potential_two):
         openmm_system.addParticle(mass=1.0)
         colloid_potentials.add_particle(radius=radius_one, surface_potential=surface_potential_one,
-                                        substrate_flag=False)
+                                        substrate_flag=False, type_flag=True)
         openmm_system.addParticle(mass=1.0)
         colloid_potentials.add_particle(radius=radius_two, surface_potential=surface_potential_two,
-                                        substrate_flag=False)
+                                        substrate_flag=False, type_flag=False)
         # Add another particle but exclude it from all interactions.
         openmm_system.addParticle(mass=2.0)
         colloid_potentials.add_particle(radius=radius_two, surface_potential=surface_potential_two)
@@ -415,19 +415,19 @@ class TestColloidPotentialsAlgebraicForTwoSubstrateParticles(TestParameters):
         if request.param == "algebraic":
             openmm_system.addParticle(mass=1.0)
             colloid_potentials_algebraic.add_particle(radius=radius_one, surface_potential=surface_potential_one,
-                                                      substrate_flag=True)
+                                                      substrate_flag=True, type_flag=True)
             openmm_system.addParticle(mass=1.0)
             colloid_potentials_algebraic.add_particle(radius=radius_two, surface_potential=surface_potential_two,
-                                                      substrate_flag=True)
+                                                      substrate_flag=True, type_flag=False)
             for potential in colloid_potentials_algebraic.yield_potentials():
                 openmm_system.addForce(potential)
         else:
             openmm_system.addParticle(mass=1.0)
             colloid_potentials_algebraic_log.add_particle(radius=radius_one, surface_potential=surface_potential_one,
-                                                      substrate_flag=True)
+                                                      substrate_flag=True, type_flag=True)
             openmm_system.addParticle(mass=1.0)
             colloid_potentials_algebraic_log.add_particle(radius=radius_two, surface_potential=surface_potential_two,
-                                                      substrate_flag=True)
+                                                      substrate_flag=True, type_flag=False)
             for potential in colloid_potentials_algebraic_log.yield_potentials():
                 openmm_system.addForce(potential)
 
@@ -466,10 +466,10 @@ class TestColloidPotentialsTabulatedForTwoSubstrateParticles(TestParameters):
                                                      surface_potential_one):
         with pytest.raises(ValueError):
             colloid_potentials_tabulated.add_particle(radius=radius_one, surface_potential=surface_potential_one,
-                                                      substrate_flag=True)
+                                                      substrate_flag=True, type_flag=True)
         with pytest.raises(ValueError):
             colloid_potentials_tabulated_log.add_particle(radius=radius_one, surface_potential=surface_potential_one,
-                                                          substrate_flag=True)
+                                                          substrate_flag=True, type_flag=True)
 
 
 class TestColloidPotentialsAlgebraicForOneParticleOneSubstrateParticle(TestParameters):
@@ -478,10 +478,10 @@ class TestColloidPotentialsAlgebraicForOneParticleOneSubstrateParticle(TestParam
                           surface_potential_one, surface_potential_two):
         openmm_system.addParticle(mass=1.0)
         colloid_potentials_algebraic.add_particle(radius=radius_one, surface_potential=surface_potential_one,
-                                                  substrate_flag=False)
+                                                  substrate_flag=False, type_flag=True)
         openmm_system.addParticle(mass=1.0)
         colloid_potentials_algebraic.add_particle(radius=radius_two, surface_potential=surface_potential_two,
-                                                  substrate_flag=True)
+                                                  substrate_flag=True, type_flag=False)
         for potential in colloid_potentials_algebraic.yield_potentials():
             openmm_system.addForce(potential)
 
@@ -522,10 +522,10 @@ class TestColloidPotentialsAlgebraicWithLogForOneParticleOneSubstrateParticle(Te
                           radius_one, radius_two, surface_potential_one, surface_potential_two):
         openmm_system.addParticle(mass=1.0)
         colloid_potentials_algebraic_log.add_particle(radius=radius_one, surface_potential=surface_potential_one,
-                                                      substrate_flag=False)
+                                                      substrate_flag=False, type_flag=True)
         openmm_system.addParticle(mass=1.0)
         colloid_potentials_algebraic_log.add_particle(radius=radius_two, surface_potential=surface_potential_two,
-                                                      substrate_flag=True)
+                                                      substrate_flag=True, type_flag=False)
         for potential in colloid_potentials_algebraic_log.yield_potentials():
             openmm_system.addForce(potential)
 
@@ -696,11 +696,11 @@ class TestColloidPotentialsAlgebraicForTwoParticlesTwoSubstrateParticles(TestPar
         for _ in range(2):
             openmm_system.addParticle(mass=1.0)
             colloid_potentials_algebraic.add_particle(radius=radius_one, surface_potential=surface_potential_one,
-                                                      substrate_flag=False)
+                                                      substrate_flag=False, type_flag=True)
         for _ in range(2):
             openmm_system.addParticle(mass=1.0)
             colloid_potentials_algebraic.add_particle(radius=radius_two, surface_potential=surface_potential_two,
-                                                      substrate_flag=True)
+                                                      substrate_flag=True, type_flag=False)
         for potential in colloid_potentials_algebraic.yield_potentials():
             openmm_system.addForce(potential)
 

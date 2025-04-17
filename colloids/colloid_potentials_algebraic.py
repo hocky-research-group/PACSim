@@ -155,7 +155,7 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         if self._use_log:
             electrostatic_potential = CustomNonbondedForce(
                 "select(flag1 * flag2, 0, "
-                "electrostatic_prefactor * * rescale_factor_one * rescale_factor_two * radius_average * psi1 * psi2 * log(1.0 + exp(-h / debye_length))); "
+                "electrostatic_prefactor * rescale_factor_one * rescale_factor_two * radius_average * psi1 * psi2 * log(1.0 + exp(-h / debye_length))); "
                 f"radius_average = {radius_average_str};"
                 "rescale_factor_one = select(type_flag1, psi1_scale, psi2_scale);"
                 "rescale_factor_two = select(type_flag2, psi1_scale, psi2_scale);"
@@ -212,6 +212,9 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         :param substrate_flag:
             If True, the colloid is considered to be a substrate particle.
         :type substrate_flag: bool
+        :param type_flag:
+            If True, the colloid is a type 1 particle.
+        :type type_flag: bool
 
         :raises TypeError:
             If the radius or surface_potential is not a Quantity with a proper unit (via the abstract base class).

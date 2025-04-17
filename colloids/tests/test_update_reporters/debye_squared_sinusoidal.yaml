@@ -48,12 +48,10 @@ trajectory_filename: trajectory.gsd
 trajectory_interval: 10
 update_reporters: 
   reporter1:
-    reporter_type: RampUpdateReporter
+    reporter_type: SquaredSinusoidalUpdateReporter
     filename: update_reporter.csv
-    update_interval: !Copy
-      key: state_data_interval
-    print_interval: !Copy
-      key: state_data_interval
+    update_interval: 1
+    print_interval: 1
     final_update_step: !Copy
       key: run_steps
     global_parameter_name: debye_length
@@ -62,6 +60,7 @@ update_reporters:
     end_value: !Quantity
       unit: nanometer
       value: 6.0
+    switch_step: 10
 use_depletion: false
 use_gravity: false
 use_log: false

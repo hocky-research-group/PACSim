@@ -160,6 +160,9 @@ class ColloidPotentialsAbstract(OpenMMNonbondedPotentialAbstract):
         :param substrate_flag:
             Whether the colloid is a substrate particle.
         :type substrate_flag: bool
+        :param type_flag:
+            Whether the colloid is a type 1 or type 2 particle.
+        :type type_flag: bool
 
         :raises TypeError:
             If the radius or surface_potential is not a Quantity with a proper unit.

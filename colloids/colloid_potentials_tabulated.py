@@ -243,7 +243,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         return potential_11, potential_22, potential_12
 
     def add_particle(self, radius: unit.Quantity, surface_potential: unit.Quantity,
-                     substrate_flag: bool = False) -> None:
+                     substrate_flag: bool = False, type_flag: bool = True) -> None:
         """
         Add a colloid with a given radius and surface potential to the system.
 
@@ -264,6 +264,9 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         :param substrate_flag:
             Whether the colloid is a substrate particle.
         :type substrate_flag: bool
+        :param type_flag:
+            Whether the colloid is a type 1 or type 2 particle.
+        :type type_flag: bool
 
         :raises TypeError:
             If the radius or surface_potential is not a Quantity with a proper unit (via the abstract base class).
@@ -280,7 +283,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         :raises ValueError:
             If the substrate flag is True.
         """
-        super().add_particle(radius, surface_potential, substrate_flag)
+        super().add_particle(radius, surface_potential, substrate_flag, type_flag)
 
         if surface_potential == self._surface_potential_one:
             if not radius == self._radius_one:

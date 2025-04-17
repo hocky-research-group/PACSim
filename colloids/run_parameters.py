@@ -419,12 +419,11 @@ class RunParameters(Parameters):
             possible_update_reporters = [name for name, _ in inspect.getmembers(update_reporters, inspect.isclass)
                                          if name != "ABC" and "Abstract" not in name]
             for update_reporter_name, update_reporter_parameters in self.update_reporters.items():
+                print(update_reporter_parameters)
                 reporter_type = update_reporter_parameters["reporter_type"]
                 if reporter_type not in possible_update_reporters:
                     raise ValueError(f"Update reporter {reporter_type} not available, the update reporter must be one of the following:",
                                     f"{', '.join(possible_update_reporters)}.")
-                if update_reporter_parameters is None:
-                    raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")
                 if "simulation" in update_reporter_parameters or "append_file" in update_reporter_parameters:
                     raise ValueError("Update-reporter parameters should not contain simulation and append_file keys.")
 

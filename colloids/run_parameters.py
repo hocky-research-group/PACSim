@@ -117,6 +117,14 @@ class RunParameters(Parameters):
         Can be either "harmonic" or "arithmetic".
         Defaults to "harmonic".
     :type electrostatic_radius_average: str
+    :param psi1_scale: 
+        Scale factor to adjust the surface charge of type 1 particles.
+        Defaults to 1.0 (no scaling).
+    :type psi1_scale: float
+    :param psi2_scale: 
+        Scale factor to adjust the surface charge of type 2 particles.
+        Defaults to 1.0 (no scaling).
+    :type psi12scale: float
     :param velocity_seed:
         The seed for the random number generator that is used to sample the initial velocities.
         If None, a random seed is used.
@@ -265,6 +273,8 @@ class RunParameters(Parameters):
     use_log: bool = False
     steric_radius_average: str = "harmonic"
     electrostatic_radius_average: str = "harmonic"
+    psi1_scale: float = 1.0
+    psi2_scale: float = 1.0
     velocity_seed: Optional[int] = None
     run_steps: int = 100
     state_data_interval: int = 100

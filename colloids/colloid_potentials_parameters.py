@@ -36,6 +36,14 @@ class ColloidPotentialsParameters(object):
         The value of the dielectric constant must be greater than zero.
         Defaults to 80.0 (i.e., water).
     :type dielectric_constant: float
+    :param psi1_scale:
+        Scale factor to adjust the surface charge of type 1 particles.
+        Defaults to 1.0 (no scaling).
+    :type psi1_scale: float
+    :param psi2_scale:
+        Scale factor to adjust the surface charge of type 2 particles.
+        Defaults to 1.0 (no scaling).
+    :type psi2_scale: float
 
     :raises TypeError:
         If the brush_density, brush_length, debye_length, or temperature is not a Quantity with a proper unit.
@@ -75,6 +83,8 @@ class ColloidPotentialsParameters(object):
         self._debye_length = debye_length.in_units_of(length_unit)
         self._temperature = temperature.in_units_of(temperature_unit)
         self._dielectric_constant = dielectric_constant
+        self._psi1_scale = psi1_scale
+        self._psi2_scale = psi2_scale
 
     @property
     def brush_density(self) -> unit.Quantity:
@@ -95,6 +105,14 @@ class ColloidPotentialsParameters(object):
     @property
     def dielectric_constant(self) -> float:
         return self._dielectric_constant
+
+    @property
+    def psi1_scale(self) -> float:
+         return self._psi1_scale
+ 
+    @property
+     def psi2_scale(self) -> float:
+         return self._psi2_scale
 
 
 if __name__ == '__main__':

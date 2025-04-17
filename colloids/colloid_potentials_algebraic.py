@@ -179,7 +179,8 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
              * unit.AVOGADRO_CONSTANT_NA).value_in_unit(self._electrostatic_prefactor_unit))
         electrostatic_potential.addGlobalParameter("debye_length",
                                                    self._parameters.debye_length.value_in_unit(length_unit))
-        electrostatic_potential.addGlobalParameter("psi_scale", self._parameters.psi_scale)
+        electrostatic_potential.addGlobalParameter("psi1_scale", self._parameters.psi1_scale)
+        electrostatic_potential.addGlobalParameter("psi2_scale", self._parameters.psi2_scale)
         electrostatic_potential.addPerParticleParameter("radius")
         # Psi should be given in millivolts.
         electrostatic_potential.addPerParticleParameter("psi")

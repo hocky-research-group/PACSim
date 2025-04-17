@@ -50,8 +50,8 @@ state_data_interval: 10
 steric_radius_average: harmonic
 trajectory_filename: test_run_and_resume/trajectory.gsd
 trajectory_interval: 10
-update_reporter: RampUpdateReporter
-update_reporter_parameters:
+update_reporters:
+  reporter_type: RampUpdateReporter
   filename: test_run_and_resume/update_reporter.csv
   update_interval: !Copy
     key: state_data_interval

@@ -38,8 +38,7 @@ state_data_filename: state_data.csv
 state_data_interval: 10
 trajectory_filename: trajectory.gsd
 trajectory_interval: 10
-update_reporter: null
-update_reporter_parameters: null
+update_reporters: null
 use_depletion: false
 use_log: false
 velocity_seed: 2

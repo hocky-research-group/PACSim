@@ -46,8 +46,7 @@ state_data_interval: 5000
 steric_radius_average: arithmetic
 trajectory_filename: trajectory.gsd
 trajectory_interval: 500000
-update_reporter: null
-update_reporter_parameters: null
+update_reporters: null
 use_depletion: true
 use_gravity: false
 use_log: false

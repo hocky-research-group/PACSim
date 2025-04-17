@@ -44,8 +44,8 @@ potential_temperature: !Quantity
   value: 298.0
 trajectory_filename: trajectory.gsd
 trajectory_interval: 10
-update_reporter: RampUpdateReporter
-update_reporter_parameters:
+update_reporters: 
+  reporter_type: RampUpdateReporter
   filename: update_reporter.csv
   update_interval: !Copy
     key: state_data_interval

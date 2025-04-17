@@ -233,19 +233,15 @@ class RunParameters(Parameters):
         cubed, and the value must be greater than zero.
         Defaults to None.
     :type particle_density: Optional[unit.Quantity]
-    :param update_reporter:
-        The name of the update reporter used to vary the value of a force-related global parameter over time
+    :param update_reporters:
+        The specifications of the update reporter(s) used to vary the value of a force-related global parameter over time
         in a simulation.
         Possible choices can be found in the update_reporters.py file.
-        If an update reporter is specified, its update reporter parameters must be specified.
+        If an update reporter is specified, its update reporter parameters must be specified. The parameters are forwarded 
+        to the initialization method of the UpdateReporter, if enabled for a simulation. Note that the initialization method
+        of the UpdateReporter class expects an OpenMM simulation object and an append_file boolean that should not appear in this dictionary.
         Defaults to None.
-    :type update_reporter: Optional[str]
-    :param update_reporter_parameters:
-        The parameters that are forwarded to the initialization method of the UpdateReporter, if enabled for a
-        simulation. Note that the initialization method of the UpdateReporter class expects an OpenMM simulation object
-        and an append_file boolean that should not appear in this dictionary.
-        Defaults to None.
-    :type update_reporter_parameters: Optional[dict[str, Any]]
+    :type update_reporters: Optional[dict[str, dict[str, Any]]]
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -295,8 +291,7 @@ class RunParameters(Parameters):
     gravitational_acceleration: Optional[unit.Quantity] = None
     water_density: Optional[unit.Quantity] = None
     particle_density: Optional[unit.Quantity] = None
-    update_reporter: Optional[str] = None
-    update_reporter_parameters: Optional[dict[str, Any]] = None
+    update_reporters: Optional[dict[str, dict[str, Any]]] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -420,19 +415,18 @@ class RunParameters(Parameters):
                 raise ValueError("Density of water must not be specified if gravity is not on.")
             if self.particle_density is not None:
                 raise ValueError("Density of particle must not be specified if gravity is not on.")
-        if self.update_reporter is not None:
+        if self.update_reporters is not None:
             possible_update_reporters = [name for name, _ in inspect.getmembers(update_reporters, inspect.isclass)
                                          if name != "ABC" and "Abstract" not in name]
-            if self.update_reporter not in possible_update_reporters:
-                raise ValueError(f"Update reporter {self.update_reporter} not available, the update reporter must be one of the following:",
-                                 f"{', '.join(possible_update_reporters)}.")
-            if self.update_reporter_parameters is None:
-                raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")
-            if "simulation" in self.update_reporter_parameters or "append_file" in self.update_reporter_parameters:
-                raise ValueError("Update-reporter parameters should not contain simulation and append_file keys.")
-        else:
-            if self.update_reporter_parameters is not None:
-                raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")
+            for update_reporter_name, update_reporter_parameters in self.update_reporters.items():
+                reporter_type = update_reporter_parameters["reporter_type"]
+                if reporter_type not in possible_update_reporters:
+                    raise ValueError(f"Update reporter {reporter_type} not available, the update reporter must be one of the following:",
+                                    f"{', '.join(possible_update_reporters)}.")
+                if update_reporter_parameters is None:
+                    raise ValueError("Update-reporter parameters must be specified if the update reporter is on.")
+                if "simulation" in update_reporter_parameters or "append_file" in update_reporter_parameters:
+                    raise ValueError("Update-reporter parameters should not contain simulation and append_file keys.")
 
 
 if __name__ == '__main__':

@@ -78,16 +78,16 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             "select(flag1 * flag2, 0, "
             "step(two_l - h) * "
             #"steric_prefactor * rs / 2.0 * brush_length * brush_length * ("
-            "steric_prefactor * rs  * brush_length * brush_length * ("
+            "steric_prefactor * radius_average  * brush_length * brush_length * ("
             "28.0 * ((two_l / h)^0.25 - 1.0) "
             "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
             "+ 12.0 * (h / two_l - 1.0))); "
-            #"h = r - rs;"
-            "h = r - 2.0 * rs;"
-            "rs = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
-            #"rs = radius1 + radius2;"
+            "h = r - rs;"
+            "radius_average = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
+            "rs = radius1 + radius2;"
             "two_l = 2.0 * brush_length"
         )
+        
         # Prefactor is k_B * T * 16 * pi * sigma^(3/2) / 35 (see Hocky paper)
         steric_potential.addGlobalParameter(
             "steric_prefactor",

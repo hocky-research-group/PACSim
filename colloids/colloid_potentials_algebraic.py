@@ -101,11 +101,11 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         self._use_log = use_log
         try:
             self._steric_radius_average = AverageType[steric_radius_average.upper()]
-        except AttributeError:
+        except (KeyError, AttributeError):
             raise ValueError(f"Unknown average type f{steric_radius_average} for the steric potential.")
         try:
             self._electrostatic_radius_average = AverageType[electrostatic_radius_average.upper()]
-        except AttributeError:
+        except (KeyError, AttributeError):
             raise ValueError(f"Unknown average type f{electrostatic_radius_average} for the electrostatic potential.")
         self._max_radius = -math.inf * length_unit
         self._cutoff_factor = cutoff_factor

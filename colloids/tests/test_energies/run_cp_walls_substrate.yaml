@@ -38,6 +38,8 @@ platform_name: Reference
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0
+psi1_scale: 1.0
+psi2_scale: 1.0
 run_steps: 0
 state_data_filename: state_data.csv
 state_data_interval: 5000

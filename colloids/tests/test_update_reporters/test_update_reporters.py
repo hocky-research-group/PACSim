@@ -25,20 +25,22 @@ class TestUpdateReporters(object):
         os.remove("trajectory.gsd")
         os.remove("update_reporter.csv")
 
-    @pytest.mark.parametrize("yaml_file,expected_parameter_values",
-                             [("debye_ramp.yaml", [5.0 + i * 0.1 for i in range(11)]),
-                              ("debye_triangle.yaml", ([5.0 + i * (1.0 / 3.0) for i in range(4)]
+    @pytest.mark.parametrize("yaml_file, update_reporter_files, expected_parameter_values",
+                             [("debye_ramp.yaml", ['update_reporter.csv'], [5.0 + i * 0.1 for i in range(11)]),
+                              ("debye_triangle.yaml", ['update_reporter.csv'], ([5.0 + i * (1.0 / 3.0) for i in range(4)]
                                                        + [6.0 - i * (1.0 / 3.0) for i in range(1, 4)]
                                                        + [5.0 + i * (1.0 / 3.0) for i in range(1, 4)]
                                                        + [6.0 - (1.0 / 3.0)])),
-                              ("debye_squared_sinusoidal.yaml", [5.0 + (sin(pi / (2.0 * 10) * i) ** 2)
-                                                                 for i in range(101)])])
-    def test_parameter_values(self, yaml_file, expected_parameter_values):
+                              ("debye_squared_sinusoidal.yaml", ['update_reporter.csv'], [5.0 + (sin(pi / (2.0 * 10) * i) ** 2)
+                                                                 for i in range(101)]),
+                              ("psi1psi2_squared_sinusoidal.yaml", ['update_reporter_psi1.csv', 'update_reporter_psi2.csv'], [(-1.0 * (np.sin(np.pi / (2.0 * 10) * i) ** 2) + 1.0) 
+                                                                for i in range(101) ])])
+    def test_parameter_values(self, yaml_file, update_reporter_files, expected_parameter_values):
         colloids_run([yaml_file])
-        f= np.loadtxt('update_reporter.csv', delimiter=",", dtype=float, skiprows=1)
-        actual_parameter_values = f[:, 1]
-        assert actual_parameter_values == pytest.approx(expected_parameter_values,rel=1.0e-12, abs=1.0e-12)
-
+        for update_reporter in update_reporter_files:
+            f= np.loadtxt(update_reporter, delimiter=",", dtype=float, skiprows=1)
+            actual_parameter_values = f[:, 1]
+            assert actual_parameter_values == pytest.approx(expected_parameter_values,rel=1.0e-12, abs=1.0e-12)
 
 if __name__ == '__main__':
     pytest.main([__file__])

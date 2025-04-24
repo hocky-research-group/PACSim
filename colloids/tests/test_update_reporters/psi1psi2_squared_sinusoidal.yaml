@@ -58,8 +58,7 @@ update_reporters:
     start_value: !Copy
       key: psi1_scale
     end_value: -1.0
-    switch_step: !Copy
-      key: run_steps
+    switch_step: 10
   psi2_reporter:
     reporter_type: SquaredSinusoidalUpdateReporter
     filename: update_reporter_psi2.csv
@@ -71,8 +70,7 @@ update_reporters:
     start_value: !Copy
       key: psi2_scale
     end_value: -1.0
-    switch_step:  !Copy
-      key: run_steps
+    switch_step:  10
 use_depletion: false
 use_gravity: false
 use_log: false

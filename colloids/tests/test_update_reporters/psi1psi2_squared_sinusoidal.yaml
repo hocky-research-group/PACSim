@@ -54,7 +54,7 @@ radii:
 run_steps: 100
 state_data_filename: state_data.csv
 state_data_interval: 10
-substrate_particle_type: null
+#substrate_particle_type: null
 substrate_type: null
 surface_potentials:
   N: !Quantity

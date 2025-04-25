@@ -87,9 +87,9 @@ format. It expects two positional arguments:
    [`colloids/colloids_create/configuration.yaml`](colloids/colloids_create/configuration.yaml) for an example. Another 
    exemplary configuration file called `example_configuration.yaml` can be created with the command
    `colloids-create --example`.
-2. The name of the GSD file of the initial configuration. See [`colloids/colloids_create/tests/reference_configuration.gsd`]       (colloids/colloids_create/reference_configuration.gsd) for an example.
+2. The name of the GSD file of the initial configuration. See  [`colloids/colloids_create/tests/reference_configuration.gsd`](colloids/colloids_create/tests/reference_configuration.gsd) for an example.
 
-In the configuration yaml file, the 'cluster_specification` key requires the filename of a LAMMPS data file specifying how
+In the configuration yaml file, the `cluster_specification` key requires the filename of a LAMMPS data file specifying how
 to construct the initial configuration. See [`colloids/colloids_create/cluster.lmp`](colloids/colloids_create/cluster.lmp) for an example.
 
 A typical workflow for running a simulation with `colloids-run` from an initial configuration created by 

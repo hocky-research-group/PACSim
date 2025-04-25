@@ -78,25 +78,22 @@ colloids-resume run.yaml checkpoint.chk 100000
 
 ### colloids-create
 The configuration file for the `colloids-run` executable specifies the filename of an initial configuration for the 
-simulation in the `initial_configuration` key. This initial configuration should be stored in the [extended XYZ file 
-format](https://www.ovito.org/manual/reference/file_formats/input/xyz.html).
+simulation in the `initial_configuration` key. This initial configuration should be stored in the GSD format.
 
-The `colloids-create` executable can be used to create an initial configuration for simulations in the extended XYZ file 
-format. It expects two configuration files in yaml format as positional arguments:
-1.  A configuration file that specifies the parameters of the simulation. This yaml file is usually the one that is 
-    passed to the `colloids-run` executable afterward, and it contains the filename in which the generated initial 
-    configuration is stored. See [`colloids/run.yaml`](colloids/run.yaml) for an example.
-2. A configuration file that specifies the parameters of the initial configuration. See 
+The `colloids-create` executable can be used to create an initial configuration for simulations in the GSD file 
+format. It expects two positional arguments:
+1. A configuration file that specifies the parameters of the initial configuration. See 
    [`colloids/colloids_create/configuration.yaml`](colloids/colloids_create/configuration.yaml) for an example. Another 
    exemplary configuration file called `example_configuration.yaml` can be created with the command
    `colloids-create --example`.
+2. The name of the GSD file of the initial configuration. See [`colloids/colloids_create/tests/reference_configuration.gsd`]       (colloids/colloids_create/reference_configuration.gsd) for an example.
 
 A typical workflow for running a simulation with `colloids-run` from an initial configuration created by 
 `colloids-create` consists of creating a directory with `run.yaml` and `configuration.yaml` files, and then running the 
 following two commands:
 
 ```bash
-colloids-create run.yaml configuration.yaml
+colloids-create configuration.yaml first_frame.gsd
 colloids-run run.yaml
 ```
 

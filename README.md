@@ -63,7 +63,7 @@ colloids-run run.yaml
 ```
 
 An exemplary configuration file called `example.yaml` can be created with the command 
-`colloids-run --example`. Another exemplary configuration file is provided in [`colloids/run.yaml`](colloids/run.yaml).
+`colloids-run --example`. Another exemplary configuration file is provided in [`colloids/tests/run_test.yaml`](colloids/tests/run_test.yaml).
 
 ### colloids-resume
 A simulation that is run with the `colloids-run` executable creates checkpoints in periodic intervals. One can resume a 
@@ -78,7 +78,8 @@ colloids-resume run.yaml checkpoint.chk 100000
 
 ### colloids-create
 The configuration file for the `colloids-run` executable specifies the filename of an initial configuration for the 
-simulation in the `initial_configuration` key. This initial configuration should be stored in the GSD format.
+simulation in the `initial_configuration` key. This initial configuration should be stored in the [GSD/HOOMD file 
+format](https://www.ovito.org/docs/current/reference/file_formats/input/gsd.html#file-formats-input-gsd).
 
 The `colloids-create` executable can be used to create an initial configuration for simulations in the GSD file 
 format. It expects two positional arguments:
@@ -88,9 +89,12 @@ format. It expects two positional arguments:
    `colloids-create --example`.
 2. The name of the GSD file of the initial configuration. See [`colloids/colloids_create/tests/reference_configuration.gsd`]       (colloids/colloids_create/reference_configuration.gsd) for an example.
 
+In the configuration yaml file, the 'cluster_specification` key requires the filename of a LAMMPS data file specifying how
+to construct the initial configuration. See [`colloids/colloids_create/cluster.lmp`](colloids/colloids_create/cluster.lmp) for an example.
+
 A typical workflow for running a simulation with `colloids-run` from an initial configuration created by 
-`colloids-create` consists of creating a directory with `run.yaml` and `configuration.yaml` files, and then running the 
-following two commands:
+`colloids-create` consists of creating a directory with `run.yaml`, `configuration.yaml`, and 'cluster.lmp` files, 
+and then running the following two commands:
 
 ```bash
 colloids-create configuration.yaml first_frame.gsd

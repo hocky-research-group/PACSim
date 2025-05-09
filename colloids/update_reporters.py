@@ -366,7 +366,6 @@ class RampUpdateReporterUntilCluster(UpdateReporterAbstract):
             cluster.compute((box, positions), neighbors={'r_max': self._cutoff_distance, "exclude_ii": True})
             unique, counts = np.unique(cluster.cluster_idx, return_counts=True)
             biggest_cluster_size = counts.max()
-            print(biggest_cluster_size)
             if biggest_cluster_size >= self._cluster_size:
                 self._cluster_reached = True
 

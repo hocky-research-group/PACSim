@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Union
+from typing import Any, Optional, Union
 import warnings
 from ase.io.lammpsdata import read_lammps_data
 import numpy as np
@@ -129,6 +129,8 @@ class ConfigurationParameters(Parameters):
         default_factory=lambda: {"1": 44.0 * electric_potential_unit, "2": -54.0 * electric_potential_unit})
     use_substrate: bool = False
     substrate_type: Optional[str] = None
+    use_random_snowman_heads: bool = False  # TODO: DOCUMENT
+    random_snowman_heads_parameters: Optional[dict[str, Any]] = None
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
@@ -226,3 +228,11 @@ class ConfigurationParameters(Parameters):
         else:
             if self.substrate_type is not None:
                 raise ValueError("The substrate type must not be specified if a substrate is not used.")
+
+        if self.use_random_snowman_heads is not None:
+            if self.random_snowman_heads_parameters is None:
+                raise ValueError("Random snowman heads parameters must be specified if random snowman heads are on.")
+        else:
+            if self.random_snowman_heads_parameters is not None:
+                raise ValueError(
+                    "Random snowman heads parameters must not be specified if random snowman heads are off.")

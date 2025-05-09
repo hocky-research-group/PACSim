@@ -358,7 +358,7 @@ class RampUpdateReporterUntilCluster(UpdateReporterAbstract):
         """
         step = simulation.currentStep
         if step % self._check_interval == 0 and not self._cluster_reached:
-            state = simulation.context.getState(positions=True)
+            state = simulation.context.getState(getPositions=True)
             positions = state.getPositions(asNumpy=True).value_in_unit(length_unit)
             cluster = freud.cluster.Cluster()
             # TODO: Change this to use the box from the simulation context, if necessary.

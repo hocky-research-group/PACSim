@@ -375,7 +375,7 @@ class RampUpdateReporterUntilCluster(UpdateReporterAbstract):
             self.set_and_print(simulation, new_value)
         else:
             if step % self._print_interval == 0:
-                print(f"{step},{old_value}", file=self._file)
+                print(f"{step},{old_value}", file=self._file, flush=True)
 
 
 class TriangleUpdateReporter(UpdateReporterAbstract):

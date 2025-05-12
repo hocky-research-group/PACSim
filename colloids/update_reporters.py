@@ -287,7 +287,8 @@ class RampTemperatureUpdateReporter(object):
             raise ValueError("The print frequency must be greater than zero.")
         self._print_interval = print_interval
         if (not append_file
-                and abs(self._start_value - simulation.integrator.getTemperature()) > 1.0e-12):
+                and abs(self._start_value
+                        - simulation.integrator.getTemperature().value_in_unit(temperature_unit)) > 1.0e-12):
             warnings.warn("The start value of the temperature does not match the value in the OpenMM integrator.")
             simulation.integrator.setTemperature(self._start_value)
         if not append_file:
@@ -331,7 +332,7 @@ class RampTemperatureUpdateReporter(object):
             The current state of the OpenMM simulation.
         :type state: openmm.State
         """
-        old_value = simulation.integrator.getTemperature()
+        old_value = simulation.integrator.getTemperature().value_in_unit(temperature_unit)
         new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._final_update_step
         step = simulation.currentStep
         simulation.integrator.setTemperature(new_value)

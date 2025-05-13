@@ -229,7 +229,7 @@ class ConfigurationParameters(Parameters):
             if self.substrate_type is not None:
                 raise ValueError("The substrate type must not be specified if a substrate is not used.")
 
-        if self.use_random_snowman_heads is not None:
+        if self.use_random_snowman_heads:
             if self.random_snowman_heads_parameters is None:
                 raise ValueError("Random snowman heads parameters must be specified if random snowman heads are on.")
         else:

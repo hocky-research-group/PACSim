@@ -3,7 +3,7 @@ from openmm import app
 from openmm import unit
 import pytest
 from colloids import ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated
-from colloids.helper_functions import read_xyz_file
+from colloids.helper_functions import read_gsd_file, get_cell_from_box
 try:
     import hoomd
     import hoomd.md
@@ -48,12 +48,14 @@ class TestCompareHoomd(object):
 
     @pytest.fixture(params=["algebraic", "tabulated"])
     def openmm_result(self, parameters, filename, request):
-        types, positions, cell = read_xyz_file(f"{filename}.xyz")
+        frame = read_gsd_file(f"{filename}.gsd", 0)
         topology = app.topology.Topology()
         chain = topology.addChain()
         residue = topology.addResidue("res1", chain)
-        for t, position in zip(types, positions):
+        types = [frame.particles.types[i] for i in frame.particles.typeid]
+        for t in types:
             topology.addAtom(t, None, residue)
+        cell = get_cell_from_box(frame.configuration.box)
         topology.setPeriodicBoxVectors(cell)
 
         system = openmm.System()
@@ -63,7 +65,8 @@ class TestCompareHoomd(object):
                                                parameters["collision_rate"], parameters["timestep"])
         if request.param == "algebraic":
             colloid_potentials = ColloidPotentialsAlgebraic(
-                colloid_potentials_parameters=parameters["colloid_potentials_parameters"], use_log=False)
+                colloid_potentials_parameters=parameters["colloid_potentials_parameters"], use_log=False,
+                steric_radius_average="arithmetic", electrostatic_radius_average="harmonic")
         else:
             assert request.param == "tabulated"
             colloid_potentials = ColloidPotentialsTabulated(
@@ -71,7 +74,7 @@ class TestCompareHoomd(object):
                 surface_potential_one=parameters["surface_potential_positive"],
                 surface_potential_two=parameters["surface_potential_negative"],
                 colloid_potentials_parameters=parameters["colloid_potentials_parameters"], use_log=False)
-        for t, position in zip(types, positions):
+        for t, position in zip(types, frame.particles.position):
             if t == "P":
                 system.addParticle(parameters["mass_positive"])
                 colloid_potentials.add_particle(radius=parameters["radius_positive"],
@@ -84,7 +87,7 @@ class TestCompareHoomd(object):
         for force in colloid_potentials.yield_potentials():
             system.addForce(force)
         simulation = app.Simulation(topology, system, integrator, platform)
-        simulation.context.setPositions(positions)
+        simulation.context.setPositions(frame.particles.position)
         simulation.context.setVelocitiesToTemperature(parameters["colloid_potentials_parameters"].temperature, 1)
         openmm_state = simulation.context.getState(getEnergy=True)
         return openmm_state.getPotentialEnergy()

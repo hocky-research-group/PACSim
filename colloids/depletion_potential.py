@@ -3,6 +3,7 @@ from typing import Iterator
 from openmm import unit
 from openmm import CustomNonbondedForce
 from colloids.abstracts import OpenMMNonbondedPotentialAbstract
+from colloids.units import energy_unit, length_unit, temperature_unit
 
 
 class DepletionPotential(OpenMMNonbondedPotentialAbstract):
@@ -37,8 +38,6 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
     :type periodic_boundary_conditions: bool
     """
     
-    _nanometer = unit.nano * unit.meter
-    
     def __init__(self, depletion_phi: float, depletant_radius: unit.Quantity, brush_length: unit.Quantity,
                  temperature: unit.Quantity, periodic_boundary_conditions: bool = True):
         """Constructor of the DepletionPotential class."""
@@ -46,17 +45,17 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
 
         if not 0.0 <= depletion_phi <= 1.0:
             raise ValueError("phi must be between zero and one")
-        if not depletant_radius.unit.is_compatible(self._nanometer):
+        if not depletant_radius.unit.is_compatible(length_unit):
             raise TypeError("depletant radius must have a unit compatible with nanometers")
-        if depletant_radius <= 0.0 * self._nanometer:
+        if depletant_radius <= 0.0 * length_unit:
             raise ValueError("depletant radius must be greater than zero")
-        if not brush_length.unit.is_compatible(self._nanometer):
+        if not brush_length.unit.is_compatible(length_unit):
             raise TypeError("brush length must have a unit compatible with nanometers")
-        if brush_length <= 0.0 * self._nanometer:
+        if brush_length <= 0.0 * length_unit:
             raise ValueError("brush length must be greater than zero")
-        if not temperature.unit.is_compatible(unit.kelvin):
+        if not temperature.unit.is_compatible(temperature_unit):
             raise TypeError("argument temperature must have a unit that is compatible with kelvin")
-        if not temperature.value_in_unit(unit.kelvin) > 0.0:
+        if not temperature.value_in_unit(temperature_unit) > 0.0:
             raise ValueError("argument temperature must have a value greater than zero")
 
         self._depletion_phi = depletion_phi
@@ -64,7 +63,7 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
         self._brush_length = brush_length
         self._temperature = temperature
         self._periodic_boundary_conditions = periodic_boundary_conditions
-        self._max_radius = -math.inf * self._nanometer
+        self._max_radius = -math.inf * length_unit
         self._depletion_potential = self._set_up_depletion_potential()
 
     def _set_up_depletion_potential(self) -> CustomNonbondedForce:
@@ -81,9 +80,9 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
         depletion_potential.addGlobalParameter(
             "depletion_prefactor",
             (-unit.BOLTZMANN_CONSTANT_kB * self._temperature * unit.AVOGADRO_CONSTANT_NA
-             * self._depletion_phi / 16.0).value_in_unit(unit.kilojoule_per_mole))
+             * self._depletion_phi / 16.0).value_in_unit(energy_unit))
         depletion_potential.addGlobalParameter("depletant_radius",
-                                               self._depletant_radius.value_in_unit(self._nanometer))
+                                               self._depletant_radius.value_in_unit(length_unit))
         depletion_potential.addPerParticleParameter("depletion_q")
         depletion_potential.addPerParticleParameter("flag")
         return depletion_potential
@@ -116,12 +115,12 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
             If the method yield_potentials was called before this method (via the abstract base class).
         """
         super().add_particle()
-        if not radius.unit.is_compatible(self._nanometer):
+        if not radius.unit.is_compatible(length_unit):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
-        if not radius.value_in_unit(self._nanometer) > 0.0:
+        if not radius.value_in_unit(length_unit) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
-        if radius.in_units_of(self._nanometer) > self._max_radius:
-            self._max_radius = radius.in_units_of(self._nanometer)
+        if radius.in_units_of(length_unit) > self._max_radius:
+            self._max_radius = radius.in_units_of(length_unit)
         self._depletion_potential.addParticle([(radius + self._brush_length) / self._depletant_radius,
                                                int(substrate_flag)])
 
@@ -139,15 +138,14 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
             If the method add_particle was not called before this method (via the abstract base class).
         """
         super().yield_potentials()
-        assert not math.isinf(self._max_radius.value_in_unit(self._nanometer))
+        assert not math.isinf(self._max_radius.value_in_unit(length_unit))
 
         if self._periodic_boundary_conditions:
             self._depletion_potential.setNonbondedMethod(self._depletion_potential.CutoffPeriodic)
         else:
             self._depletion_potential.setNonbondedMethod(self._depletion_potential.CutoffNonPeriodic)
         self._depletion_potential.setCutoffDistance(
-            (2.0 * self._max_radius + 2.0 * self._depletant_radius + 2.0 * self._brush_length).value_in_unit(
-             self._nanometer))
+            (2.0 * self._max_radius + 2.0 * self._depletant_radius + 2.0 * self._brush_length).value_in_unit(length_unit))
         self._depletion_potential.setUseLongRangeCorrection(False)
         self._depletion_potential.setUseSwitchingFunction(False)
 

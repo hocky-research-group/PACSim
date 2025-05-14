@@ -35,12 +35,14 @@ class TestTuneSurfacePotential(object):
     @pytest.fixture
     def colloid_potentials_algebraic(self, colloid_potentials_parameters):
         return ColloidPotentialsAlgebraic(colloid_potentials_parameters=colloid_potentials_parameters, use_log=False,
-                                          cutoff_factor=21.0, periodic_boundary_conditions=False)
+                                          cutoff_factor=21.0, periodic_boundary_conditions=False,
+                                          steric_radius_average="arithmetic", electrostatic_radius_average="harmonic")
 
     @pytest.fixture
     def colloid_potentials_algebraic_log(self, colloid_potentials_parameters):
         return ColloidPotentialsAlgebraic(colloid_potentials_parameters=colloid_potentials_parameters, use_log=True,
-                                          cutoff_factor=21.0, periodic_boundary_conditions=False)
+                                          cutoff_factor=21.0, periodic_boundary_conditions=False,
+                                          steric_radius_average="arithmetic", electrostatic_radius_average="harmonic")
 
     @pytest.fixture
     def other_radius(self):

@@ -16,13 +16,11 @@ class TestUpdateReporters(object):
     def tear_down(self):
         yield
         assert os.path.isfile("final_frame.gsd")
-        assert os.path.isfile("final_frame.xyz")
         assert os.path.isfile("state_data.csv")
         assert os.path.isfile("trajectory.gsd")
         assert os.path.isfile("update_reporter.csv")
 
         os.remove("final_frame.gsd")
-        os.remove("final_frame.xyz")
         os.remove("state_data.csv")
         os.remove("trajectory.gsd")
         os.remove("update_reporter.csv")

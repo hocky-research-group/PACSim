@@ -1,1 +1,1 @@
-from .abstracts import ConfigurationGenerator
+from .abstracts import ConfigurationGenerator, ConfigurationModifier

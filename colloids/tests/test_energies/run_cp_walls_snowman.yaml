@@ -14,13 +14,13 @@ debye_length: !Quantity
 depletant_radius: null
 depletion_phi: null
 dielectric_constant: 80.0
+electrostatic_radius_average: harmonic
 epsilon: !Quantity
     unit: kilojoule/mole
     value: 2.477709860209665  # 1 k_B T
 final_configuration_gsd_filename: final_frame.gsd
-final_configuration_xyz_filename: final_frame.xyz
 gravitational_acceleration: null
-initial_configuration: initial_frame_snowman.xyz
+initial_configuration: initial_frame_snowman.gsd
 integrator: LangevinIntegrator
 integrator_parameters:
   frictionCoeff: !Quantity
@@ -32,53 +32,16 @@ integrator_parameters:
     value: 0.015
   temperature: !Copy
     key: potential_temperature
-masses:
-  N: !Quantity
-    unit: dalton
-    value: 0.970876
-  P: !Quantity
-    unit: dalton
-    value: 1.0
-  NN: !Quantity
-    unit: dalton
-    value: 0.230059
 minimize_energy_initially: false
 particle_density: null
 platform_name: Reference
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0
-radii:
-  N: !Quantity
-    unit: nanometer
-    value: 101.0
-  P: !Quantity
-    unit: nanometer
-    value: 102.0
-  NN: !Quantity
-    unit: nanometer
-    value: 62.5
 run_steps: 0
-snowman_bond_types:
-  N: NN
-snowman_distances:
-  N: !Quantity
-    unit: nanometer
-    value: 101.0
-snowman_seed: 3
 state_data_filename: state_data.csv
 state_data_interval: 5000
-substrate_type: null
-surface_potentials:
-  N: !Quantity
-    unit: millivolt
-    value: -40.0
-  P: !Quantity
-    unit: millivolt
-    value: 50.0
-  NN: !Quantity
-    unit: millivolt
-    value: -40.0
+steric_radius_average: arithmetic
 trajectory_filename: trajectory.gsd
 trajectory_interval: 500000
 update_reporter: null
@@ -86,9 +49,6 @@ update_reporter_parameters: null
 use_depletion: false
 use_gravity: false
 use_log: false
-use_snowman: true
-use_substrate: false
-use_tabulated: false
 velocity_seed: null
 wall_directions:
   - true

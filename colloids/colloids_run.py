@@ -1,25 +1,20 @@
 import argparse
 import inspect
-import itertools
 import sys
 from typing import Sequence
-import MDAnalysis.analysis.distances
-import numpy as np
-import numpy.random as npr
-import numpy.typing as npt
+import warnings
+import gsd.hoomd
 import openmm
 from openmm import app
-from openmm import unit
-from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ColloidPotentialsTabulated,
-                      ShiftedLennardJonesWalls, DepletionPotential, Gravity)
+from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
+                      DepletionPotential, Gravity)
 from colloids.gsd_reporter import GSDReporter
-from colloids.helper_functions import (generate_fibonacci_sphere_grid_points, read_initial_file, write_gsd_file,
-                                       write_xyz_file)
+from colloids.helper_functions import get_cell_from_box, read_gsd_file, write_gsd_file
 import colloids.integrators as integrators
 from colloids.run_parameters import RunParameters
-from colloids.substrate import substrate_positions_hexagonal
 from colloids.status_reporter import StatusReporter
 import colloids.update_reporters as update_reporters
+from colloids.units import electric_potential_unit, length_unit
 
 
 class ExampleAction(argparse.Action):
@@ -34,39 +29,79 @@ class ExampleAction(argparse.Action):
         parser.exit()
 
 
-def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt.NDArray[float],
-                      positions: npt.NDArray[float]) -> (app.Simulation, npt.NDArray[float]):
+def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
+    """Check the frame and the run parameters."""
+    for diameter in frame.particles.diameter:
+        if not diameter > 0.0:
+            raise ValueError("Every diameter must be greater than zero.")
+    for mass in frame.particles.mass:
+        if not mass >= 0.0:
+            raise ValueError("Every mass must be greater than or equal to zero.")
+    for constraint_value in frame.constraints.value:
+        if not constraint_value > 0.0:
+            raise ValueError("Every constraint distance must be greater than zero.")
+
+    if any(parameters.wall_directions):
+        # Check for orthogonal box vectors if walls should be included.
+        if not all(a == 0.0 for a in frame.configuration.box[3:]):
+            raise ValueError("If any wall is included, the box vectors must be parallel to the coordinate axes.")
+        # If not all walls are present, the box of OpenMM needs to be enlarged because OpenMM will use periodic
+        # boundaries, and we do not want to let particles interact through the walls. The enlargement of the box does
+        # currently not consider the depletant radius, which is why it should be small enough.
+        if not all(parameters.wall_directions):
+            if parameters.use_depletion:
+                if (parameters.depletant_radius
+                        > (parameters.cutoff_factor * parameters.debye_length - 2.0 * parameters.brush_length) / 2.0):
+                    raise ValueError("The depletant radius is too large for the cutoff factor and brush length when "
+                                     "partial walls are included (r_d <= (cutoff_factor * lambda_D - 2 * L) / 2)")
+
+    if parameters.use_depletion:
+        assert (parameters.depletant_radius is not None and parameters.depletant_radius.value_in_unit(length_unit) > 0.0)
+        for diameter in frame.particles.diameter:
+            if parameters.depletant_radius.value_in_unit(length_unit) / (diameter / 2.0) > 0.1547:
+                warnings.warn("Size ratio of depletant to colloid particles is too large. "
+                              "Analytical computation of depletion potential may be invalid."
+                              "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
+                              "pp 10079 - 10106.")
+    use_substrate = any(mass == 0.0 for mass in frame.particles.mass)
+    if use_substrate:
+        if not all(parameters.wall_directions):
+            raise ValueError("A substrate can only be used if all walls are active.")
+
+
+def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.Simulation:
+    radii = frame.particles.diameter / 2.0 * length_unit
+    surface_potentials = frame.particles.charge * electric_potential_unit
+
     # ----------------------------------- Set up system and parameters. ------------------------------------------------
     topology = app.topology.Topology()
     chain = topology.addChain()
     residue = topology.addResidue("res", chain)
 
     atoms = []
-    for t in types:
-        atoms.append(topology.addAtom(t, None, residue))
+    for type_id in frame.particles.typeid:
+        atoms.append(topology.addAtom(frame.particles.types[type_id], None, residue))
 
     system = openmm.System()
 
+    cell = get_cell_from_box(frame.configuration.box)
     include_walls = any(parameters.wall_directions)
     all_walls = all(parameters.wall_directions)
     if include_walls:
         box_vector_one = cell[0]
         box_vector_two = cell[1]
         box_vector_three = cell[2]
-        if not (box_vector_one[1] == 0.0 and box_vector_one[2] == 0.0 and
+        assert (box_vector_one[1] == 0.0 and box_vector_one[2] == 0.0 and
                 box_vector_two[0] == 0.0 and box_vector_two[2] == 0.0 and
-                box_vector_three[0] == 0.0 and box_vector_three[1] == 0.0):
-            raise ValueError("If any wall is included, the box vectors must be parallel to the coordinate axes.")
-        wall_distances = (box_vector_one[0] * (unit.nano * unit.meter) if parameters.wall_directions[0] else None,
-                          box_vector_two[1] * (unit.nano * unit.meter) if parameters.wall_directions[1] else None,
-                          box_vector_three[2] * (unit.nano * unit.meter) if parameters.wall_directions[2] else None)
+                box_vector_three[0] == 0.0 and box_vector_three[1] == 0.0)
+        wall_distances = (box_vector_one[0] * length_unit if parameters.wall_directions[0] else None,
+                          box_vector_two[1] * length_unit if parameters.wall_directions[1] else None,
+                          box_vector_three[2] * length_unit if parameters.wall_directions[2] else None)
         final_cell = cell.copy()
         if not all_walls:
-            if parameters.use_depletion:
-                if (parameters.depletant_radius
-                        > (parameters.cutoff_factor * parameters.debye_length - 2.0 * parameters.brush_length) / 2.0):
-                    raise ValueError("the depletant radius is too large for the cutoff factor and brush length when "
-                                     "partial walls are included (r_d <= (cutoff_factor * lambda_D - 2 * L) / 2)")
+            assert (not parameters.use_depletion
+                    or parameters.depletant_radius
+                    > (parameters.cutoff_factor * parameters.debye_length - 2.0 * parameters.brush_length) / 2.0)
             for index, wall_direction in enumerate(parameters.wall_directions):
                 if wall_direction:
                     # The shifted Lennard Jones walls diverge at distance r = radius - 1 from the location of the wall,
@@ -77,9 +112,8 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
                     # through the walls, we thus increase the length of the periodic box vectors (not the wall) by
                     # 2 * (radius_max - radius_min) + 2 + cutoff_factor * debye_length.
                     final_cell[index][index] += \
-                        (2.0 * (max(parameters.radii.values()) - min(parameters.radii.values()))
-                         + 2.0 * (unit.nano * unit.meter)
-                         + parameters.cutoff_factor * parameters.debye_length).value_in_unit(unit.nano * unit.meter)
+                        (2.0 * (max(radii) - min(radii)) + 2.0 * length_unit
+                         + parameters.cutoff_factor * parameters.debye_length).value_in_unit(length_unit)
     else:
         wall_distances = None
         final_cell = cell
@@ -89,6 +123,9 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
 
+    # Substrate is detected by immobile particles with mass 0.0.
+    use_substrate = any(mass == 0.0 for mass in frame.particles.mass)
+
     # TODO: Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
 
@@ -97,77 +134,18 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     potentials_parameters = ColloidPotentialsParameters(
         brush_density=parameters.brush_density, brush_length=parameters.brush_length,
         debye_length=parameters.debye_length, temperature=parameters.potential_temperature,
-        dielectric_constant=parameters.dielectric_constant
-    )
-
-    # ------------------------------------ Create additional particles. ------------------------------------------------
-    snowman_positions = []
-    snowman_in_initial_configuration = False
-    if parameters.use_snowman:
-        if any(v in types for v in parameters.snowman_bond_types.values()):
-            snowman_in_initial_configuration = True
-            if not all(v in types for v in parameters.snowman_bond_types.values()):
-                raise ValueError("If one snowman head type is in the initial configuration, all snowman bond types "
-                                 "must be present.")
-            print("[INFO] Snowman head types are present in the initial configuration.")
-        else:
-            snowman_in_initial_configuration = False
-            if parameters.snowman_seed is not None and parameters.snowman_seed > 0:
-                npr.seed(parameters.snowman_seed)
-            nanometer = unit.nano * unit.meter
-            for i, t in enumerate(types):
-                if t in parameters.snowman_bond_types:
-                    snowman_type = parameters.snowman_bond_types[t]
-                    snowman_atom = topology.addAtom(snowman_type, None, residue)
-                    topology.addBond(atoms[i], snowman_atom)
-                    offset = list(generate_fibonacci_sphere_grid_points(
-                        1, parameters.snowman_distances[t].value_in_unit(nanometer),
-                        parameters.snowman_seed is None or parameters.snowman_seed > 0))[0]
-                    assert abs(np.linalg.norm(offset) - parameters.snowman_distances[t].value_in_unit(nanometer)) < 1.0e-12
-                    snowman_positions.append(positions[i] + offset)
-                else:
-                    snowman_positions.append(None)
-
-    substrate_positions = []
-    substrate_in_initial_configuration = False
-    if parameters.use_substrate:
-        assert all_walls
-        if parameters.substrate_type in types:
-            print("[INFO] Substrate type is present in the initial configuration.")
-            substrate_in_initial_configuration = True
-        else:
-            substrate_in_initial_configuration = False
-            substrate_positions = substrate_positions_hexagonal(parameters.radii[parameters.substrate_type], cell)
-            for _ in substrate_positions:
-                # Setting the mass to zero tells the integrator that the particle is immobile.
-                # See http://docs.openmm.org/7.1.0/api-python/generated/simtk.openmm.openmm.System.html.
-                topology.addAtom(parameters.substrate_type, None, residue)
+        dielectric_constant=parameters.dielectric_constant)
 
     # ---------------------------------------- Create all forces. ------------------------------------------------------
-    if parameters.use_tabulated:
-        # TODO: Maybe generalize tabulated potentials to more than two types.
-        # Use a dictionary instead of a set to preserve the order of the types.
-        # See https://stackoverflow.com/questions/1653970/does-python-have-an-ordered-set
-        # Works since Python 3.7.
-        set_of_types = list(dict.fromkeys(types))
-        if not len(set_of_types) == 2:
-            raise ValueError("Tabulated potentials only supports two types.")
-        first_type = set_of_types.pop()
-        second_type = set_of_types.pop()
-        colloid_potentials = ColloidPotentialsTabulated(
-            radius_one=parameters.radii[first_type], radius_two=parameters.radii[second_type],
-            surface_potential_one=parameters.surface_potentials[first_type],
-            surface_potential_two=parameters.surface_potentials[second_type],
-            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
-            cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls)
-    else:
-        colloid_potentials = ColloidPotentialsAlgebraic(
-            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
-            cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls)
+    colloid_potentials = ColloidPotentialsAlgebraic(
+        colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
+        cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls,
+        steric_radius_average=parameters.steric_radius_average,
+        electrostatic_radius_average=parameters.electrostatic_radius_average)
 
     if include_walls:
         slj_walls = ShiftedLennardJonesWalls(wall_distances, parameters.epsilon, parameters.alpha,
-                                             parameters.wall_directions, parameters.use_substrate)
+                                             parameters.wall_directions, use_substrate)
     else:
         slj_walls = None
 
@@ -186,129 +164,32 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     else:
         gravitational_potential = None
 
-    # ------------------------------------- Add all particles to the system. -------------------------------------------
-    for t in types:
-        system.addParticle(parameters.masses[t])
+    # --------------------------- Add all particles and constraints to the system. -------------------------------------
+    for mass in frame.particles.mass:
+        system.addParticle(mass)
 
-    snowman_indices = []
-    if parameters.use_snowman and snowman_in_initial_configuration:
-        assert snowman_positions == []
-        snowman_indices = [None for _ in range(len(types))]
-        for snowman_body_type, snowman_head_type in parameters.snowman_bond_types.items():
-            snowman_body_indices_in_system = [i for i, t in enumerate(types) if t == snowman_body_type]
-            snowman_head_indices_in_system = [i for i, t in enumerate(types) if t == snowman_head_type]
-            snowman_body_positions = np.array([positions[i] for i in snowman_body_indices_in_system])
-            snowman_head_positions = np.array([positions[i] for i in snowman_head_indices_in_system])
-            assert len(snowman_body_indices_in_system) == len(snowman_head_indices_in_system)
-            distances = MDAnalysis.analysis.distances.distance_array(
-                snowman_body_positions, snowman_head_positions)
-            found_snowman_indices = np.full(len(snowman_body_positions), -1, dtype=int)
-            for body_index in range(len(snowman_body_positions)):
-                relevant_distances = distances[body_index]
-                relevant_head_indices = np.nonzero(
-                    np.abs(relevant_distances
-                           - parameters.snowman_distances[snowman_body_type].value_in_unit(unit.nanometer)) < 1.0e-1)[0]
-                assert len(relevant_head_indices) == 1
-                head_index = relevant_head_indices[0]
-                system.addConstraint(snowman_body_indices_in_system[body_index],
-                                     snowman_head_indices_in_system[head_index],
-                                     parameters.snowman_distances[snowman_body_type])
-                snowman_indices[snowman_body_indices_in_system[body_index]] = snowman_head_indices_in_system[head_index]
-                found_snowman_indices[body_index] = relevant_head_indices[0]
-            assert np.all(np.sort(found_snowman_indices) == np.arange(len(snowman_body_positions)))
-
-    if parameters.use_snowman and not snowman_in_initial_configuration:
-        assert len(types) == len(snowman_positions)
-        for i, (t, snowman_position) in enumerate(zip(types, snowman_positions)):
-            if snowman_position is not None:
-                snowman_type = parameters.snowman_bond_types[t]
-                snowman_index = system.addParticle(parameters.masses[snowman_type])
-                snowman_indices.append(snowman_index)
-                system.addConstraint(i, snowman_index, parameters.snowman_distances[t])
-            else:
-                snowman_indices.append(None)
-
-    if parameters.use_substrate and substrate_in_initial_configuration:
-        assert substrate_positions == []
-
-    if parameters.use_substrate and not substrate_in_initial_configuration:
-        for _ in substrate_positions:
-            system.addParticle(parameters.masses[parameters.substrate_type])
+    for i in range(frame.constraints.N):
+        if not len(frame.constraints.group[i]) == 2:
+            raise ValueError("Every constraint must have exactly two particles.")
+        system.addConstraint(frame.constraints.group[i][0], frame.constraints.group[i][1], frame.constraints.value[i])
 
     # ------------------------------------- Add all particles to the forces. -------------------------------------------
     # Be careful to add the particles in the same order as to the system.
-    for i, t in enumerate(types):
-        colloid_potentials.add_particle(radius=parameters.radii[t],
-                                        surface_potential=parameters.surface_potentials[t],
-                                        substrate_flag=(t == parameters.substrate_type))
-        if include_walls:
-            if t != parameters.substrate_type:
-                slj_walls.add_particle(index=i, radius=parameters.radii[t])
+    for i in range(frame.particles.N):
+        is_substrate = frame.particles.mass[i] == 0.0
+        colloid_potentials.add_particle(radius=radii[i], surface_potential=surface_potentials[i],
+                                        substrate_flag=is_substrate)
+        if include_walls and not is_substrate:
+            slj_walls.add_particle(index=i, radius=radii[i])
         if parameters.use_depletion:
-            depletion_potential.add_particle(radius=parameters.radii[t],
-                                             substrate_flag=(t == parameters.substrate_type))
-        if parameters.use_gravity:
-            if t != parameters.substrate_type:
-                gravitational_potential.add_particle(index=i, radius=parameters.radii[t])
+            depletion_potential.add_particle(radius=radii[i], substrate_flag=is_substrate)
+        if parameters.use_gravity and not is_substrate:
+            gravitational_potential.add_particle(index=i, radius=radii[i])
 
-    if parameters.use_snowman and snowman_in_initial_configuration:
-        for body_index, head_index in enumerate(snowman_indices):
-            if head_index is not None:
-                colloid_potentials.add_exclusion(body_index, head_index)
-                if parameters.use_depletion:
-                    depletion_potential.add_exclusion(body_index, head_index)
-
-    if parameters.use_snowman and not snowman_in_initial_configuration:
-        assert len(types) == len(snowman_positions) == len(snowman_indices)
-        for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
-            if snowman_position is not None:
-                assert snowman_index is not None
-                snowman_type = parameters.snowman_bond_types[t]
-                colloid_potentials.add_particle(radius=parameters.radii[snowman_type],
-                                                surface_potential=parameters.surface_potentials[snowman_type],
-                                                substrate_flag=False)
-                colloid_potentials.add_exclusion(i, snowman_index)
-            else:
-                assert snowman_index is None
-
-        if include_walls:
-            for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
-                if snowman_position is not None:
-                    assert snowman_index is not None
-                    slj_walls.add_particle(index=snowman_index,
-                                           radius=parameters.radii[parameters.snowman_bond_types[t]])
-                else:
-                    assert snowman_index is None
-
+    for i in range(frame.constraints.N):
+        colloid_potentials.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
         if parameters.use_depletion:
-            for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
-                if snowman_position is not None:
-                    assert snowman_index is not None
-                    snowman_type = parameters.snowman_bond_types[t]
-                    depletion_potential.add_particle(radius=parameters.radii[snowman_type], substrate_flag=False)
-                    depletion_potential.add_exclusion(i, snowman_index)
-                else:
-                    assert snowman_index is None
-
-        if parameters.use_gravity:
-            for i, (t, snowman_position, snowman_index) in enumerate(zip(types, snowman_positions, snowman_indices)):
-                if snowman_position is not None:
-                    assert snowman_index is not None
-                    gravitational_potential.add_particle(index=snowman_index,
-                                                         radius=parameters.radii[parameters.snowman_bond_types[t]])
-                else:
-                    assert snowman_index is None
-
-    if parameters.use_substrate and not substrate_in_initial_configuration:
-        # No need to add the substrate particles to the wall and gravitational potential as they are immobile.
-        for _ in substrate_positions:
-            colloid_potentials.add_particle(radius=parameters.radii[parameters.substrate_type],
-                                            surface_potential=parameters.surface_potentials[parameters.substrate_type],
-                                            substrate_flag=True)
-        if parameters.use_depletion:
-            for _ in substrate_positions:
-                depletion_potential.add_particle(radius=parameters.radii[parameters.substrate_type],
-                                                 substrate_flag=True)
+            depletion_potential.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
 
     # -------------------------------------- Add all forces to the system. ---------------------------------------------
     for force in colloid_potentials.yield_potentials():
@@ -340,8 +221,7 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
                 cutoff_distance = force.getCutoffDistance()
                 cutoff_distance_index = -1
                 for other_cutoff_index in range(len(cutoffs)):
-                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(
-                            unit.nano * unit.meter)) < 1.0e-6:
+                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(length_unit)) < 1.0e-6:
                         cutoff_distance_index = other_cutoff_index
                 if cutoff_distance_index == -1:
                     cutoffs.append(cutoff_distance)
@@ -356,16 +236,16 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     else:
         simulation = app.Simulation(topology, system, integrator, platform)
 
-    extra_positions = np.array([p for p in itertools.chain(snowman_positions, substrate_positions) if p is not None])
-    return simulation, extra_positions
+    return simulation
 
 
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
-                     total_number_steps: int, cell: npt.NDArray[float]) -> None:
+                     total_number_steps: int, initial_frame: gsd.hoomd.Frame) -> None:
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
-                                            parameters.radii, parameters.surface_potentials, simulation,
+                                            initial_frame.particles.diameter / 2.0 * length_unit,
+                                            initial_frame.particles.charge * electric_potential_unit, simulation,
                                             append_file=append_file,
-                                            cell=cell * (unit.nano * unit.meter)))
+                                            cell=get_cell_from_box(initial_frame.configuration.box) * length_unit))
     simulation.reporters.append(StatusReporter(max(1, total_number_steps // 100), total_number_steps,
                                                desc="Production"))
     simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
@@ -398,14 +278,14 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
         raise ValueError("The YAML file must have the .yaml extension.")
 
     parameters = RunParameters.from_yaml(args.yaml_file)
-    parameters.check_types_of_initial_configuration()
 
-    types, positions, cell = read_initial_file(parameters.initial_configuration)
+    frame = read_gsd_file(parameters.initial_configuration, parameters.frame_index)
 
-    simulation, extra_positions = set_up_simulation(parameters, types, cell, positions)
+    check_frame(parameters, frame)
 
-    simulation.context.setPositions(np.concatenate((positions, extra_positions)) if len(extra_positions) > 0
-                                    else positions)
+    simulation = set_up_simulation(parameters, frame)
+
+    simulation.context.setPositions(frame.particles.position)
     if parameters.velocity_seed is not None:
         simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
                                                       parameters.velocity_seed)
@@ -427,7 +307,7 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
     # Reset the current step to zero after the equilibration.
     simulation.currentStep = 0
 
-    set_up_reporters(parameters, simulation, False, parameters.run_steps, cell)
+    set_up_reporters(parameters, simulation, False, parameters.run_steps, frame)
 
     simulation.step(parameters.run_steps)
 
@@ -435,11 +315,10 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
     # TODO: CHECK ALL SURFACE SEPARATIONS
 
     if parameters.final_configuration_gsd_filename is not None:
-        write_gsd_file(parameters.final_configuration_gsd_filename, simulation, parameters.radii,
-                       parameters.surface_potentials, cell * (unit.nano * unit.meter))
-
-    if parameters.final_configuration_xyz_filename is not None:
-        write_xyz_file(parameters.final_configuration_xyz_filename, simulation, cell * (unit.nano * unit.meter))
+        write_gsd_file(parameters.final_configuration_gsd_filename, simulation,
+                       frame.particles.diameter / 2.0 * length_unit,
+                       frame.particles.charge * electric_potential_unit,
+                       get_cell_from_box(frame.configuration.box) * length_unit)
 
     return simulation
 

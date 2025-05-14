@@ -5,6 +5,7 @@ import numpy.typing as npt
 from openmm import Continuous1DFunction, CustomNonbondedForce, unit
 from colloids.abstracts import ColloidPotentialsAbstract
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
+from colloids.units import electric_potential_unit, energy_unit, length_unit
 
 
 class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
@@ -12,7 +13,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
     This class sets up the steric and electrostatic pair potentials between colloids in a solution using the
     CustomNonbondedForces class of openmm with tabulated functions.
 
-    The potentials are given in Hueckel, Hocky, Palacci & Sacanna, Nature 580, 487--490 (2020)
+    The potentials are based on the models described in Hueckel, Hocky, Palacci & Sacanna, Nature 580, 487--490 (2020)
     (see https://doi.org/10.1038/s41586-020-2205-0). Any references to equations or symbols in the code refer to this
     paper.
 
@@ -36,7 +37,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
     The cutoffs can be set to be periodic or non-periodic.
 
     Note that the steric potential from the Alexander-de Gennes polymer brush model uses the mixing rule
-    r = r_1 + r_2 / 2.0 for the prefactor [see eq. (1)], whereas the electrostatic potential from DLVO theory uses
+    r = (r_1 + r_2) / 2.0 for the prefactor [see eq. (1)], whereas the electrostatic potential from DLVO theory uses
     r = 2.0 / (1.0 / r_1 + 1.0 / r_2) for the prefactor.
 
     :param radius_one:
@@ -90,25 +91,25 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         super().__init__(colloid_potentials_parameters, periodic_boundary_conditions)
         if not cutoff_factor > 0.0:
             raise ValueError("The cutoff factor must be greater than zero.")
-        if not radius_one.unit.is_compatible(self._nanometer):
+        if not radius_one.unit.is_compatible(length_unit):
             raise TypeError("argument radius_one must have a unit that is compatible with nanometer")
-        if not radius_one.value_in_unit(self._nanometer) > 0.0:
+        if not radius_one.value_in_unit(length_unit) > 0.0:
             raise ValueError("argument radius_one must have a value greater than zero")
-        if not radius_two.unit.is_compatible(self._nanometer):
+        if not radius_two.unit.is_compatible(length_unit):
             raise TypeError("argument radius_two must have a unit that is compatible with nanometer")
-        if not radius_two.value_in_unit(self._nanometer) > 0.0:
+        if not radius_two.value_in_unit(length_unit) > 0.0:
             raise ValueError("argument radius_two must have a value greater than zero")
-        if not surface_potential_one.unit.is_compatible(self._millivolt):
+        if not surface_potential_one.unit.is_compatible(electric_potential_unit):
             raise TypeError("argument surface_potential_one must have a unit that is compatible with millivolts")
-        if not surface_potential_two.unit.is_compatible(self._millivolt):
+        if not surface_potential_two.unit.is_compatible(electric_potential_unit):
             raise TypeError("argument surface_potential_two must have a unit that is compatible with millivolts")
         if surface_potential_one == surface_potential_two:
             raise ValueError("the surface potentials of the two types of colloids must be different")
 
-        self._radius_one = radius_one.in_units_of(self._nanometer)
-        self._radius_two = radius_two.in_units_of(self._nanometer)
-        self._surface_potential_one = surface_potential_one.in_units_of(self._millivolt)
-        self._surface_potential_two = surface_potential_two.in_units_of(self._millivolt)
+        self._radius_one = radius_one.in_units_of(length_unit)
+        self._radius_two = radius_two.in_units_of(length_unit)
+        self._surface_potential_one = surface_potential_one.in_units_of(electric_potential_unit)
+        self._surface_potential_two = surface_potential_two.in_units_of(electric_potential_unit)
         self._use_log = use_log
         self._cutoff_factor = cutoff_factor
         self._maximum_surface_separation = self._cutoff_factor * self._parameters.debye_length
@@ -124,7 +125,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         Return the steric potential from the Alexander-de Gennes polymer brush model for the given surface-to-surface
         separations.
         """
-        double_brush_length = 2.0 * self._parameters.brush_length.value_in_unit(self._nanometer)
+        double_brush_length = 2.0 * self._parameters.brush_length.value_in_unit(length_unit)
         h_over_double_brush_length = h_values / double_brush_length
         double_brush_length_over_h = double_brush_length / h_values
         return prefactor * np.where(h_values <= double_brush_length,
@@ -135,7 +136,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
     def _electrostatic_potential(self, prefactor: float, h_values: npt.NDArray[float]) -> npt.NDArray[float]:
         """Return the electrostatic potential from DLVO theory for the given surface-to-surface separations."""
-        debye_length = self._parameters.debye_length.value_in_unit(self._nanometer)
+        debye_length = self._parameters.debye_length.value_in_unit(length_unit)
         if self._use_log:
             return prefactor * np.log(1.0 + np.exp(-h_values / debye_length))
         else:
@@ -144,35 +145,35 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
     def _set_up_potentials(self) -> (CustomNonbondedForce, CustomNonbondedForce, CustomNonbondedForce):
         """Set up the CustomNonbondedForce instances based on tabulated functions."""
         r_values_11 = np.linspace(
-            1.00005 * 2.0 * self._radius_one.value_in_unit(self._nanometer),
-            (2.0 * self._radius_one + self._maximum_surface_separation).value_in_unit(self._nanometer),
+            1.00005 * 2.0 * self._radius_one.value_in_unit(length_unit),
+            (2.0 * self._radius_one + self._maximum_surface_separation).value_in_unit(length_unit),
             num=self._number_samples)
         r_values_22 = np.linspace(
-            1.00005 * 2.0 * self._radius_two.value_in_unit(self._nanometer),
-            (2.0 * self._radius_two + self._maximum_surface_separation).value_in_unit(self._nanometer),
+            1.00005 * 2.0 * self._radius_two.value_in_unit(length_unit),
+            (2.0 * self._radius_two + self._maximum_surface_separation).value_in_unit(length_unit),
             num=self._number_samples)
         r_values_12 = np.linspace(
-            (1.00005 * (self._radius_one + self._radius_two)).value_in_unit(self._nanometer),
-            ((self._radius_one + self._radius_two) + self._maximum_surface_separation).value_in_unit(self._nanometer),
+            (1.00005 * (self._radius_one + self._radius_two)).value_in_unit(length_unit),
+            ((self._radius_one + self._radius_two) + self._maximum_surface_separation).value_in_unit(length_unit),
             num=self._number_samples)
 
-        h_values_11 = r_values_11 - 2.0 * self._radius_one.value_in_unit(self._nanometer)
-        h_values_22 = r_values_22 - 2.0 * self._radius_two.value_in_unit(self._nanometer)
-        h_values_12 = r_values_12 - (self._radius_one + self._radius_two).value_in_unit(self._nanometer)
+        h_values_11 = r_values_11 - 2.0 * self._radius_one.value_in_unit(length_unit)
+        h_values_22 = r_values_22 - 2.0 * self._radius_two.value_in_unit(length_unit)
+        h_values_12 = r_values_12 - (self._radius_one + self._radius_two).value_in_unit(length_unit)
 
         steric_prefactor_11 = (
                 unit.BOLTZMANN_CONSTANT_kB * self._parameters.temperature * 16.0 * math.pi * self._radius_one *
                 (self._parameters.brush_length ** 2) * (self._parameters.brush_density ** (3 / 2)) / 35.0
-                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
+                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(energy_unit)
         steric_prefactor_22 = (
                 unit.BOLTZMANN_CONSTANT_kB * self._parameters.temperature * 16.0 * math.pi * self._radius_two *
                 (self._parameters.brush_length ** 2) * (self._parameters.brush_density ** (3 / 2)) / 35.0
-                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
+                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(energy_unit)
         steric_prefactor_12 = (
                 unit.BOLTZMANN_CONSTANT_kB * self._parameters.temperature * 16.0 * math.pi *
                 (self._radius_one + self._radius_two) / 2.0 * (self._parameters.brush_length ** 2) *
                 (self._parameters.brush_density ** (3 / 2)) / 35.0
-                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
+                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(energy_unit)
 
         steric_potential_11 = self._steric_potential(steric_prefactor_11, h_values_11)
         steric_potential_22 = self._steric_potential(steric_prefactor_22, h_values_22)
@@ -181,16 +182,16 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         electrostatic_prefactor_11 = (
                 2.0 * math.pi * self._parameters.VACUUM_PERMITTIVITY * self._parameters.dielectric_constant
                 * self._radius_one * self._surface_potential_one * self._surface_potential_one
-                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
+                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(energy_unit)
         electrostatic_prefactor_22 = (
                 2.0 * math.pi * self._parameters.VACUUM_PERMITTIVITY * self._parameters.dielectric_constant
                 * self._radius_two * self._surface_potential_two * self._surface_potential_two
-                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
+                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(energy_unit)
         electrostatic_prefactor_12 = (
                 2.0 * math.pi * self._parameters.VACUUM_PERMITTIVITY * self._parameters.dielectric_constant
                 * 2.0 / (1.0 / self._radius_one + 1.0 / self._radius_two)
                 * self._surface_potential_one * self._surface_potential_two
-                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole)
+                * unit.AVOGADRO_CONSTANT_NA).value_in_unit(energy_unit)
 
         electrostatic_potential_11 = self._electrostatic_potential(electrostatic_prefactor_11, h_values_11)
         electrostatic_potential_22 = self._electrostatic_potential(electrostatic_prefactor_22, h_values_22)
@@ -212,7 +213,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         potential_11.setCutoffDistance(r_values_11[-1])
         potential_11.setUseSwitchingFunction(True)
         potential_11.setSwitchingDistance((self._switch_off_distance
-                                          + 2.0 * self._radius_one).value_in_unit(self._nanometer))
+                                           + 2.0 * self._radius_one).value_in_unit(length_unit))
         potential_11.setUseLongRangeCorrection(False)
 
         potential_22 = CustomNonbondedForce("tabulated_function_22(r)")
@@ -224,7 +225,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         potential_22.setCutoffDistance(r_values_22[-1])
         potential_22.setUseSwitchingFunction(True)
         potential_22.setSwitchingDistance((self._switch_off_distance
-                                          + 2.0 * self._radius_two).value_in_unit(self._nanometer))
+                                          + 2.0 * self._radius_two).value_in_unit(length_unit))
         potential_22.setUseLongRangeCorrection(False)
 
         potential_12 = CustomNonbondedForce("tabulated_function_12(r)")
@@ -236,7 +237,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         potential_12.setCutoffDistance(r_values_12[-1])
         potential_12.setUseSwitchingFunction(True)
         potential_12.setSwitchingDistance((self._switch_off_distance
-                                          + self._radius_one + self._radius_two).value_in_unit(self._nanometer))
+                                          + self._radius_one + self._radius_two).value_in_unit(length_unit))
         potential_12.setUseLongRangeCorrection(False)
 
         return potential_11, potential_22, potential_12
@@ -345,6 +346,6 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
 
 if __name__ == '__main__':
-    ColloidPotentialsTabulated(radius_one=105 * (unit.nano * unit.meter), radius_two=95.0 * (unit.nano * unit.meter),
-                               surface_potential_one=44.0 * (unit.milli * unit.volt),
-                               surface_potential_two=-54.0 * (unit.milli * unit.volt))
+    ColloidPotentialsTabulated(radius_one=105 * length_unit, radius_two=95.0 * length_unit,
+                               surface_potential_one=44.0 * electric_potential_unit,
+                               surface_potential_two=-54.0 * electric_potential_unit)

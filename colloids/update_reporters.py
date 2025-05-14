@@ -1,8 +1,11 @@
 from abc import abstractmethod, ABC
 import math
 import warnings
+import freud.cluster
+import numpy as np
 import openmm.app
 from openmm import unit
+from colloids.units import length_unit, temperature_unit
 
 
 class UpdateReporterAbstract(ABC):
@@ -78,7 +81,7 @@ class UpdateReporterAbstract(ABC):
             raise ValueError(f"The global parameter {self._global_parameter_name} is not in the simulation context.")
         self._file = open(filename, "a" if append_file else "w")
         if not append_file:
-            print(f"timestep,{self._global_parameter_name}", file=self._file)
+            print(f"timestep,{self._global_parameter_name}", file=self._file, flush=True)
         self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
         # Check if the start value of the global parameter matches the value in the OpenMM simulation.
         # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
@@ -154,7 +157,7 @@ class UpdateReporterAbstract(ABC):
         step = simulation.currentStep
         simulation.context.setParameter(self._global_parameter_name, new_value)
         if step % self._print_interval == 0:
-            print(f"{step},{new_value}", file=self._file)
+            print(f"{step},{new_value}", file=self._file, flush=True)
 
     def __del__(self) -> None:
         """Destructor of the UpdateReporter class."""
@@ -249,6 +252,224 @@ class RampUpdateReporter(UpdateReporterAbstract):
         old_value = simulation.context.getParameter(self._global_parameter_name)
         new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._final_update_step
         self.set_and_print(simulation, new_value)
+
+
+class RampTemperatureUpdateReporter(object):
+    def __init__(self, filename: str, update_interval: int, final_update_step: int, start_value: unit.Quantity,
+                 end_value: unit.Quantity, print_interval: int, simulation: openmm.app.Simulation,
+                 append_file: bool = False):
+        """Constructor of the RampTemperatureUpdateReporter class."""
+        if not filename.endswith(".csv"):
+            raise ValueError("The file must have the .csv extension.")
+        if not update_interval > 0:
+            raise ValueError("The update frequency must be greater than zero.")
+        if not final_update_step >= update_interval:
+            raise ValueError("The final update step must be greater than or equal to the update frequency.")
+        if not start_value.unit.is_compatible(temperature_unit):
+            raise TypeError("The start value must have a unit that is compatible with Kelvin.")
+        if not end_value.unit.is_compatible(temperature_unit):
+            raise TypeError("The end value must have a unit that is compatible with Kelvin.")
+        if not start_value.value_in_unit(temperature_unit) > 0.0:
+            raise ValueError("The start value must be greater than zero.")
+        if not end_value.value_in_unit(temperature_unit) > 0.0:
+            raise ValueError("The end value must be greater than zero.")
+        self._update_interval = update_interval
+        self._final_update_step = final_update_step
+        self._file = open(filename, "a" if append_file else "w")
+        if not append_file:
+            print(f"timestep,temperature", file=self._file, flush=True)
+        self._start_value = start_value.value_in_unit(temperature_unit)
+        self._end_value = end_value.value_in_unit(temperature_unit)
+        # Check if the start value of the global parameter matches the value in the OpenMM simulation.
+        # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
+        # the start value is not necessarily the same as the value in the OpenMM simulation.
+        if not print_interval > 0:
+            raise ValueError("The print frequency must be greater than zero.")
+        self._print_interval = print_interval
+        if (not append_file
+                and abs(self._start_value
+                        - simulation.integrator.getTemperature().value_in_unit(temperature_unit)) > 1.0e-12):
+            warnings.warn("The start value of the temperature does not match the value in the OpenMM integrator.")
+            simulation.integrator.setTemperature(self._start_value)
+        if not append_file:
+            print(f"0,{self._start_value}", file=self._file)
+
+    # noinspection PyPep8Naming
+    def describeNextReport(self, simulation: openmm.app.Simulation) -> tuple[int, bool, bool, bool, bool, bool]:
+        """Get information about the next report this reporter will generate.
+
+        This method is called by OpenMM once this reporter is added to the list of reporters of a simulation.
+
+        :param simulation:
+            The simulation to generate a report for.
+        :type simulation: openmm.app.Simulation
+
+        :returns:
+            (Number of steps until next report,
+            Whether the next report requires positions (False),
+            Whether the next report requires velocities (False),
+            Whether the next report requires forces (False),
+            Whether the next report requires energies (False),
+            Whether positions should be wrapped to lie in a single periodic box (False))
+        :rtype: tuple[int, bool, bool, bool, bool, bool]
+        """
+        if simulation.currentStep >= self._final_update_step:
+            # 0 signals to not interrupt the simulation again.
+            return 0, False, False, False, False, False
+        steps = self._update_interval - simulation.currentStep % self._update_interval
+        return steps, False, False, False, False, False
+
+    def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
+        """
+        Linearly change the value of a global parameter during the simulation.
+
+        This function is called by OpenMM when the reporter should generate a report.
+
+        :param simulation:
+            The OpenMM simulation to generate a report for.
+        :type simulation: openmm.app.Simulation
+        :param state:
+            The current state of the OpenMM simulation.
+        :type state: openmm.State
+        """
+        old_value = simulation.integrator.getTemperature().value_in_unit(temperature_unit)
+        new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._final_update_step
+        step = simulation.currentStep
+        simulation.integrator.setTemperature(new_value)
+        if step % self._print_interval == 0:
+            print(f"{step},{new_value}", file=self._file, flush=True)
+
+    def __del__(self) -> None:
+        """Destructor of the UpdateReporter class."""
+        try:
+            self._file.close()
+        except AttributeError:
+            # If another error occurred, the '_file' attribute might not exist.
+            pass
+
+
+class RampUpdateReporterUntilCluster(UpdateReporterAbstract):
+    """
+    This class sets up a reporter to linearly change the value of a force-related global parameter in a ramp over the
+    course of an OpenMM simulation.
+
+    Both the start and end values of the global parameter are specified on initialization.
+
+    :param filename:
+        The name of the file to write to.
+        The filename must end with the .csv extension.
+    :type filename: str
+    :param update_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is updated.
+        The value must be greater than zero.
+    :type update_interval: int
+    :param final_update_step:
+        The final step at which the value of the global parameter will be updated.
+        The value must be greater than or equal to the update_interval.
+    :type final_update_step: int
+    :param global_parameter_name:
+        The name of the global parameter to be updated.
+        This must be one of the global parameters passed into any of the OpenMM Force objects.
+    :type global_parameter_name: str
+    :param start_value:
+        The start value of the global parameter.
+        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
+        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type start_value: unit.Quantity
+    :param end_value:
+        The end value of the global parameter.
+        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
+        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type end_value: unit.Quantity
+    :param print_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is printed
+        to the output .csv file.
+        The value must be greater than zero.
+    :type print_interval: int
+    :param cluster_size:
+        TODO
+    :type cluster_size: int
+    :param simulation:
+        The OpenMM simulation that this reporter will be added to.
+        The context of this OpenMM simulation must contain the parameter to be updated.
+    :type simulation: openmm.app.Simulation
+    :param append_file:
+        If True, open an existing csv file to append to. If False, create a new file possibly overwriting an already
+        existing file.
+        Defaults to False.
+    :type append_file: bool
+
+    :raises ValueError:
+        If the filename does not end with the .csv extension (via the abstract base class).
+        If the update_interval is not greater than zero (via the abstract base class).
+        If the print_interval is not greater than zero (via the abstract base class).
+        If the final_update_step is not greater than or equal to the update_interval (via the abstract base class).
+        If the global_parameter_name is not in the simulation context (via the abstract base class).
+        If the start and end values have incompatible units.
+    """
+
+    def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
+                 start_value: unit.Quantity, end_value: unit.Quantity, print_interval: int, check_interval: int,
+                 cluster_size: int, cutoff_distance: unit.Quantity, cell_length: unit.Quantity,
+                 simulation: openmm.app.Simulation, append_file: bool = False):
+        """Constructor of the LinearMonotonicUpdateReporter class."""
+        super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
+                         global_parameter_name=global_parameter_name, start_value=start_value,
+                         print_interval=print_interval, simulation=simulation, append_file=append_file)
+        if not start_value.unit.is_compatible(end_value.unit):
+            raise ValueError(f"The start and end values have incompatible units.")
+        if not check_interval > 0:
+            raise ValueError("The check frequency must be greater than zero.")
+        if not cluster_size > 0:
+            raise ValueError("The cluster size must be greater than zero.")
+        if not cutoff_distance.unit.is_compatible(length_unit):
+            raise TypeError("The cutoff distance must have a unit that is compatible with nanometers.")
+        if not cutoff_distance.value_in_unit(length_unit) > 0.0:
+            raise ValueError("The cutoff distance must be greater than zero.")
+        if not cell_length.unit.is_compatible(length_unit):
+            raise TypeError("The cell length must have a unit that is compatible with nanometers.")
+        if not cell_length.value_in_unit(length_unit) > 0.0:
+            raise ValueError("The cell length must be greater than zero.")
+        self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
+        self._check_interval = check_interval
+        self._cluster_size = cluster_size
+        self._cutoff_distance = cutoff_distance.value_in_unit(length_unit)
+        self._cell_length = cell_length.value_in_unit(length_unit)
+        self._cluster_reached = False
+
+    def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
+        """
+        Linearly change the value of a global parameter during the simulation.
+
+        This function is called by OpenMM when the reporter should generate a report.
+
+        :param simulation:
+            The OpenMM simulation to generate a report for.
+        :type simulation: openmm.app.Simulation
+        :param state:
+            The current state of the OpenMM simulation.
+        :type state: openmm.State
+        """
+        step = simulation.currentStep
+        if step % self._check_interval == 0 and not self._cluster_reached:
+            state = simulation.context.getState(getPositions=True)
+            positions = state.getPositions(asNumpy=True).value_in_unit(length_unit)
+            cluster = freud.cluster.Cluster()
+            # TODO: Change this to use the box from the simulation context, if necessary.
+            box = freud.box.Box(Lx=self._cell_length, Ly=self._cell_length, Lz=self._cell_length)
+            cluster.compute((box, positions), neighbors={'r_max': self._cutoff_distance, "exclude_ii": True})
+            unique, counts = np.unique(cluster.cluster_idx, return_counts=True)
+            biggest_cluster_size = counts.max()
+            if biggest_cluster_size >= self._cluster_size:
+                self._cluster_reached = True
+
+        old_value = simulation.context.getParameter(self._global_parameter_name)
+        if not self._cluster_reached:
+            new_value = old_value + (self._end_value - self._start_value) * self._update_interval / self._final_update_step
+            self.set_and_print(simulation, new_value)
+        else:
+            if step % self._print_interval == 0:
+                print(f"{step},{old_value}", file=self._file, flush=True)
 
 
 class TriangleUpdateReporter(UpdateReporterAbstract):

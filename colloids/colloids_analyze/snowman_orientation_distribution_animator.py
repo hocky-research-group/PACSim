@@ -100,9 +100,12 @@ class SnowmanOrientationDistributionAnimator(PlotterWithClusterIndex):
     _nanometer = unit.nano * unit.meter
 
     def __init__(self, working_directory: str, run_parameters: Sequence[LabeledRunParametersWithPath],
-                 cluster_index: Optional[int] = None, highlight_ids=Optional[Sequence[int]],
+                 snowman_body_type: str, snowman_head_type: str,
+                 cluster_index: Optional[int] = None, highlight_ids: Optional[Sequence[int]] = None,
                  start_frame: int = 0) -> None:
         super().__init__(working_directory, run_parameters, cluster_index)
+        self._snowman_body_type = snowman_body_type
+        self._snowman_head_type = snowman_head_type
         self._highlight_ids = highlight_ids
         self._start_frame = start_frame
 
@@ -112,9 +115,6 @@ class SnowmanOrientationDistributionAnimator(PlotterWithClusterIndex):
         plt.rcParams.update({"text.usetex": False})
 
         for index, rp in enumerate(self._run_parameters):
-            if not len(rp.run_parameters.snowman_bond_types) == 1:
-                raise ValueError("The number of snowman bond types must be exactly one.")
-
             # If run_parameters["parameters"].trajectory_filename is a complete path, the division operator of paths
             # only returns that complete path. Otherwise, this combines base_path and path.
             trajectory_path = rp.path / rp.run_parameters.trajectory_filename
@@ -126,11 +126,8 @@ class SnowmanOrientationDistributionAnimator(PlotterWithClusterIndex):
             cluster_map = self._get_cluster_map(trajectory_path, len(universe.atoms))
 
             # Find the snowman mapping in the first frame
-            snowman_body_type = list(rp.run_parameters.snowman_bond_types.keys())[0]
-            snowman_head_type = list(rp.run_parameters.snowman_bond_types.values())[0]
-            snowman_distance = rp.run_parameters.snowman_distances[snowman_body_type].value_in_unit(self._nanometer)
-            snowman_body_group = universe.select_atoms(f"name {snowman_body_type}")
-            snowman_head_group = universe.select_atoms(f"name {snowman_head_type}")
+            snowman_body_group = universe.select_atoms(f"name {self._snowman_body_type}")
+            snowman_head_group = universe.select_atoms(f"name {self._snowman_head_type}")
             if self._highlight_ids is not None:
                 highlight_body_indices = [-1 for _ in self._highlight_ids]
                 for i, atom in enumerate(snowman_body_group):
@@ -144,6 +141,8 @@ class SnowmanOrientationDistributionAnimator(PlotterWithClusterIndex):
                     assert snowman_body_group[found_index].index == self._highlight_ids[i]
             distances = MDAnalysis.analysis.distances.distance_array(
                 snowman_body_group.positions, snowman_head_group.positions)
+            snowman_distance = np.min(distances)
+            print(f"[INFO] Found snowman distance: {snowman_distance}")
             snowman_indices = np.zeros(len(snowman_body_group), dtype=int)
             for body_index, snowman_body in enumerate(snowman_body_group):
                 relevant_distances = distances[body_index]
@@ -154,7 +153,7 @@ class SnowmanOrientationDistributionAnimator(PlotterWithClusterIndex):
 
             fig = plt.figure()
             ax = fig.add_subplot(111, projection="3d")
-            number_snowman = len(universe.select_atoms(f"name {list(rp.run_parameters.snowman_bond_types.keys())[0]}"))
+            number_snowman = len(universe.select_atoms(f"name {self._snowman_body_type}"))
             x_coords, y_coords, z_coords = np.zeros(number_snowman), np.zeros(number_snowman), np.zeros(number_snowman)
             scatter = ax.scatter(x_coords, y_coords, z_coords, marker="o", alpha=0.1, color="C0")
             if self._highlight_ids is not None:
@@ -197,8 +196,8 @@ class SnowmanOrientationDistributionAnimator(PlotterWithClusterIndex):
             ani = Player(fig, update, min_frame=self._start_frame, max_frame=len(universe.trajectory) - 1,
                          save_count=len(universe.trajectory))
             # TODO: Allow to save with option
-            # ani.save("snowman_orientation_distribution.mp4")
-            plt.show()
+            ani.save("snowman_orientation_distribution.mp4")
+            #plt.show()
             plt.close()
 
         # Reset rcParams.

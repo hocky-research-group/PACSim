@@ -4,7 +4,7 @@ import warnings
 import freud.cluster
 import numpy as np
 import openmm.app
-from openmm import unit
+from openmm import unit, CustomNonbondedForce, CustomExternalForce
 from colloids.units import length_unit, temperature_unit
 
 
@@ -346,6 +346,103 @@ class RampTemperatureUpdateReporter(object):
         except AttributeError:
             # If another error occurred, the '_file' attribute might not exist.
             pass
+
+
+class AnnealParticleParameterUpdateReporter(object):
+    def __init__(self, particle_type: str, particle_parameter_name: str, update_interval: int, final_update_step: int,
+                 end_value: float, simulation: openmm.app.Simulation, append_file: bool = False):
+        """Constructor of the AnnealParticleParameterUpdateReporter class."""
+        if not update_interval > 0:
+            raise ValueError("The update frequency must be greater than zero.")
+        if not final_update_step >= update_interval:
+            raise ValueError("The final update step must be greater than or equal to the update frequency.")
+        self._update_interval = update_interval
+        self._final_update_step = final_update_step
+        self._end_value = end_value
+
+        self._particle_type = particle_type
+        self._particle_parameter_name = particle_parameter_name
+        self._particle_parameter_indices = {}
+        self._start_values = {}
+        for force_index, force in enumerate(simulation.system.getForces()):
+            if not isinstance(force, (CustomNonbondedForce, CustomExternalForce)):
+                continue
+            for index in range(force.getNumPerParticleParameters()):
+                if force.getPerParticleParameterName(index) == particle_parameter_name:
+                    assert force_index not in self._particle_parameter_indices
+                    self._particle_parameter_indices[force_index] = index
+
+            self._start_values[force_index] = {}
+            assert force.getNumParticles() == simulation.topology.getNumAtoms()
+            for index, atom in enumerate(simulation.topology.atoms()):
+                if atom.name != self._particle_type:
+                    continue
+                assert index not in self._start_values[force_index]
+                if isinstance(force, CustomNonbondedForce):
+                    self._start_values[force_index][index] = force.getParticleParameters(index)
+                else:
+                    assert isinstance(force, CustomExternalForce)
+                    self._start_values[force_index][index] = force.getParticleParameters(index)[1]
+            if len(self._start_values[force_index]) == 0:
+                raise ValueError(f"The particle type {self._particle_type} is not in the simulation.")
+        if len(self._particle_parameter_indices) == 0:
+            raise ValueError(f"The particle parameter {self._particle_parameter_name} is not in the simulation "
+                             f"context.")
+        assert simulation.currentStep == 0  # TODO: Should be generalized to any starting step.
+
+    # noinspection PyPep8Naming
+    def describeNextReport(self, simulation: openmm.app.Simulation) -> tuple[int, bool, bool, bool, bool, bool]:
+        """Get information about the next report this reporter will generate.
+
+        This method is called by OpenMM once this reporter is added to the list of reporters of a simulation.
+
+        :param simulation:
+            The simulation to generate a report for.
+        :type simulation: openmm.app.Simulation
+
+        :returns:
+            (Number of steps until next report,
+            Whether the next report requires positions (False),
+            Whether the next report requires velocities (False),
+            Whether the next report requires forces (False),
+            Whether the next report requires energies (False),
+            Whether positions should be wrapped to lie in a single periodic box (False))
+        :rtype: tuple[int, bool, bool, bool, bool, bool]
+        """
+        if simulation.currentStep >= self._final_update_step:
+            # 0 signals to not interrupt the simulation again.
+            return 0, False, False, False, False, False
+        steps = self._update_interval - simulation.currentStep % self._update_interval
+        return steps, False, False, False, False, False
+
+    def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
+        """
+        Linearly change the value of a global parameter during the simulation.
+
+        This function is called by OpenMM when the reporter should generate a report.
+
+        :param simulation:
+            The OpenMM simulation to generate a report for.
+        :type simulation: openmm.app.Simulation
+        :param state:
+            The current state of the OpenMM simulation.
+        :type state: openmm.State
+        """
+        current_step = simulation.currentStep  # TODO: The changed radii are currently not stored in the trajectory.
+        for force_index, force in enumerate(simulation.system.getForces()):
+            if force_index in self._particle_parameter_indices:
+                for particle_index, start_values in self._start_values[force_index].items():
+                    new_values = [v for v in start_values]
+                    start_value = start_values[self._particle_parameter_indices[force_index]]
+                    new_values[self._particle_parameter_indices[force_index]] = (
+                        start_value + current_step * (self._end_value - start_value) / self._final_update_step
+                    )
+                    if isinstance(force, CustomNonbondedForce):
+                        force.setParticleParameters(particle_index, new_values)
+                    else:
+                        assert isinstance(force, CustomExternalForce)
+                        force.setParticleParameters(particle_index, particle_index, new_values)
+                force.updateParametersInContext(simulation.context)
 
 
 class RampUpdateReporterUntilCluster(UpdateReporterAbstract):

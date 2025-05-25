@@ -1,5 +1,6 @@
 from abc import abstractmethod, ABC
 import math
+from typing import Optional, Sequence
 import warnings
 import freud.cluster
 import numpy as np
@@ -508,7 +509,8 @@ class RampUpdateReporterUntilCluster(UpdateReporterAbstract):
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
                  start_value: unit.Quantity, end_value: unit.Quantity, print_interval: int, check_interval: int,
                  cluster_size: int, cutoff_distance: unit.Quantity, cell_length: unit.Quantity,
-                 simulation: openmm.app.Simulation, append_file: bool = False):
+                 simulation: openmm.app.Simulation, append_file: bool = False,
+                 ignore_types: Optional[Sequence[str]] = None):
         """Constructor of the LinearMonotonicUpdateReporter class."""
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
@@ -533,6 +535,16 @@ class RampUpdateReporterUntilCluster(UpdateReporterAbstract):
         self._cutoff_distance = cutoff_distance.value_in_unit(length_unit)
         self._cell_length = cell_length.value_in_unit(length_unit)
         self._cluster_reached = False
+        self._ignore_types = ignore_types
+        self._mask = np.ones(simulation.topology.getNumAtoms(), dtype=bool)
+        if ignore_types is not None:
+            atom_names = set(atom.name for atom in simulation.topology.atoms())
+            for t in ignore_types:
+                if t not in atom_names:
+                    raise ValueError(f"The atom type {t} is not in the simulation.")
+            for index, atom in enumerate(simulation.topology.atoms()):
+                if atom.name in ignore_types:
+                    self._mask[index] = False
 
     def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
         """
@@ -550,7 +562,7 @@ class RampUpdateReporterUntilCluster(UpdateReporterAbstract):
         step = simulation.currentStep
         if step % self._check_interval == 0 and not self._cluster_reached:
             state = simulation.context.getState(getPositions=True)
-            positions = state.getPositions(asNumpy=True).value_in_unit(length_unit)
+            positions = state.getPositions(asNumpy=True).value_in_unit(length_unit)[self._mask]
             cluster = freud.cluster.Cluster()
             # TODO: Change this to use the box from the simulation context, if necessary.
             box = freud.box.Box(Lx=self._cell_length, Ly=self._cell_length, Lz=self._cell_length)

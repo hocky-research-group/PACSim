@@ -7,7 +7,7 @@ import gsd.hoomd
 import openmm
 from openmm import app
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
-                      DepletionPotential, Gravity)
+                      DepletionPotential, Gravity, LennardJonesPotential, WCAPotential)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import get_cell_from_box, read_gsd_file, write_gsd_file
 import colloids.integrators as integrators
@@ -72,6 +72,7 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
 def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.Simulation:
     radii = frame.particles.diameter / 2.0 * length_unit
     surface_potentials = frame.particles.charge * electric_potential_unit
+    radii_dict = {frame.particles.types[type_id]: radius for type_id, radius in zip(frame.particles.typeid, radii)}
 
     # ----------------------------------- Set up system and parameters. ------------------------------------------------
     topology = app.topology.Topology()
@@ -137,11 +138,12 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         dielectric_constant=parameters.dielectric_constant)
 
     # ---------------------------------------- Create all forces. ------------------------------------------------------
-    colloid_potentials = ColloidPotentialsAlgebraic(
-        colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
-        cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls,
-        steric_radius_average=parameters.steric_radius_average,
-        electrostatic_radius_average=parameters.electrostatic_radius_average)
+    if parameters.use_colloid_potentials:
+        colloid_potentials = ColloidPotentialsAlgebraic(
+            colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
+            cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls,
+            steric_radius_average=parameters.steric_radius_average,
+            electrostatic_radius_average=parameters.electrostatic_radius_average)
 
     if include_walls:
         slj_walls = ShiftedLennardJonesWalls(wall_distances, parameters.epsilon, parameters.alpha,
@@ -164,6 +166,14 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     else:
         gravitational_potential = None
 
+    if parameters.use_lennard_jones:
+        lennard_jones_potential = LennardJonesPotential(
+            epsilon=parameters.lennard_jones_epsilon, radii=radii_dict, interactions=parameters.interactions,
+            n=parameters.n, periodic_boundary_conditions=not all_walls)
+
+    else:
+        lennard_jones_potential = None
+
     # --------------------------- Add all particles and constraints to the system. -------------------------------------
     for mass in frame.particles.mass:
         system.addParticle(mass)
@@ -177,23 +187,30 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     # Be careful to add the particles in the same order as to the system.
     for i in range(frame.particles.N):
         is_substrate = frame.particles.mass[i] == 0.0
-        colloid_potentials.add_particle(radius=radii[i], surface_potential=surface_potentials[i],
-                                        substrate_flag=is_substrate)
+        if parameters.use_colloid_potentials:
+            colloid_potentials.add_particle(radius=radii[i], surface_potential=surface_potentials[i],
+                                            substrate_flag=is_substrate)
         if include_walls and not is_substrate:
             slj_walls.add_particle(index=i, radius=radii[i])
         if parameters.use_depletion:
             depletion_potential.add_particle(radius=radii[i], substrate_flag=is_substrate)
         if parameters.use_gravity and not is_substrate:
             gravitational_potential.add_particle(index=i, radius=radii[i])
+        if parameters.use_lennard_jones:
+            lennard_jones_potential.add_particle(type=frame.particles.types[frame.particles.typeid[i]], substrate_flag=is_substrate)
 
     for i in range(frame.constraints.N):
-        colloid_potentials.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
+        if parameters.use_colloid_potentials:
+            colloid_potentials.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
         if parameters.use_depletion:
             depletion_potential.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
+        if parameters.use_lennard_jones:
+            lennard_jones_potential.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
 
     # -------------------------------------- Add all forces to the system. ---------------------------------------------
-    for force in colloid_potentials.yield_potentials():
-        system.addForce(force)
+    if parameters.use_colloid_potentials:
+        for force in colloid_potentials.yield_potentials():
+            system.addForce(force)
 
     if include_walls:
         for force in slj_walls.yield_potentials():
@@ -208,6 +225,10 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         for force in gravitational_potential.yield_potentials():
             system.addForce(force)
         assert not system.usesPeriodicBoundaryConditions()
+
+    if parameters.use_lennard_jones:
+        for force in lennard_jones_potential.yield_potentials():
+            system.addForce(force)
 
     # -------------------------------------- Set up the simulation. ----------------------------------------------------
     if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":

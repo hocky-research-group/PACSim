@@ -201,6 +201,28 @@ class RunParameters(Parameters):
         If depletion attraction is on, depletant_radius must not be None, its unit must be compatible with nanometers,
         and the value must be greater than zero.
     :type depletant_radius: Optional[unit.Quantity]
+    :param use_lennard_jones:
+        A boolean indicating whether the Lennard-Jones potential is used for the colloidal particles.
+        If true, epsilon and alpha parameters must be specified.
+        Defaults to False.
+    :type use_lennard_jones: bool
+    :param epsilon:
+        The unshifted Lennard-Jones potential well-depth for the colloidal particles.
+        If Lennard-Jones potential is on, epsilon must not be None, its unit must be compatible with kilojoules per mole,
+        and the value must be greater than zero.
+        Defaults to None.
+    :type epsilon: Optional[unit.Quantity]
+    :param interactions:
+        The interactions between the particles, which is a list of tuples containing the names of the particles that
+        interact.
+        If Lennard-Jones potential is on, the interactions must be specified.
+        Defaults to None.
+    :type interactions: Optional[list[tuple[str, str]]]
+    :param n:
+        The order of the Lennard-Jones potential, which is typically 6 for the attractive part.
+        If Lennard-Jones potential is on, n must not be None and the value must be greater than zero.
+        Defaults to None.
+    :type n: Optional[float]
     :param use_gravity: bool
         A boolean indicating whether the gravitational force is turned on for the simulation.
         If true, the gravitational acceleration, particle density, and water density parameters must be specified.
@@ -257,6 +279,7 @@ class RunParameters(Parameters):
             "frictionCoeff": 0.001574074286750681 / time_unit,
             "randomNumberSeed": None
         })
+    use_colloid_potentials: bool = True
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / (length_unit ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * length_unit)
     debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * length_unit)
@@ -281,6 +304,10 @@ class RunParameters(Parameters):
     use_depletion: bool = False
     depletion_phi: Optional[float] = None
     depletant_radius: Optional[unit.Quantity] = None
+    use_lennard_jones: bool = False
+    lennard_jones_epsilon: Optional[unit.Quantity] = None
+    interactions: Optional[list[tuple[str, str]]] = None
+    n: Optional[float] = None
     use_gravity: bool = False
     gravitational_acceleration: Optional[unit.Quantity] = None
     water_density: Optional[unit.Quantity] = None
@@ -380,6 +407,35 @@ class RunParameters(Parameters):
                 raise ValueError("Depletion phi must not be specified if depletion potential is not on.")
             if self.depletant_radius is not None:
                 raise ValueError("Depletant radius must not be specified if depletion potential is not on.")
+        if self.use_lennard_jones:
+            if self.lennard_jones_epsilon is None:
+                raise ValueError("Epsilon must be specified if Lennard-Jones potential is on.")
+            if not self.lennard_jones_epsilon.unit.is_compatible(energy_unit):
+                raise TypeError("Epsilon must have a unit compatible with kilojoules per mole.")
+            if self.lennard_jones_epsilon <= 0.0 * energy_unit:
+                raise ValueError("Epsilon must be greater than zero.")
+            if self.interactions is None:
+                raise ValueError("Interactions must be specified if Lennard-Jones potential is on.")
+            if not isinstance(self.interactions, list) or not all(isinstance(i, tuple) and len(i) == 3
+                                                                   for i in self.interactions):
+                raise TypeError("Interactions must be a list of tuples containing the names of the particles that "
+                                "interact.")
+            if not isinstance(self.interactions, list) or not all(i[2] == "attractive" or i[2] == "repulsive"
+                                                                   for i in self.interactions):
+                raise TypeError("Interactions must be attractive or repulsive.")
+            if self.n is None:
+                raise ValueError("Order n must be specified if Lennard-Jones potential is on.")
+            if not isinstance(self.n, (int, float)) or self.n <= 0:
+                raise TypeError("Order n must be a positive number.")
+            if not all(isinstance(type_name, str) for interaction in self.interactions for type_name in interaction):
+                raise TypeError("All interaction type names must be strings.")
+        else:
+            if self.lennard_jones_epsilon is not None:
+                raise ValueError("Epsilon must not be specified if Lennard-Jones potential is not on.")
+            if self.interactions is not None:
+                raise ValueError("Interactions must not be specified if Lennard-Jones potential is not on.")
+            if self.n is not None:
+                raise ValueError("Order n must not be specified if Lennard-Jones potential is not on.")
         if self.use_gravity:
             if self.gravitational_acceleration is None:
                 raise ValueError("Gravitational acceleration must be specified if gravity is on.")

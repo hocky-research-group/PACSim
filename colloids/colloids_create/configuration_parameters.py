@@ -151,7 +151,7 @@ class ConfigurationParameters(Parameters):
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
-        if not cluster_specification.endswith(".lmp"):
+        if not self.cluster_specification.endswith(".lmp"):
             raise ValueError("The cluster specification file must be of the lammps-data file format.")
         
         for t in self.masses:

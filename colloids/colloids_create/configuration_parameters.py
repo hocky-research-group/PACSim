@@ -119,12 +119,12 @@ class ConfigurationParameters(Parameters):
     :type substrate_type: Optional[Union[str, int]]
 
     :raises TypeError:
-        If the cluster specification file does not end in ".lmp."
         If the lattice repeats are not an integer or a list of three integers.
         If the masses, radii, or surface potentials do not have the correct units.
         If the masses, radii, or surface potentials dictionaries do not have strings as keys.
         If the substrate type is not a string.
     :raises ValueError:
+        If the cluster specification file does not end in ".lmp."
         If the number of lattice repeats is not positive.
         If the (cluster) padding factor is not greater than zero.
         If the masses are not greater than or equal to zero.
@@ -151,6 +151,9 @@ class ConfigurationParameters(Parameters):
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
+        if not cluster_specification.endswith(".lmp"):
+            raise ValueError("The cluster specification file must be of the lammps-data file format.")
+        
         for t in self.masses:
             if not isinstance(t, str):
                 raise TypeError("The types of the masses dictionary must be strings.")

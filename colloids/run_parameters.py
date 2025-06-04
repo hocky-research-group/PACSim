@@ -206,12 +206,6 @@ class RunParameters(Parameters):
         If true, epsilon and alpha parameters must be specified.
         Defaults to False.
     :type use_lennard_jones: bool
-    :param epsilon:
-        The unshifted Lennard-Jones potential well-depth for the colloidal particles.
-        If Lennard-Jones potential is on, epsilon must not be None, its unit must be compatible with kilojoules per mole,
-        and the value must be greater than zero.
-        Defaults to None.
-    :type epsilon: Optional[unit.Quantity]
     :param interactions:
         The interactions between the particles, which is a list of tuples containing the names of the particles that
         interact.
@@ -305,7 +299,6 @@ class RunParameters(Parameters):
     depletion_phi: Optional[float] = None
     depletant_radius: Optional[unit.Quantity] = None
     use_lennard_jones: bool = False
-    lennard_jones_epsilon: Optional[unit.Quantity] = None
     interactions: Optional[list[tuple[str, str]]] = None
     n: Optional[float] = None
     use_gravity: bool = False
@@ -408,15 +401,9 @@ class RunParameters(Parameters):
             if self.depletant_radius is not None:
                 raise ValueError("Depletant radius must not be specified if depletion potential is not on.")
         if self.use_lennard_jones:
-            if self.lennard_jones_epsilon is None:
-                raise ValueError("Epsilon must be specified if Lennard-Jones potential is on.")
-            if not self.lennard_jones_epsilon.unit.is_compatible(energy_unit):
-                raise TypeError("Epsilon must have a unit compatible with kilojoules per mole.")
-            if self.lennard_jones_epsilon <= 0.0 * energy_unit:
-                raise ValueError("Epsilon must be greater than zero.")
             if self.interactions is None:
                 raise ValueError("Interactions must be specified if Lennard-Jones potential is on.")
-            if not isinstance(self.interactions, list) or not all(isinstance(i, tuple) and len(i) == 3
+            if not isinstance(self.interactions, list) or not all(isinstance(i, tuple) and len(i) == 4
                                                                    for i in self.interactions):
                 raise TypeError("Interactions must be a list of tuples containing the names of the particles that "
                                 "interact.")
@@ -427,7 +414,7 @@ class RunParameters(Parameters):
                 raise ValueError("Order n must be specified if Lennard-Jones potential is on.")
             if not isinstance(self.n, (int, float)) or self.n <= 0:
                 raise TypeError("Order n must be a positive number.")
-            if not all(isinstance(type_name, str) for interaction in self.interactions for type_name in interaction):
+            if not all(isinstance(type_name, str) for interaction in self.interactions for type_name in interaction[:2]):
                 raise TypeError("All interaction type names must be strings.")
         else:
             if self.lennard_jones_epsilon is not None:

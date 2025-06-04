@@ -3,7 +3,6 @@ from .colloid_potentials_algebraic import ColloidPotentialsAlgebraic
 from .colloid_potentials_parameters import ColloidPotentialsParameters
 from .colloid_potentials_tabulated import ColloidPotentialsTabulated
 from .lennard_jones_potential import LennardJonesPotential
-from .wca_potential import WCAPotential
 from .depletion_potential import DepletionPotential
 from .gravity import Gravity
 from .shifted_lennard_jones_walls import ShiftedLennardJonesWalls

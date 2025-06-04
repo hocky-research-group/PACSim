@@ -7,7 +7,7 @@ import gsd.hoomd
 import openmm
 from openmm import app
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
-                      DepletionPotential, Gravity, LennardJonesPotential, WCAPotential)
+                      DepletionPotential, Gravity, LennardJonesPotential)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import get_cell_from_box, read_gsd_file, write_gsd_file
 import colloids.integrators as integrators
@@ -168,9 +168,8 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
 
     if parameters.use_lennard_jones:
         lennard_jones_potential = LennardJonesPotential(
-            epsilon=parameters.lennard_jones_epsilon, radii=radii_dict, interactions=parameters.interactions,
+            radii=radii_dict, interactions=parameters.interactions,
             n=parameters.n, periodic_boundary_conditions=not all_walls)
-
     else:
         lennard_jones_potential = None
 

@@ -37,53 +37,55 @@ class LennardJonesPotential(OpenMMNonbondedPotentialAbstract):
     :type periodic_boundary_conditions: bool
     """
     
-    def __init__(self, epsilon: unit.Quantity, radii: dict[str, unit.Quantity], interactions: tuple[str, str],
+    def __init__(self, radii: dict[str, unit.Quantity], interactions: tuple[str, str, str, unit.Quantity],
                  n: float, periodic_boundary_conditions: bool = True):
         """Constructor of the LennardJonesPotential class."""
         super().__init__()
 
 
-        if not epsilon.unit.is_compatible(energy_unit):
-            raise TypeError("The epsilon parameter must have a unit compatible with kJ.")
-        if epsilon.value_in_unit(energy_unit) <= 0.0:
-            raise ValueError("The epsilon parameter must be greater than zero.")
         if not isinstance(n, (int, float)) or n <= 0:
             raise TypeError("The order parameter must be a positive number.")
-        if not all(isinstance(interaction, tuple) or len(interaction) != 3 for interaction in interactions):
+        if not all(isinstance(interaction, tuple) or len(interaction) != 4 for interaction in interactions):
             raise TypeError("The interactions parameter must be a tuple of three strings representing the particle types.")
-        if not all(isinstance(type_name, str) for interaction in interactions for type_name in interaction ):
+        if not all(isinstance(type_name, str) for interaction in interactions for type_name in interaction[:2]):
             raise TypeError("All interaction type names must be strings.")
         
-        self._epsilon = epsilon
         self._n = n
+        self.radii = radii
         self._interactions = interactions
-        self._sigmas: list[unit.Quantity] = [radii[interaction[0]] + radii[interaction[1]] for interaction in interactions]
         self._periodic_boundary_conditions = periodic_boundary_conditions
         self._max_radius = -math.inf * length_unit
-        self._lennard_jones_potentials: list[CustomNonbondedForce] = [self._set_up_lennard_jones_potential(sigma, interaction) 
-                                                                      for sigma, interaction in zip(self._sigmas, interactions)]
+        self._lennard_jones_potentials: list[CustomNonbondedForce] = [self._set_up_lennard_jones_potential(interaction) 
+                                                                      for  interaction in interactions]
 
-    def _set_up_lennard_jones_potential(self, sigma: unit.Quantity, interaction: str) -> CustomNonbondedForce:
+    def _set_up_lennard_jones_potential(self, interaction: str) -> CustomNonbondedForce:
         """Set up the basic functional form of the Jennard Jones potential"""
         assert interaction[2] in ["attractive", "repulsive"], "Interaction type must be either 'attractive' or 'repulsive'."
+
+        interaction_numbers = f'{interaction[0]}{interaction[1]}'
+
         if interaction[2] == "attractive":
             lennard_jones_potential = CustomNonbondedForce(
-                "select(flag1 * flag2 * (1 - type1_match1) * (1 - type2_match2),"
-                "0, 4 * epsilon * (an^2 - an));"
+                "select(flag1 * flag2 * (1 - (1 - (1 - type1_match1) * (1 - type2_match2))"
+                " * (1 - (1 - type1_match2) * (1 - type2_match1))),"
+                f"0, 4 * epsilon{interaction_numbers} * (an^2 - an));"
                 "an = a^(-n);"
-                f"a = r / sigma{interaction[0]}{interaction[1]};"
+                f"a = r / sigma{interaction_numbers};"
             )
 
         if interaction[2] == "repulsive":
             lennard_jones_potential = CustomNonbondedForce(
-                "select(flag1 * flag2 * (1 - type1_match1) * (1 - type2_match2),"
-                "0, 4 * epsilon * (an^2 - an + 1/4));"
+                "select(flag1 * flag2 * (1 - (1 - (1 - type1_match1) * (1 - type2_match2))"
+                " * (1 - (1 - type1_match2) * (1 - type2_match1))),"
+                f"0, 4 * epsilon{interaction_numbers} * (an^2 - an + 1/4));"
                 "an = a^(-n);"
-                f"a = r / sigma{interaction[0]}{interaction[1]};"
+                f"a = r / sigma{interaction_numbers};"
             )
 
-        lennard_jones_potential.addGlobalParameter("epsilon", self._epsilon.value_in_unit(energy_unit))
-        lennard_jones_potential.addGlobalParameter(f"sigma{interaction[0]}{interaction[1]}", sigma.value_in_unit(length_unit))
+        sigma = self.radii[interaction[0]] + self.radii[interaction[1]]
+
+        lennard_jones_potential.addGlobalParameter(f"epsilon{interaction_numbers}", interaction[3])
+        lennard_jones_potential.addGlobalParameter(f"sigma{interaction_numbers}", sigma.value_in_unit(length_unit))
         lennard_jones_potential.addGlobalParameter("n", self._n)
         lennard_jones_potential.addPerParticleParameter("type1_match")
         lennard_jones_potential.addPerParticleParameter("type2_match")
@@ -146,12 +148,14 @@ class LennardJonesPotential(OpenMMNonbondedPotentialAbstract):
         super().yield_potentials()
 
         for i, lennard_jones_potential in enumerate(self._lennard_jones_potentials):
+            sigma = self.radii[self._interactions[i][0]] + self.radii[self._interactions[i][1]]
+
             if self._interactions[i][2] == "attractive":
-                r_min = (1 + math.log(2.0) / self._n) * self._sigmas[i]
-                r_cut = (3 * r_min - 2 * self._sigmas[i]).value_in_unit(length_unit)
+                r_min = (1 + math.log(2.0) / self._n) * sigma
+                r_cut = (3 * r_min - 2 * sigma).value_in_unit(length_unit)
 
             elif self._interactions[i][2] == "repulsive":
-                r_cut = (2 ** (1 / self._n) * self._sigmas[i]).value_in_unit(length_unit)
+                r_cut = (2 ** (1 / self._n) * sigma).value_in_unit(length_unit)
 
             if self._periodic_boundary_conditions:
                 lennard_jones_potential.setNonbondedMethod(lennard_jones_potential.CutoffPeriodic)

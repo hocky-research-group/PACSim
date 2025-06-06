@@ -68,7 +68,7 @@ class LennardJonesPotential(OpenMMNonbondedPotentialAbstract):
             lennard_jones_potential = CustomNonbondedForce(
                 "select(flag1 * flag2 * (1 - (1 - (1 - type1_match1) * (1 - type2_match2))"
                 " * (1 - (1 - type1_match2) * (1 - type2_match1))),"
-                f"0, 4 * epsilon{interaction_numbers} * (an^2 - an));"
+                f"0, 4 * factor * epsilon{interaction_numbers} * (an^2 - an));"
                 "an = a^(-n);"
                 f"a = r / sigma{interaction_numbers};"
             )
@@ -77,13 +77,14 @@ class LennardJonesPotential(OpenMMNonbondedPotentialAbstract):
             lennard_jones_potential = CustomNonbondedForce(
                 "select(flag1 * flag2 * (1 - (1 - (1 - type1_match1) * (1 - type2_match2))"
                 " * (1 - (1 - type1_match2) * (1 - type2_match1))),"
-                f"0, 4 * epsilon{interaction_numbers} * (an^2 - an + 1/4));"
+                f"0, 4 * factor * epsilon{interaction_numbers} * (an^2 - an + 1/4));"
                 "an = a^(-n);"
                 f"a = r / sigma{interaction_numbers};"
             )
 
         sigma = self.radii[interaction[0]] + self.radii[interaction[1]]
 
+        lennard_jones_potential.addGlobalParameter("factor", 1.0)
         lennard_jones_potential.addGlobalParameter(f"epsilon{interaction_numbers}", interaction[3])
         lennard_jones_potential.addGlobalParameter(f"sigma{interaction_numbers}", sigma.value_in_unit(length_unit))
         lennard_jones_potential.addGlobalParameter("n", self._n)

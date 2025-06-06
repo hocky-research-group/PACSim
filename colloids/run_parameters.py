@@ -417,8 +417,6 @@ class RunParameters(Parameters):
             if not all(isinstance(type_name, str) for interaction in self.interactions for type_name in interaction[:2]):
                 raise TypeError("All interaction type names must be strings.")
         else:
-            if self.lennard_jones_epsilon is not None:
-                raise ValueError("Epsilon must not be specified if Lennard-Jones potential is not on.")
             if self.interactions is not None:
                 raise ValueError("Interactions must not be specified if Lennard-Jones potential is not on.")
             if self.n is not None:

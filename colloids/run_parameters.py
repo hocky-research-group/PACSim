@@ -234,13 +234,6 @@ class RunParameters(Parameters):
         cubed, and the value must be greater than zero.
         Defaults to None.
     :type water_density: Optional[unit.Quantity]
-    :param particle_density:
-        The density of the colloidal particles. This is used to compute the effective particle density when calculating
-        the gravitational force.
-        If gravity is on, the particle density must be specified, its unit must be compatible with grams per centimeter
-        cubed, and the value must be greater than zero.
-        Defaults to None.
-    :type particle_density: Optional[unit.Quantity]
     :param update_reporter:
         The name of the update reporter used to vary the value of a force-related global parameter over time
         in a simulation.
@@ -304,7 +297,6 @@ class RunParameters(Parameters):
     use_gravity: bool = False
     gravitational_acceleration: Optional[unit.Quantity] = None
     water_density: Optional[unit.Quantity] = None
-    particle_density: Optional[unit.Quantity] = None
     update_reporter: Optional[str] = None
     update_reporter_parameters: Optional[dict[str, Any]] = None
 
@@ -435,12 +427,6 @@ class RunParameters(Parameters):
                 raise TypeError("The water density must have a unit compatible with grams per centimeter cubed.")
             if self.water_density <= 0.0 * (unit.gram / length_unit ** 3):
                 raise ValueError("The water density must be greater than zero.")
-            if self.particle_density is None:
-                raise ValueError("Density of particle must be specified if gravity is on.")
-            if not self.particle_density.unit.is_compatible(unit.gram / length_unit ** 3):
-                raise TypeError("The particle density must have a unit compatible with grams per centimeter cubed.")
-            if self.particle_density <= 0.0 * (unit.gram / length_unit ** 3):
-                raise ValueError("The particle density must be greater than zero.")
             if not all(self.wall_directions):
                 raise ValueError("Gravity can only be turned on if all walls are active and, hence, no periodic "
                                  "boundary conditions are present.")
@@ -449,8 +435,6 @@ class RunParameters(Parameters):
                 raise ValueError("Gravitational acceleration must not be specified if gravity is not on.")
             if self.water_density is not None:
                 raise ValueError("Density of water must not be specified if gravity is not on.")
-            if self.particle_density is not None:
-                raise ValueError("Density of particle must not be specified if gravity is not on.")
         if self.update_reporter is not None:
             possible_update_reporters = [name for name, _ in inspect.getmembers(update_reporters, inspect.isclass)
                                          if name != "ABC" and "Abstract" not in name]

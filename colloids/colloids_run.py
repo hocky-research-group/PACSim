@@ -161,8 +161,7 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
 
     if parameters.use_gravity:
         assert all_walls
-        gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density,
-                                          parameters.particle_density)
+        gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density)
     else:
         gravitational_potential = None
 
@@ -194,7 +193,7 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         if parameters.use_depletion:
             depletion_potential.add_particle(radius=radii[i], substrate_flag=is_substrate)
         if parameters.use_gravity and not is_substrate:
-            gravitational_potential.add_particle(index=i, radius=radii[i])
+            gravitational_potential.add_particle(index=i, radius=radii[i], mass=mass[i])
         if parameters.use_lennard_jones:
             lennard_jones_potential.add_particle(type=frame.particles.types[frame.particles.typeid[i]], substrate_flag=is_substrate)
 

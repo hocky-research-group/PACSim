@@ -3,6 +3,7 @@ import math
 import warnings
 import openmm.app
 from openmm import unit
+from typing import Union
 
 
 class UpdateReporterAbstract(ABC):
@@ -62,7 +63,7 @@ class UpdateReporterAbstract(ABC):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step, global_parameter_name: str,
-                 start_value: unit.Quantity, print_interval: int, simulation: openmm.app.Simulation,
+                 start_value: Union[unit.Quantity, float], print_interval: int, simulation: openmm.app.Simulation,
                  append_file: bool = False):
         """Constructor of the UpdateReporterAbstract class."""
         if not filename.endswith(".csv"):
@@ -223,14 +224,17 @@ class RampUpdateReporter(UpdateReporterAbstract):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
-                 start_value: unit.Quantity, end_value: unit.Quantity, print_interval: int,
+                 start_value: Union[unit.Quantity, float], end_value: Union[unit.Quantity, float], print_interval: int,
                  simulation: openmm.app.Simulation, append_file: bool = False):
         """Constructor of the LinearMonotonicUpdateReporter class."""
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
                          print_interval=print_interval, simulation=simulation, append_file=append_file)
-        if not start_value.unit.is_compatible(end_value.unit):
-            raise ValueError(f"The start and end values have incompatible units.")
+        if type(start_value) != type(end_value):
+            raise TypeError("The start and end values must be of the same type.")
+        if isinstance(start_value, unit.Quantity):
+            if not start_value.unit.is_compatible(end_value.unit):
+                raise ValueError(f"The start and end values have incompatible units.")
         self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
 
     def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
@@ -320,7 +324,7 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
-                 start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int, print_interval: int,
+                 start_value: Union[unit.Quantity, float], end_value: Union[unit.Quantity, float], switch_step: int, print_interval: int,
                  simulation: openmm.app.Simulation, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
@@ -428,7 +432,7 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
-                 start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int, print_interval: int,
+                 start_value: Union[unit.Quantity, float], end_value: Union[unit.Quantity, float], switch_step: int, print_interval: int,
                  simulation: openmm.app.Simulation, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,

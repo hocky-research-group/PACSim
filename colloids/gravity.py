@@ -39,7 +39,8 @@ class Gravity(OpenMMPotentialAbstract):
     _acceleration_unit = length_unit / time_unit ** 2
     _density_unit = unit.gram / length_unit ** 3
 
-    def __init__(self, gravitational_acceleration: unit.Quantity, water_density: unit.Quantity) -> None:
+    def __init__(self, gravitational_acceleration: unit.Quantity, water_density: unit.Quantity,
+                 particle_density: unit.Quantity) -> None:
         """Constructor of the Gravity class."""
         super().__init__()
 
@@ -52,9 +53,14 @@ class Gravity(OpenMMPotentialAbstract):
             raise TypeError("argument water_density must have a unit compatible with grams per centimeter cubed.")
         if not water_density.value_in_unit(self._density_unit) > 0.0:
             raise ValueError("argument water_density must have a value greater than zero")
+        if not particle_density.unit.is_compatible(self._density_unit):
+            raise TypeError("argument particle_density must have a unit compatible with grams per centimeter cubed.")
+        if not particle_density.value_in_unit(self._density_unit) > 0.0:
+            raise ValueError("argument particle_density must have a value greater than zero")
 
         self._gravitational_acceleration = gravitational_acceleration
         self._water_density = water_density
+        self._particle_density = particle_density
         self._gravitational_potential = self._set_up_gravitational_potential()
 
     def _set_up_gravitational_potential(self) -> CustomExternalForce:
@@ -68,7 +74,7 @@ class Gravity(OpenMMPotentialAbstract):
 
         return gravitational_potential
 
-    def add_particle(self, index: int, radius: unit.Quantity, mass: unit.Quantity) -> None:
+    def add_particle(self, index: int, radius: unit.Quantity) -> None:
         """
         Add a colloid with a given radius to the system.
 
@@ -96,8 +102,8 @@ class Gravity(OpenMMPotentialAbstract):
             raise ValueError("argument radius must have a value greater than zero")
         self._gravitational_potential.addParticle(
             index,
-            [((mass - self._water_density * 4.0 / 3.0 * math.pi * (radius ** 3))
-              * unit.AVOGADRO_CONSTANT_NA).value_in_unit(mass_unit)])
+            [((self._particle_density - self._water_density)
+              * 4.0 / 3.0 * math.pi * (radius ** 3) * unit.AVOGADRO_CONSTANT_NA).value_in_unit(mass_unit)])
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """

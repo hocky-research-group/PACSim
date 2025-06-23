@@ -17,8 +17,8 @@ def colloids_resume(argv: Sequence[str]) -> app.Simulation:
 
     if not args.yaml_file.endswith(".yaml"):
         raise ValueError("The YAML file must have the .yaml extension.")
-    if not args.checkpoint_file.endswith(".chk"):
-        raise ValueError("The checkpoint file must have the .chk extension.")
+    if not args.checkpoint_file.endswith(".chk") or not args.checkpoint_file.endswith(".gsd"):
+        raise ValueError("The checkpoint file must have the .chk or .gsd extension.")
     if not args.number_steps > 0:
         raise ValueError("The number of steps must be positive.")
 
@@ -30,7 +30,12 @@ def colloids_resume(argv: Sequence[str]) -> app.Simulation:
 
     simulation = set_up_simulation(parameters, frame)
 
-    simulation.loadCheckpoint(args.checkpoint_file)
+    if args.checkpoint_file.endswith(".gsd"):
+        # If the checkpoint file is a GSD file, load the state from it
+        simulation.loadState(args.checkpoint_file)
+    elif args.checkpoint_file.endswith(".chk"):
+        # If the checkpoint file is a checkpoint file, load the state from it
+        simulation.loadCheckpoint(args.checkpoint_file)
 
     set_up_reporters(parameters, simulation, True, args.number_steps, frame)
 

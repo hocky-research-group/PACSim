@@ -441,9 +441,6 @@ class RunParameters(Parameters):
                 raise TypeError("The particle density must have a unit compatible with grams per centimeter cubed.")
             if self.particle_density <= 0.0 * (unit.gram / length_unit ** 3):
                 raise ValueError("The particle density must be greater than zero.")
-            if not all(self.wall_directions):
-                raise ValueError("Gravity can only be turned on if all walls are active and, hence, no periodic "
-                                 "boundary conditions are present.")
         else:
             if self.gravitational_acceleration is not None:
                 raise ValueError("Gravitational acceleration must not be specified if gravity is not on.")

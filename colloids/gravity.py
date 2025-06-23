@@ -40,7 +40,7 @@ class Gravity(OpenMMPotentialAbstract):
     _density_unit = unit.gram / length_unit ** 3
 
     def __init__(self, gravitational_acceleration: unit.Quantity, water_density: unit.Quantity,
-                 particle_density: unit.Quantity) -> None:
+                 particle_density: unit.Quantity, periodic_boundary_conditions: bool) -> None:
         """Constructor of the Gravity class."""
         super().__init__()
 
@@ -61,6 +61,7 @@ class Gravity(OpenMMPotentialAbstract):
         self._gravitational_acceleration = gravitational_acceleration
         self._water_density = water_density
         self._particle_density = particle_density
+        self._periodic_boundary_conditions = periodic_boundary_conditions
         self._gravitational_potential = self._set_up_gravitational_potential()
 
     def _set_up_gravitational_potential(self) -> CustomExternalForce:

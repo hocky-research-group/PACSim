@@ -160,9 +160,8 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         depletion_potential = None
 
     if parameters.use_gravity:
-        assert all_walls
         gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density,
-                                          parameters.particle_density)
+                                          parameters.particle_density, periodic_boundary_conditions=not all_walls)
     else:
         gravitational_potential = None
 
@@ -220,10 +219,8 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
             system.addForce(force)
 
     if parameters.use_gravity:
-        assert all_walls
         for force in gravitational_potential.yield_potentials():
             system.addForce(force)
-        assert not system.usesPeriodicBoundaryConditions()
 
     if parameters.use_lennard_jones:
         for force in lennard_jones_potential.yield_potentials():

@@ -13,9 +13,11 @@ class SnowmanOrientationDistributionPlotter(PlotterWithClusterIndex):
     _millivolt = unit.milli * unit.volt
 
     def __init__(self, working_directory: str, run_parameters: Sequence[LabeledRunParametersWithPath],
-                 frame_index: int = -1, open_interactive: bool = False, cluster_index: Optional[int] = None,
-                 use_rotated: bool = False) -> None:
+                 snowman_body_type: str, snowman_head_type: str, frame_index: int = -1, open_interactive: bool = False,
+                 cluster_index: Optional[int] = None, use_rotated: bool = False) -> None:
         super().__init__(working_directory, run_parameters, cluster_index)
+        self._snowman_body_type = snowman_body_type
+        self._snowman_head_type = snowman_head_type
         self._frame_index = frame_index
         self._open_interactive = open_interactive
         self._use_rotated = use_rotated
@@ -39,39 +41,39 @@ class SnowmanOrientationDistributionPlotter(PlotterWithClusterIndex):
                 _ = universe.trajectory[self._frame_index]
                 cluster_map = self._get_cluster_map(trajectory_path, len(universe.atoms))
 
+                # Find the snowman mapping in the first frame
+                snowman_body_group = universe.select_atoms(f"name {self._snowman_body_type}")
+                snowman_head_group = universe.select_atoms(f"name {self._snowman_head_type}")
+                distances = MDAnalysis.analysis.distances.distance_array(
+                    snowman_body_group.positions, snowman_head_group.positions)
+                snowman_distance = np.min(distances)
+                print(f"[INFO] Found snowman distance: {snowman_distance}")
+
                 fig = plt.figure()
                 ax = fig.add_subplot(111, projection="3d")
-                for i, (snowman_body_type, snowman_head_type) in enumerate(
-                        rp.run_parameters.snowman_bond_types.items()):
-                    snowman_distance = rp.run_parameters.snowman_distances[snowman_body_type].value_in_unit(
-                        self._nanometer)
-                    snowman_body_group = universe.select_atoms(f"name {snowman_body_type}")
-                    snowman_head_group = universe.select_atoms(f"name {snowman_head_type}")
-                    distances = MDAnalysis.analysis.distances.distance_array(
-                        snowman_body_group.positions, snowman_head_group.positions)
-                    snowman_indices = np.zeros(len(snowman_body_group), dtype=int)
-                    for body_index, snowman_body in enumerate(snowman_body_group):
-                        relevant_distances = distances[body_index]
-                        relevant_head_indices = np.nonzero(np.abs(relevant_distances - snowman_distance) < 1.0e-1)[0]
-                        assert len(relevant_head_indices) == 1
-                        snowman_indices[body_index] = relevant_head_indices[0]
-                    assert np.all(np.sort(snowman_indices) == np.arange(len(snowman_body_group)))
-                    x_coords = []
-                    y_coords = []
-                    z_coords = []
-                    for body_index, snowman_body in enumerate(snowman_body_group):
-                        snowman_head = snowman_head_group[snowman_indices[body_index]]
-                        assert cluster_map[snowman_body.id] == cluster_map[snowman_head.id]
-                        if cluster_map[snowman_body.id] != self._cluster_index:
-                            continue
-                        snowman_distance_vector = snowman_head.position - snowman_body.position
-                        assert np.abs(np.linalg.norm(snowman_distance_vector) - snowman_distance) < 1.0e-1
-                        snowman_distance_vector /= np.linalg.norm(snowman_distance_vector)
-                        assert np.abs(np.linalg.norm(snowman_distance_vector) - 1.0) < 1.0e-6
-                        x_coords.append(snowman_distance_vector[0])
-                        y_coords.append(snowman_distance_vector[1])
-                        z_coords.append(snowman_distance_vector[2])
-                    ax.scatter(x_coords, y_coords, z_coords, marker="o", alpha=0.1, color=f"C{i}")
+                snowman_indices = np.zeros(len(snowman_body_group), dtype=int)
+                for body_index, snowman_body in enumerate(snowman_body_group):
+                    relevant_distances = distances[body_index]
+                    relevant_head_indices = np.nonzero(np.abs(relevant_distances - snowman_distance) < 1.0e-1)[0]
+                    assert len(relevant_head_indices) == 1
+                    snowman_indices[body_index] = relevant_head_indices[0]
+                assert np.all(np.sort(snowman_indices) == np.arange(len(snowman_body_group)))
+                x_coords = []
+                y_coords = []
+                z_coords = []
+                for body_index, snowman_body in enumerate(snowman_body_group):
+                    snowman_head = snowman_head_group[snowman_indices[body_index]]
+                    assert cluster_map[snowman_body.id] == cluster_map[snowman_head.id]
+                    if cluster_map[snowman_body.id] != self._cluster_index:
+                        continue
+                    snowman_distance_vector = snowman_head.position - snowman_body.position
+                    assert np.abs(np.linalg.norm(snowman_distance_vector) - snowman_distance) < 1.0e-1
+                    snowman_distance_vector /= np.linalg.norm(snowman_distance_vector)
+                    assert np.abs(np.linalg.norm(snowman_distance_vector) - 1.0) < 1.0e-6
+                    x_coords.append(snowman_distance_vector[0])
+                    y_coords.append(snowman_distance_vector[1])
+                    z_coords.append(snowman_distance_vector[2])
+                ax.scatter(x_coords, y_coords, z_coords, marker="o", alpha=0.1)
                 ax.set_title(f"{rp.label}, orientation of snowmen, cluster {self._cluster_index}")
                 ax.set_aspect("equal")
                 ax.set_xlim(-1.1, 1.1)

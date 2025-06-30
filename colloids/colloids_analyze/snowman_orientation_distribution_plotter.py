@@ -1,4 +1,6 @@
 from typing import Optional, Sequence
+from matplotlib import cm
+from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import MDAnalysis
@@ -49,8 +51,6 @@ class SnowmanOrientationDistributionPlotter(PlotterWithClusterIndex):
                 snowman_distance = np.min(distances)
                 print(f"[INFO] Found snowman distance: {snowman_distance}")
 
-                fig = plt.figure()
-                ax = fig.add_subplot(111, projection="3d")
                 snowman_indices = np.zeros(len(snowman_body_group), dtype=int)
                 for body_index, snowman_body in enumerate(snowman_body_group):
                     relevant_distances = distances[body_index]
@@ -73,6 +73,48 @@ class SnowmanOrientationDistributionPlotter(PlotterWithClusterIndex):
                     x_coords.append(snowman_distance_vector[0])
                     y_coords.append(snowman_distance_vector[1])
                     z_coords.append(snowman_distance_vector[2])
+
+                points = np.vstack([x_coords,  y_coords, z_coords]).T
+                u = points[:, 2]  # cos(theta)
+                phi = np.arctan2(points[:, 1], points[:, 0])
+                nbins = 50
+                phi_bins = np.linspace(-np.pi, np.pi, nbins + 1)
+                u_bins = np.linspace(-1.0, 1.0, nbins + 1)
+                hist, phi_edges, u_edges = np.histogram2d(phi, u, bins=[phi_bins, u_bins], density=False)
+                phi_centers = 0.5 * (phi_edges[:-1] + phi_edges[1:])
+                u_centers = 0.5 * (u_edges[:-1] + u_edges[1:])
+                phi_grid, u_grid = np.meshgrid(phi_centers, u_centers, indexing='xy')
+                theta_grid = np.arccos(u_grid)
+                xgrid = np.sin(theta_grid) * np.cos(phi_grid)
+                ygrid = np.sin(theta_grid) * np.sin(phi_grid)
+                zgrid = np.cos(theta_grid)
+                density = hist.T  # Transpose to match the grid shape
+
+                eps = 1e-8
+                density = np.clip(density, eps, None)
+                vmin = max(density.min(), eps)
+                vmax = density.max()
+                norm = LogNorm(vmin=vmin, vmax=vmax)
+                facecolors = cm.plasma(norm(density))
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection="3d")
+                ax.plot_surface(xgrid, ygrid, zgrid, facecolors=facecolors, rstride=1, cstride=1, shade=True,
+                                antialiased=True)
+                mappable = cm.ScalarMappable(norm=norm, cmap=cm.plasma)
+                mappable.set_array(density)
+                fig.colorbar(mappable, ax=ax, shrink=0.6, pad=0.1, label='Log Density')
+                ax.set_aspect("equal")
+                ax.set_xlim(-1.1, 1.1)
+                ax.set_ylim(-1.1, 1.1)
+                ax.set_zlim(-1.1, 1.1)
+                if self._open_interactive:
+                    plt.show()
+                pdf.savefig(fig)
+                fig.clear()
+                plt.close(fig)
+
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection="3d")
                 ax.scatter(x_coords, y_coords, z_coords, marker="o", alpha=0.1)
                 ax.set_title(f"{rp.label}, orientation of snowmen, cluster {self._cluster_index}")
                 ax.set_aspect("equal")

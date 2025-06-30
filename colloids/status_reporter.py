@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 import openmm.app
 import tqdm
 
@@ -18,6 +18,11 @@ class StatusReporter(object):
         The total number of steps of the OpenMM simulation.
         The value must be greater than zero.
     :type total_number_steps: int
+    :param desc:
+        A description of the progress bar that is displayed in front of the progress bar.
+        If None, no description is displayed.
+        The default value is None.
+    :type desc: Optional[str]
 
     :raises ValueError:
         If the report interval is not greater than zero.
@@ -25,14 +30,14 @@ class StatusReporter(object):
         If the total number of steps is not positive.
     """
 
-    def __init__(self, report_interval: int, total_number_steps: int) -> None:
+    def __init__(self, report_interval: int, total_number_steps: int, desc: Optional[str] = None) -> None:
         """Constructor of the StatusReporter class."""
         if not report_interval > 0:
             raise ValueError("The report interval must be greater than zero.")
         if not total_number_steps >= 0:
             raise ValueError("The total number of steps must be positive.")
         self._report_interval = report_interval
-        self._status = tqdm.tqdm(miniters=1, total=total_number_steps, unit="steps")
+        self._status = tqdm.tqdm(miniters=1, total=total_number_steps, unit="steps", desc=desc)
 
     # noinspection PyPep8Naming
     def describeNextReport(self, simulation: openmm.app.Simulation) -> tuple[int, bool, bool, bool, bool, bool]:

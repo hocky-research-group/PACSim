@@ -115,8 +115,9 @@ def main():
     # However, ase would transform the distances in the lammps-data file to Angstroms by multiplying them by 10 if
     # we specify units="nano". For units="metal", the ase distances are equal to the distances in the lammps-data
     # file. We then just pretend that the distances are in nanometers.
-    cluster = read_lammps_data(configuration_parameters.cluster_specification, units="metal")
-    generator = ClusterGenerator(cluster, configuration_parameters.lattice_repeats,
+    clusters = [read_lammps_data(spec, units="metal") for spec in configuration_parameters.cluster_specifications]
+    generator = ClusterGenerator(clusters, configuration_parameters.cluster_relative_weights,
+                                 configuration_parameters.lattice_repeats,
                                  configuration_parameters.cluster_padding_factor,
                                  configuration_parameters.padding_factor,
                                  configuration_parameters.random_rotation)

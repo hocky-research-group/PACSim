@@ -17,11 +17,13 @@ class ConfigurationParameters(Parameters):
     pairs. Any OpenMM quantities are converted to Quantity objects that can be represented in a readable way in the
     yaml file.
 
-    The base configuration is constructed from a single cluster of colloids. The cluster is defined in a lammps-data
-    file together with lattice vectors. The cluster is first centered and then repeated in all three directions of the
-    lattice vectors to create the base configuration. Every replica of the cluster can optionally be randomly rotated.
+    The base configuration is constructed from clusters of colloids. The cluster is defined in a lammps-data file
+    together with cell vectors. Every cluster of colloids is assumed to have the same cell vectors. To generate the
+    initial configuration, the clusters are first centered. Then, the shared cell vectors of the clusters are repeated
+    in all three directions. Every replica of the cell is then filled with a randomly selected cluster from the list of
+    clusters. The clusters are selected based on their relative weights. Every cluster can optionally be randomly rotated.
 
-    All colloid positions in the centered cluster must lie in the unit cell defined by the lattice vectors.
+    All colloid positions in the centered clusters must lie in the unit cell defined by the lattice vectors.
 
     To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors. Additionally,
     one can increase a padding factor that scales the overall box size and thus increases the distance between the
@@ -42,10 +44,16 @@ class ConfigurationParameters(Parameters):
     After the base configuration has been created, it can be modified by adding a substrate at the bottom of the
     simulation box.
 
-    :param cluster_specification:
-        The filename of the cluster definition in lammps-data format.
-        Defaults to cluster.lmp.
-    :type cluster_specification: str
+    :param cluster_specifications:
+        The filenames of the cluster definitions in lammps-data format.
+        Defaults to [cluster.lmp].
+    :type cluster_specifications: list[str]
+    :param cluster_relative_weights:
+        The relative weights of the clusters. The weights are used to randomly select a cluster from the list of
+        clusters when generating the initial configuration.
+        The weights should be positive.
+        Defaults to [1.0].
+    :type cluster_relative_weights: Sequence[float]
     :param lattice_repeats:
         The number of repeats of the lattice in the three directions of the lattice vectors of the cluster.
         If only a single integer is given, the same number of repeats is used in all directions.
@@ -116,7 +124,8 @@ class ConfigurationParameters(Parameters):
         If the substrate type is not in the radii, masses, or surface potentials dictionaries.
         If the mass of the substrate type is not zero.
     """
-    cluster_specification: str = "cluster.lmp"
+    cluster_specifications: list[str] = field(default_factory=lambda: ["cluster.lmp"])
+    cluster_relative_weights: list[float] = field(default_factory=lambda: [1.0])
     lattice_repeats: Union[int, list[int]] = 8
     cluster_padding_factor: float = 1.0
     padding_factor: float = 1.0
@@ -134,6 +143,12 @@ class ConfigurationParameters(Parameters):
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
+        if not len(self.cluster_specifications) > 0:
+            raise ValueError("At least one cluster must be provided.")
+        if len(self.cluster_specifications) != len(self.cluster_relative_weights):
+            raise ValueError("The number of clusters must match the number of cluster probabilities.")
+        if not all(prob > 0.0 for prob in self.cluster_relative_weights):
+            raise ValueError("All cluster probabilities must be greater than zero.")
         for t in self.masses:
             if not isinstance(t, str):
                 raise TypeError("The types of the masses dictionary must be strings.")
@@ -170,31 +185,39 @@ class ConfigurationParameters(Parameters):
         # However, ase would transform the distances in the lammps-data file to Angstroms by multiplying them by 10 if
         # we specify units="nano". For units="metal", the ase distances are equal to the distances in the lammps-data
         # file. We then just pretend that the distances are in nanometers.
-        atoms = read_lammps_data(self.cluster_specification, units="metal")
-        types = set(str(atom.number) for atom in atoms)
-        for t in types:
-            if t not in self.masses:
-                raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in masses dictionary.")
-            if t not in self.radii:
-                raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in radii dictionary.")
-            if t not in self.surface_potentials:
-                raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in surface potentials "
-                                 f"dictionary.")
+        found_types = set()
+        cell = None
+        for cluster_specification in self.cluster_specifications:
+            atoms = read_lammps_data(cluster_specification, units="metal")
+            # If no cell is set in the lammps-data file, the lattice vectors are set to the identity matrix.
+            if np.equal(atoms.get_cell(), [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]).all():
+                warnings.warn("The lattice vectors of the cluster are probably not set in the lammps-data file."
+                              "The identity matrix is used as lattice vectors.")
+            if cell is None:
+                cell = atoms.get_cell()
+            else:
+                if not np.allclose(atoms.get_cell(), cell):
+                    raise ValueError("All clusters must have the same cell vectors.")
+            types = set(str(atom.number) for atom in atoms)
+            found_types.update(types)
+            for t in types:
+                if t not in self.masses:
+                    raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in masses dictionary.")
+                if t not in self.radii:
+                    raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in radii dictionary.")
+                if t not in self.surface_potentials:
+                    raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in surface potentials "
+                                     f"dictionary.")
         for t in self.masses:
-            if t not in types and t != self.substrate_type:
+            if t not in found_types and t != self.substrate_type:
                 raise ValueError(f"Non-substrate type {t} of the masses dictionary is not in the lammps-data file.")
         for t in self.radii:
-            if t not in types and t != self.substrate_type:
+            if t not in found_types and t != self.substrate_type:
                 raise ValueError(f"Non-substrate type {t} of the radii dictionary is not in the lammps-data file.")
         for t in self.surface_potentials:
-            if t not in types and t != self.substrate_type:
+            if t not in found_types and t != self.substrate_type:
                 raise ValueError(f"Non-substrate type {t} of the surface potentials dictionary is not in the "
                                  f"lammps-data file.")
-
-        # If no cell is set in the lammps-data file, the lattice vectors are set to the identity matrix.
-        if np.equal(atoms.get_cell(), [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]).all():
-            warnings.warn("The lattice vectors of the cluster are probably not set in the lammps-data file."
-                          "The identity matrix is used as lattice vectors.")
 
         if isinstance(self.lattice_repeats, int):
             if self.lattice_repeats <= 0:

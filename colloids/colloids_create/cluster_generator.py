@@ -80,8 +80,8 @@ class ClusterGenerator(ConfigurationGenerator):
             raise ValueError("At least one cluster must be provided.")
         if len(clusters) != len(cluster_relative_weights):
             raise ValueError("The number of clusters must match the number of cluster probabilities.")
-        if not all(prob > 0.0 for prob in cluster_relative_weights):
-            raise ValueError("All cluster probabilities must be greater than zero.")
+        if not all(prob >= 0.0 for prob in cluster_relative_weights):
+            raise ValueError("All cluster probabilities must be non-negative.")
         if not all(np.allclose(c.cell, clusters[0].cell) for c in clusters):
             raise ValueError("All clusters must have the same cell vectors.")
 

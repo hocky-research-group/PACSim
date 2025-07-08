@@ -22,8 +22,6 @@ def read_gsd_file(filename: str, frame_index: int) -> gsd.hoomd.Frame:
     if not filename.endswith(".gsd"):
         raise ValueError("The file must have the .gsd extension.")
     with gsd.hoomd.open(filename) as f:
-        if len(f) != 1:
-            raise ValueError("The GSD file must contain exactly one frame.")
         frame = f[frame_index]
     return frame
 

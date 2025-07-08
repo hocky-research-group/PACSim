@@ -147,8 +147,11 @@ class ConfigurationParameters(Parameters):
             raise ValueError("At least one cluster must be provided.")
         if len(self.cluster_specifications) != len(self.cluster_relative_weights):
             raise ValueError("The number of clusters must match the number of cluster probabilities.")
-        if not all(prob > 0.0 for prob in self.cluster_relative_weights):
-            raise ValueError("All cluster probabilities must be greater than zero.")
+        if not all(prob >= 0.0 for prob in self.cluster_relative_weights):
+            raise ValueError("All cluster probabilities must be non-negative.")
+        if any(prob == 0.0 for prob in self.cluster_relative_weights):
+            warnings.warn("Some cluster probabilities are zero. These clusters will not be used in the initial "
+                          "configuration.")
         for t in self.masses:
             if not isinstance(t, str):
                 raise TypeError("The types of the masses dictionary must be strings.")

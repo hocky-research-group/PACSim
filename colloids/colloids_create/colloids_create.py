@@ -1,5 +1,6 @@
 import argparse
 import inspect
+import warnings
 from ase.io.lammpsdata import read_lammps_data
 import gsd.hoomd
 import numpy as np
@@ -85,13 +86,13 @@ def check_frame_types(frame: gsd.hoomd.Frame, masses: dict[str, unit.Quantity], 
             raise ValueError(f"Type {t} of the frame is not in the surface potentials dictionary.")
     for t in masses:
         if t not in frame.particles.types:
-            raise ValueError(f"Type {t} of the masses dictionary is not in the frame.")
+            warnings.warn(f"Type {t} of the masses dictionary is not in the frame.")
     for t in radii:
         if t not in frame.particles.types:
-            raise ValueError(f"Type {t} of the radii dictionary is not in the frame.")
+            warnings.warn(f"Type {t} of the radii dictionary is not in the frame.")
     for t in surface_potentials:
         if t not in frame.particles.types:
-            raise ValueError(f"Type {t} of the surface potentials dictionary is not in the frame.")
+            warnings.warn(f"Type {t} of the surface potentials dictionary is not in the frame.")
 
 
 def main():

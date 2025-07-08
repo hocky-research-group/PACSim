@@ -151,14 +151,9 @@ class ClusterGenerator(ConfigurationGenerator):
             r = (self._lattice_repeats, self._lattice_repeats, self._lattice_repeats)
         else:
             r = self._lattice_repeats
-        repeated_cluster = choices(centered_padded_clusters, weights=self._cluster_relative_weights, k=1)[0].copy()
-        if "bonds" in repeated_cluster.arrays:
-            bond_pairs = [(first_index, second_index)
-                          for first_index, bonds in enumerate(repeated_cluster.arrays["bonds"])
-                          for second_index in self._extract_bonded_indices(bonds)]
-        else:
-            bond_pairs = []
 
+        repeated_cluster = None
+        bond_pairs = []
         # All cells are assumed to be the same so we can use the first one.
         cell = centered_padded_clusters[0].get_cell()
         # Adapted from ase's repeat function.
@@ -184,18 +179,28 @@ class ClusterGenerator(ConfigurationGenerator):
                                              "rotation padding distance to allow for rotations.")
                     # Translate the unwrapped positions of the new cluster to the correct repeat.
                     unwrapped_positions += np.dot((r0, r1, r2), cell)
-                    # Concatenate the arrays of the new cluster to the repeated cluster.
-                    for name, a in new_cluster.arrays.items():
-                        if name != "bonds":
-                            repeated_cluster.arrays[name] = np.concatenate((repeated_cluster.arrays[name], a),
-                                                                           axis=0)
-                        else:
-                            # For the bonds, we need to adjust the indices to account for the repetitions.
-                            bond_pairs += [(first_index + i0, second_index + i0)
+                    if repeated_cluster is None:
+                        # If this is the first cluster, we create the repeated cluster.
+                        assert r0 == r1 == r2 == i0 == 0
+                        repeated_cluster = new_cluster.copy()
+                        if "bonds" in repeated_cluster.arrays:
+                            # Extract the bonds and adjust the indices to account for the repetitions.
+                            bond_pairs += [(first_index, second_index)
                                            for first_index, bonds in enumerate(new_cluster.arrays["bonds"])
                                            for second_index in self._extract_bonded_indices(bonds)]
-                    # Set the positions of the repeated cluster to the unwrapped positions.
-                    repeated_cluster.arrays["positions"][i0:i0 + len(new_cluster)] = unwrapped_positions
+                    else:
+                        # Concatenate the arrays of the new cluster to the repeated cluster.
+                        for name, a in new_cluster.arrays.items():
+                            if name != "bonds":
+                                repeated_cluster.arrays[name] = np.concatenate((repeated_cluster.arrays[name], a),
+                                                                               axis=0)
+                            else:
+                                # For the bonds, we need to adjust the indices to account for the repetitions.
+                                bond_pairs += [(first_index + i0, second_index + i0)
+                                               for first_index, bonds in enumerate(new_cluster.arrays["bonds"])
+                                               for second_index in self._extract_bonded_indices(bonds)]
+                        # Set the positions of the repeated cluster to the unwrapped positions.
+                        repeated_cluster.arrays["positions"][i0:i0 + len(new_cluster)] = unwrapped_positions
                     i0 += len(new_cluster)
 
         # Enlarge the cell of the repeated cluster.

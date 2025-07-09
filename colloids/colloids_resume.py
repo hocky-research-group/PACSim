@@ -5,7 +5,7 @@ from openmm import app
 from colloids.colloids_run import set_up_simulation, set_up_reporters, check_frame, get_cell_from_box
 from colloids.helper_functions import read_gsd_file, write_gsd_file
 from colloids.run_parameters import RunParameters
-from colloids.units import electric_potential_unit, length_unit
+from colloids.units import electric_potential_unit, length_unit, time_unit
 
 
 def colloids_resume(argv: Sequence[str]) -> app.Simulation:
@@ -24,17 +24,21 @@ def colloids_resume(argv: Sequence[str]) -> app.Simulation:
 
     parameters = RunParameters.from_yaml(args.yaml_file)
 
-    frame = read_gsd_file(parameters.initial_configuration, parameters.frame_index)
-
-    check_frame(parameters, frame)
-
-    simulation = set_up_simulation(parameters, frame)
-
     if args.checkpoint_file.endswith(".gsd"):
-        # If the checkpoint file is a GSD file, load the state from it
-        simulation.loadState(args.checkpoint_file)
+        # If the checkpoint file is a GSD file, read the gsd file
+        frame = read_gsd_file(args.checkpoint_file, -1)
+        check_frame(parameters, frame)
+
+        simulation = set_up_simulation(parameters, frame)
+        simulation.context.setPositions(frame.particles.position * length_unit)
+        simulation.context.setVelocities(frame.particles.velocity * length_unit / time_unit)
+
     elif args.checkpoint_file.endswith(".chk"):
         # If the checkpoint file is a checkpoint file, load the state from it
+        frame = read_gsd_file(parameters.initial_configuration, parameters.frame_index)
+        check_frame(parameters, frame)
+
+        simulation = set_up_simulation(parameters, frame)
         simulation.loadCheckpoint(args.checkpoint_file)
 
     set_up_reporters(parameters, simulation, True, args.number_steps, frame)

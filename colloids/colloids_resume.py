@@ -32,6 +32,7 @@ def colloids_resume(argv: Sequence[str]) -> app.Simulation:
         simulation = set_up_simulation(parameters, frame)
         simulation.context.setPositions(frame.particles.position * length_unit)
         simulation.context.setVelocities(frame.particles.velocity * length_unit / time_unit)
+        set_up_reporters(parameters, simulation, False, args.number_steps, frame)
 
     elif args.checkpoint_file.endswith(".chk"):
         # If the checkpoint file is a checkpoint file, load the state from it
@@ -40,8 +41,7 @@ def colloids_resume(argv: Sequence[str]) -> app.Simulation:
 
         simulation = set_up_simulation(parameters, frame)
         simulation.loadCheckpoint(args.checkpoint_file)
-
-    set_up_reporters(parameters, simulation, True, args.number_steps, frame)
+        set_up_reporters(parameters, simulation, True, args.number_steps, frame)
 
     simulation.step(args.number_steps)
 

@@ -97,9 +97,6 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             raise ValueError("argument alpha must satisfy 0 <= alpha <= 1")
         if alpha != 1.0:
             warnings.warn("The force of the shifted Lennard-Jones potential as a wall is only continuous if alpha = 1.")
-        if use_substrate:
-            if not all(wall_directions):
-                raise ValueError("all wall directions must be active if a substrate is used")
 
         self._wall_distances = wall_distances
         self._epsilon = epsilon

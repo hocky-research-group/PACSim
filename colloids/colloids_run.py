@@ -63,10 +63,6 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
                               "Analytical computation of depletion potential may be invalid."
                               "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
                               "pp 10079 - 10106.")
-    use_substrate = any(mass == 0.0 for mass in frame.particles.mass)
-    if use_substrate:
-        if not all(parameters.wall_directions):
-            raise ValueError("A substrate can only be used if all walls are active.")
 
 
 def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.Simulation:

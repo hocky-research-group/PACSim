@@ -189,15 +189,14 @@ class ClusterGenerator(ConfigurationGenerator):
                 [[first_index + i * len(centered_padded_cluster),
                   second_index + i * len(centered_padded_cluster)]
                  for i in range(number_repetitions) for first_index, second_index in bond_pairs], dtype=np.uint32)
-            all_distances = repeated_cluster.get_all_distances()
-            # Distances within all replicas should be the same.
-            assert all(np.allclose(all_distances[i * len(centered_padded_cluster):(i + 1) * len(centered_padded_cluster),
-                                                 i * len(centered_padded_cluster):(i + 1) * len(centered_padded_cluster)],
-                                   centered_padded_cluster.get_all_distances()) for i in range(number_repetitions))
+            all_positions = repeated_cluster.get_positions()
+            all_positions = all_positions[:len(centered_padded_cluster)]
+            all_distances = np.linalg.norm(
+                all_positions[:, np.newaxis] - all_positions[np.newaxis, :], axis=-1)
             all_values = np.array(
-                [all_distances[first_index + i * len(centered_padded_cluster),
-                               second_index + i * len(centered_padded_cluster)]
-                for i in range(number_repetitions) for first_index, second_index in bond_pairs], dtype=np.float32)
+                [all_distances[(first_index, second_index)]
+                 for i in range(number_repetitions)
+                for first_index, second_index in bond_pairs], dtype=np.float32)
 
             frame.constraints.N = len(bond_pairs) * number_repetitions
             frame.constraints.group = all_constraints

@@ -178,6 +178,10 @@ def set_up_simulation(parameters: RunParameters, types: Sequence[str], cell: npt
     else:
         gravitational_potential = None
 
+    if parameters.use_plumed:
+        script = open(parameters.plumed_script, "r")
+        system.addForce(PlumedForce(script))
+
     # ------------------------------------- Add all particles to the system. -------------------------------------------
     for t in types:
         system.addParticle(parameters.masses[t])
@@ -394,6 +398,35 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
     if parameters.final_configuration_xyz_filename is not None:
         write_xyz_file(parameters.final_configuration_xyz_filename, simulation, cell * (unit.nano * unit.meter))
 
+   if parameters.use_plumed:
+        with (gsd.hoomd.open(parameters.trajectory_filename, "r") as file_read,
+              gsd.hoomd.open(f"trajectory_lq6.gsd", "w") as file_write):
+            for i, frame in enumerate(file_read):
+                if i == 0:
+                    frame.particles.charge = np.zeros(frame.particles.N)
+                else:
+                    lq6 = np.loadtxt("LQ6MULTICOLVAR.xyz", skiprows=i * 2 + (i - 1) * number_particles,
+                                     max_rows=number_particles, usecols=(4,))
+                    assert len(lq6) > 0
+                    frame.particles.charge = lq6
+                file_write.append(frame)
+                file_write.flush()
+
+        with (gsd.hoomd.open("trajectory.gsd", "r") as file_read,
+              gsd.hoomd.open("trajectory_q6.gsd", "w") as file_write):
+            for i, frame in enumerate(file_read):
+                if i == 0:
+                    frame.particles.charge = np.zeros(frame.particles.N)
+                else:
+                    lq6 = np.loadtxt("Q6MULTICOLVAR.xyz", skiprows=i * 2 + (i - 1) * number_particles,
+                                     max_rows=number_particles, usecols=(4,))
+                    assert len(lq6) > 0
+                    frame.particles.charge = lq6
+                file_write.append(frame)
+                file_write.flush()
+ 
+    
+    
     return simulation
 
 

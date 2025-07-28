@@ -298,6 +298,8 @@ class RunParameters(Parameters):
     cutoff_factor: float = 21.0
     use_log: bool = False
     use_tabulated: bool = False
+    use_plumed: bool = False
+    plumed_script: Optional[stores] = None
     velocity_seed: Optional[int] = None
     run_steps: int = 100
     state_data_interval: int = 100

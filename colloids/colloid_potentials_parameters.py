@@ -74,6 +74,8 @@ class ColloidPotentialsParameters(object):
         self._debye_length = debye_length.in_units_of(unit.nano * unit.meter)
         self._temperature = temperature.in_units_of(unit.kelvin)
         self._dielectric_constant = dielectric_constant
+        self._psi1_scale = psi1_scale
+        self._psi2_scale = psi2_scale
 
     @property
     def brush_density(self) -> unit.Quantity:
@@ -94,6 +96,14 @@ class ColloidPotentialsParameters(object):
     @property
     def dielectric_constant(self) -> float:
         return self._dielectric_constant
+
+    @property
+    def psi1_scale(self) -> float:
+        return self._psi1_scale
+
+    @property
+    def psi2_scale(self) -> float:
+        return self._psi2_scale
         
 
 if __name__ == '__main__':

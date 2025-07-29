@@ -299,7 +299,7 @@ class RunParameters(Parameters):
     use_log: bool = False
     use_tabulated: bool = False
     use_plumed: bool = False
-    plumed_script: Optional[stores] = None
+    plumed_script: Optional[str] = None
     velocity_seed: Optional[int] = None
     run_steps: int = 100
     state_data_interval: int = 100

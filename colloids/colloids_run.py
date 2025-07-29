@@ -19,7 +19,10 @@ from colloids.run_parameters import RunParameters
 from colloids.substrate import substrate_positions_hexagonal
 from colloids.status_reporter import StatusReporter
 import colloids.update_reporters as update_reporters
-from openmmplumed import PlumedForce
+try:
+    from openmmplumed import PlumedForce
+except ModuleNotFoundError:
+    pass
 import gsd.hoomd
 
 

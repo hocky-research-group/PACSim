@@ -68,6 +68,7 @@ update_reporter_parameters:
 use_depletion: true
 use_gravity: true
 use_log: false
+use_plumed: false
 velocity_seed: 2
 wall_directions:
   - true

@@ -238,6 +238,15 @@ class RunParameters(Parameters):
         and an append_file boolean that should not appear in this dictionary.
         Defaults to None.
     :type update_reporter_parameters: Optional[dict[str, Any]]
+    :param use_plumed: 
+        A boolean indicating whether to interface a simulation with the PLUMED plugin.
+        If true, plumed_script must be specified and must point to a plumed input file.
+        Defaults to False.
+    :type use_plumed: bool
+    :param plumed_script
+        A plumed input file to be used for interfacing with a simulation.
+    :type plumed_script: Optional[str]
+
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -287,6 +296,8 @@ class RunParameters(Parameters):
     particle_density: Optional[unit.Quantity] = None
     update_reporter: Optional[str] = None
     update_reporter_parameters: Optional[dict[str, Any]] = None
+    use_plumed: bool = False
+    plumed_script: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -423,7 +434,12 @@ class RunParameters(Parameters):
         else:
             if self.update_reporter_parameters is not None:
                 raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")
-
+        if self.use_plumed:
+            if self.plumed_script is None:
+                raise ValueError("PLUMED input file must be specified if using PLUMED.")
+        else:
+            if self.plumed_script is not None:
+                raise ValueError("PLUMED input file must not be specified if PLUMED is not being used.")
 
 if __name__ == '__main__':
     RunParameters(initial_configuration="tests/first_frame.xyz").to_yaml("example.yaml")

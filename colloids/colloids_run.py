@@ -15,7 +15,7 @@ from colloids.run_parameters import RunParameters
 from colloids.status_reporter import StatusReporter
 import colloids.update_reporters as update_reporters
 from colloids.units import electric_potential_unit, length_unit
-
+from openmmplumed import PlumedForce
 
 class ExampleAction(argparse.Action):
     def __init__(self, option_strings, dest, **kwargs):
@@ -163,6 +163,14 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
                                           parameters.particle_density)
     else:
         gravitational_potential = None
+
+    if parameters.use_plumed:
+        f = open(parameters.plumed_script, "r")
+        script=''
+        for line in f.readlines()[1:]:
+            script+=line
+        
+        system.addForce(PlumedForce(script))
 
     # --------------------------- Add all particles and constraints to the system. -------------------------------------
     for mass in frame.particles.mass:

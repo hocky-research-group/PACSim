@@ -6,8 +6,7 @@ Install and setup [Git Large File Storage](https://git-lfs.com) (used for the la
 
 If you only want to use the openmm part of this package, you can use Python 3.12 (or any older version >= 3.10).
 
-If you want to use the Hoomd part of this package, use Python 3.10 because that is the latest Python version that is 
-supported by Hoomd < 3.
+If you want to use the Hoomd or openmm-plumed parts of this package, use Python 3.10 because that is the latest Python version that is supported by Hoomd < 3 and openmm-plumed v2.
 
 We recommend installing Python and the required packages using 
 [Anaconda](https://www.anaconda.com/products/distribution). 
@@ -17,13 +16,27 @@ The following packages are required:
 - jupyterlab >= 4.1 
 - matplotlib >= 3.8
 - numpy >= 1.26
-- openmm >= 8.0
+- openmm >= 8.1
 - pytest >= 7.4
 - gsd >= 3.2
 - pyyaml >= 6.0
 - tqdm >= 4.65
 - pandas >= 2.2
 - hoomd == 2.9.7
+- plumed == 2.9.0
+- openmm-plumed v2
+
+Note that some PLUMED modules that are necessary for functionality such as calculation of local order parameters and adjacency matrices are not compiled by default, but can be enabled during configuration. 
+We recommend enabling the crystallization, multicolvar, and adjmat modules when compiling:
+
+```bash
+./configure --enable-modules=crystallization+multicolvar+adjmat
+```
+ 
+PLUMED 2.9.0 is available for download [here](https://github.com/plumed/plumed2/releases/tag/v2.9.0). Instructions for configuring and compiling can be found [here](https://www.plumed.org/doc-v2.9/user-doc/html/_installation.html). 
+
+After installing and configuring PLUMED, openmm-plumed can be installed by following [these instructions](https://github.com/openmm/openmm-plumed).
+ 
 
 ## Installation
 
@@ -33,8 +46,7 @@ Clone the repository and install the package in editable mode in your virtual en
 pip install -e .
 ```
 
-Note that this attempts to install the requirements with pip, if you did not install them yourself before. However, 
-because hoomd is not available on PyPI, you need to install it manually (or via conda).
+Note that this attempts to install the requirements with pip, if you did not install them yourself before. However, because hoomd and openmm-plumed are not available on PyPI, you need to install them manually (or via conda). If plumed was not previously configured, it will be installed at this point with default modules and some functionality may not be available.
 
 ## Testing
 

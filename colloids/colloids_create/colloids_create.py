@@ -6,6 +6,7 @@ from openmm import unit
 from colloids.colloids_create.configuration_parameters import ConfigurationParameters
 from colloids.colloids_create.cluster_generator import ClusterGenerator
 from colloids.colloids_create.substrate_modifier import SubstrateModifier
+from colloids.colloids_create.trajectory_wrapper import TrajectoryWrapper
 from colloids.units import electric_potential_unit, length_unit, mass_unit
 
 
@@ -140,6 +141,13 @@ def main():
     frame.particles.diameter = np.array(
         [2.0 * configuration_parameters.radii[frame.particles.types[i]].value_in_unit(length_unit)
          for i in frame.particles.typeid], dtype=np.float32)
+
+    if configuration_parameters.crystal_seed_file is not None:
+        base_trajectory = TrajectoryWrapper(trajectory=[frame])
+        seed_trajectory = TrajectoryWrapper(filename=configuration_parameters.crystal_seed_file)
+
+        base_trajectory.seed_particles(seed_trajectory, epsilon=20.0)
+        frame = base_trajectory[base_trajectory.current_frame]
 
     with gsd.hoomd.open(name=args.save_file, mode="w") as f:
         f.append(frame)

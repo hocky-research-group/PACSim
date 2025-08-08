@@ -163,7 +163,7 @@ class ClusterGenerator(ConfigurationGenerator):
 
         frame = Frame()
         frame.particles.N = len(repeated_cluster)
-        frame.particles.types = tuple(set(str(atom.number) for atom in repeated_cluster))
+        frame.particles.types = tuple(sorted(list(set(str(atom.number) for atom in repeated_cluster))))
         frame.particles.typeid = np.array([frame.particles.types.index(str(atom.number))
                                            for atom in repeated_cluster], dtype=np.uint32)
         frame.particles.position = repeated_cluster.positions.astype(np.float32)

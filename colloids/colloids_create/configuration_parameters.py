@@ -87,6 +87,14 @@ class ConfigurationParameters(Parameters):
         The unit of the surface potentials must be compatible with millivolts.
         Defaults to {"1": 44.0 * millivolt, "2": -54.0 * millivolt}.
     :type surface_potentials: dict[str, unit.Quantity]
+    :param seed_file:
+        The gsd file with the crystal seed to be used for the colloids.
+        If a seed file is specified, the colloids are placed in the crystal lattice and then the seed is placed in the
+        center of the simulation box, overwriting the colloids in the center.
+        If no seed file is specified, the initial configuration is created from the cluster definition.
+        Must be a .gsd file.
+        Defaults to None.
+    :type seed_file: Optional[str]
     :param use_substrate:
         A boolean indicating whether to place a substrate at the bottom of the simulation box.
         In a simulation with colloids_run, a substrate can only be used when all walls are active. The bottom wall is
@@ -127,6 +135,7 @@ class ConfigurationParameters(Parameters):
                                                                      "2": 95.0 * length_unit})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"1": 44.0 * electric_potential_unit, "2": -54.0 * electric_potential_unit})
+    crystal_seed_file: Optional[str] = None
     use_substrate: bool = False
     substrate_type: Optional[str] = None
 
@@ -209,6 +218,10 @@ class ConfigurationParameters(Parameters):
             raise ValueError("Cluster padding factor must be greater than zero.")
         if self.padding_factor <= 0.0:
             raise ValueError("Padding factor must be greater than zero.")
+
+        if self.crystal_seed_file is not None:
+            if not self.crystal_seed_file.endswith(".gsd"):
+                raise ValueError("Seed file must be a .gsd file.")
 
         if self.use_substrate:
             if self.substrate_type is None:

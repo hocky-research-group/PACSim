@@ -143,10 +143,11 @@ def main():
          for i in frame.particles.typeid], dtype=np.float32)
 
     if configuration_parameters.crystal_seed_file is not None:
+        overlap_distance = configuration_parameters.seed_overlap_distance.value_in_unit(length_unit)
         base_trajectory = TrajectoryWrapper(trajectory=[frame])
         seed_trajectory = TrajectoryWrapper(filename=configuration_parameters.crystal_seed_file)
 
-        base_trajectory.seed_particles(seed_trajectory, epsilon=20.0)
+        base_trajectory.seed_particles(seed_trajectory, epsilon=overlap_distance)
         frame = base_trajectory[base_trajectory.current_frame]
 
     with gsd.hoomd.open(name=args.save_file, mode="w") as f:

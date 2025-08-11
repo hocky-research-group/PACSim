@@ -142,13 +142,18 @@ def main():
         [2.0 * configuration_parameters.radii[frame.particles.types[i]].value_in_unit(length_unit)
          for i in frame.particles.typeid], dtype=np.float32)
 
-    if configuration_parameters.crystal_seed_file is not None:
+    if configuration_parameters.seed_files is not None:
+        # Set the particle velocities to zero before seeding. They will be set to the correct values in the run script.
         overlap_distance = configuration_parameters.seed_overlap_distance.value_in_unit(length_unit)
+        frame.particles.velocity = np.zeros((frame.particles.N, 3), dtype=np.float32)
         base_trajectory = TrajectoryWrapper(trajectory=[frame])
-        seed_trajectory = TrajectoryWrapper(filename=configuration_parameters.crystal_seed_file)
 
-        base_trajectory.seed_particles(seed_trajectory, epsilon=overlap_distance)
-        frame = base_trajectory[base_trajectory.current_frame]
+        for seed_file, seed_fractional_coordinates in zip(configuration_parameters.seed_files,
+                                                          configuration_parameters.seed_fractional_coordinates):
+            seed_trajectory = TrajectoryWrapper(filename=seed_file)
+
+            base_trajectory.seed_particles(seed_trajectory, epsilon=overlap_distance, seed_fractional_coords=seed_fractional_coordinates)
+            frame = base_trajectory[base_trajectory.current_frame]
 
     with gsd.hoomd.open(name=args.save_file, mode="w") as f:
         f.append(frame)

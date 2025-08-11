@@ -5,6 +5,7 @@ from typing import Sequence
 import warnings
 import gsd.hoomd
 import openmm
+import numpy as np
 from openmm import app
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
                       DepletionPotential, Gravity, LennardJonesPotential)
@@ -303,6 +304,16 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
                                                       parameters.velocity_seed)
     else:
         simulation.context.setVelocitiesToTemperature(parameters.potential_temperature)
+
+    # Check if the frame already contains velocities.
+    if frame.particles.velocity is not None:
+        velocities = frame.particles.velocity
+    else:
+        velocities = None
+
+    if velocities is not None:
+        temp_velocities = simulation.context.getState(getVelocities=True).getVelocities(asNumpy=True)
+        velocities = np.where(velocities != 0.0, temp_velocities, velocities)
 
     if parameters.minimize_energy_initially:
         # TODO: Do we want this?

@@ -1,0 +1,444 @@
+import pdb
+import argparse
+import inspect
+import sys
+from typing import Sequence
+import warnings
+import gsd.hoomd
+import openmm
+from openmm import app
+from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls, DepletionPotential, Gravity)
+from colloids.gsd_reporter import GSDReporter
+from colloids.helper_functions import get_cell_from_box, read_gsd_file, write_gsd_file
+import colloids.integrators as integrators
+from colloids.run_parameters import RunParameters
+from colloids.status_reporter import StatusReporter
+import colloids.update_reporters as update_reporters
+from colloids.units import electric_potential_unit, length_unit
+
+import torch
+from openmmtorch import TorchForce
+from rsh import rsh_cart_6
+
+
+def calc_stein_single(i: int, pos, num_nbs: int, order: int, device: torch.device):
+    disps = pos - pos[i]
+    dists = torch.square(disps)
+    dists = torch.sum(dists, dim=(1))
+    dists = torch.sqrt(dists)
+    
+    inds_nbs = torch.argsort(dists)[1:num_nbs+1]
+    disps = pos[inds_nbs] - pos[i]
+    dists = torch.sqrt(torch.sum(torch.square(disps), dim=(1)))
+    disps_nbs = disps.T/dists
+    disps_nbs = disps_nbs.T
+
+    Y_nm = rsh_cart_6(disps_nbs, device)
+    q_nm_2 = torch.square(torch.mean(Y_nm, dim=(0)))
+    q_n = torch.zeros(order+1, device=device)
+    for n in range(order+1):
+        for m in range(-n, n+1):
+            q_n[n] += q_nm_2[n*(n+1) + m]
+        q_n[n] = torch.sqrt(4*torch.pi/(2*n+1)*q_n[n])
+    return q_n[order], inds_nbs
+
+def calc_stein(pos, num_nbs: int, order: int, device: torch.device):
+    natoms = len(pos)
+
+    q_n, inds_nbs = calc_stein_single(0, pos, num_nbs, order, device)
+    for i in range(1, natoms):
+        q_n_i, _ = calc_stein_single(i, pos, num_nbs, order, device)
+        q_n = q_n + q_n_i
+    return q_n/natoms
+
+class Q6Module(torch.nn.Module):
+    def __init__(self, num_nbs, order):
+        super().__init__()
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        else:
+            self.device = torch.device("cpu")
+        self.num_nbs = num_nbs
+        self.order = order
+
+    def forward(self, positions):
+        positions = positions.float()
+        q_n = calc_stein(positions, self.num_nbs, self.order, self.device)
+        return q_n
+
+class CVReporter(object):
+    def __init__(self, file, reportInterval, cv):
+        self._out = open(file, 'w')
+        self._out.write('Timestep CV\n')
+        self._reportInterval = reportInterval
+        self._cv = cv
+
+    def __del__(self):
+        self._out.close()
+
+    def describeNextReport(self, simulation):
+        steps = self._reportInterval - simulation.currentStep%self._reportInterval
+        return (steps, False, False, True, False, None)
+
+    def report(self, simulation, state):
+        cv_val = self._cv.getCollectiveVariableValues(simulation.context)[0]
+        self._out.write('%d ' % simulation.currentStep)
+        self._out.write('%.5f ' % (cv_val))
+        self._out.write('\n')
+        self._out.flush()
+
+        
+class EnergyReporter(object):
+    def __init__(self, file, reportInterval, system):
+        self._out = open(file, 'w')
+        self._out.write('Timestep ')
+        for i, f in enumerate(system.getForces()):
+            self._out.write('%s ' % f.getName())
+        self._out.write('\n')
+        self._reportInterval = reportInterval
+
+    def __del__(self):
+        self._out.close()
+
+    def describeNextReport(self, simulation):
+        steps = self._reportInterval - simulation.currentStep%self._reportInterval
+        return (steps, False, False, True, False, None)
+
+    def report(self, simulation, state):
+        self._out.write('%d ' % simulation.currentStep)
+        for i, f in enumerate(simulation.system.getForces()):
+            # if f.getForceGroup() != 0: continue
+            istate = simulation.context.getState(getEnergy=True, groups={i})
+            self._out.write('%.5f ' % (istate.getPotentialEnergy()._value))
+        self._out.write('\n')
+        self._out.flush()
+        
+
+class ExampleAction(argparse.Action):
+    def __init__(self, option_strings, dest, **kwargs):
+        super().__init__(option_strings, dest, nargs=0, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        # TODO ADD OPTION FOR PLATFORM PROPERTIES?
+        # TODO PUT EQUILIBRATION STEPS?
+        default_parameters = RunParameters()
+        default_parameters.to_yaml("example.yaml")
+        parser.exit()
+
+
+def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
+    """Check the frame and the run parameters."""
+    for diameter in frame.particles.diameter:
+        if not diameter > 0.0:
+            raise ValueError("Every diameter must be greater than zero.")
+    for mass in frame.particles.mass:
+        if not mass >= 0.0:
+            raise ValueError("Every mass must be greater than or equal to zero.")
+    for constraint_value in frame.constraints.value:
+        if not constraint_value > 0.0:
+            raise ValueError("Every constraint distance must be greater than zero.")
+
+    if any(parameters.wall_directions):
+        # Check for orthogonal box vectors if walls should be included.
+        if not all(a == 0.0 for a in frame.configuration.box[3:]):
+            raise ValueError("If any wall is included, the box vectors must be parallel to the coordinate axes.")
+        # If not all walls are present, the box of OpenMM needs to be enlarged because OpenMM will use periodic
+        # boundaries, and we do not want to let particles interact through the walls. The enlargement of the box does
+        # currently not consider the depletant radius, which is why it should be small enough.
+        if not all(parameters.wall_directions):
+            if parameters.use_depletion:
+                if (parameters.depletant_radius
+                        > (parameters.cutoff_factor * parameters.debye_length - 2.0 * parameters.brush_length) / 2.0):
+                    raise ValueError("The depletant radius is too large for the cutoff factor and brush length when "
+                                     "partial walls are included (r_d <= (cutoff_factor * lambda_D - 2 * L) / 2)")
+
+    if parameters.use_depletion:
+        assert (parameters.depletant_radius is not None and parameters.depletant_radius.value_in_unit(length_unit) > 0.0)
+        for diameter in frame.particles.diameter:
+            if parameters.depletant_radius.value_in_unit(length_unit) / (diameter / 2.0) > 0.1547:
+                warnings.warn("Size ratio of depletant to colloid particles is too large. "
+                              "Analytical computation of depletion potential may be invalid."
+                              "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
+                              "pp 10079 - 10106.")
+    use_substrate = any(mass == 0.0 for mass in frame.particles.mass)
+    if use_substrate:
+        if not all(parameters.wall_directions):
+            raise ValueError("A substrate can only be used if all walls are active.")
+
+
+def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.Simulation:
+    radii = frame.particles.diameter / 2.0 * length_unit
+    surface_potentials = frame.particles.charge * electric_potential_unit
+
+    # ----------------------------------- Set up system and parameters. ------------------------------------------------
+    topology = app.topology.Topology()
+    chain = topology.addChain()
+    residue = topology.addResidue("res", chain)
+
+    atoms = []
+    for type_id in frame.particles.typeid:
+        atoms.append(topology.addAtom(frame.particles.types[type_id], None, residue))
+
+    system = openmm.System()
+
+    cell = get_cell_from_box(frame.configuration.box)
+    include_walls = any(parameters.wall_directions)
+    all_walls = all(parameters.wall_directions)
+    if include_walls:
+        box_vector_one = cell[0]
+        box_vector_two = cell[1]
+        box_vector_three = cell[2]
+        assert (box_vector_one[1] == 0.0 and box_vector_one[2] == 0.0 and
+                box_vector_two[0] == 0.0 and box_vector_two[2] == 0.0 and
+                box_vector_three[0] == 0.0 and box_vector_three[1] == 0.0)
+        wall_distances = (box_vector_one[0] * length_unit if parameters.wall_directions[0] else None,
+                          box_vector_two[1] * length_unit if parameters.wall_directions[1] else None,
+                          box_vector_three[2] * length_unit if parameters.wall_directions[2] else None)
+        final_cell = cell.copy()
+        if not all_walls:
+            assert (not parameters.use_depletion
+                    or parameters.depletant_radius
+                    > (parameters.cutoff_factor * parameters.debye_length - 2.0 * parameters.brush_length) / 2.0)
+            for index, wall_direction in enumerate(parameters.wall_directions):
+                if wall_direction:
+                    # The shifted Lennard Jones walls diverge at distance r = radius - 1 from the location of the wall,
+                    # where radius is the radius of the particle. The minimum distance between periodic images through
+                    # a wall is thus 2 * radius_min - 2, where radius_min is the smallest radius in the system.
+                    # The maximum cutoff of the electrostatic interactions is
+                    # 2 * radius_max + cutoff_factor * debye_length. In order to prevent particles from interacting
+                    # through the walls, we thus increase the length of the periodic box vectors (not the wall) by
+                    # 2 * (radius_max - radius_min) + 2 + cutoff_factor * debye_length.
+                    final_cell[index][index] += \
+                        (2.0 * (max(radii) - min(radii)) + 2.0 * length_unit
+                         + parameters.cutoff_factor * parameters.debye_length).value_in_unit(length_unit)
+    else:
+        wall_distances = None
+        final_cell = cell
+
+    if not all_walls:
+        topology.setPeriodicBoxVectors(final_cell)
+        system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
+                                            openmm.Vec3(*final_cell[2]))
+
+    # Substrate is detected by immobile particles with mass 0.0.
+    use_substrate = any(mass == 0.0 for mass in frame.particles.mass)
+
+    # TODO: Prevent printing the traceback when the platform is not existing.
+    platform = openmm.Platform.getPlatformByName(parameters.platform_name)
+
+    integrator = getattr(integrators, parameters.integrator)(**parameters.integrator_parameters)
+
+    potentials_parameters = ColloidPotentialsParameters(
+        brush_density=parameters.brush_density, brush_length=parameters.brush_length,
+        debye_length=parameters.debye_length, temperature=parameters.potential_temperature,
+        dielectric_constant=parameters.dielectric_constant)
+
+    # ---------------------------------------- Create all forces. ------------------------------------------------------
+    colloid_potentials = ColloidPotentialsAlgebraic(
+        colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
+        cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls,
+        steric_radius_average=parameters.steric_radius_average,
+        electrostatic_radius_average=parameters.electrostatic_radius_average)
+
+    if include_walls:
+        slj_walls = ShiftedLennardJonesWalls(wall_distances, parameters.epsilon, parameters.alpha,
+                                             parameters.wall_directions, use_substrate)
+    else:
+        slj_walls = None
+
+    if parameters.use_depletion:
+        depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,
+                                                 brush_length=parameters.brush_length,
+                                                 temperature=parameters.potential_temperature,
+                                                 periodic_boundary_conditions=not all_walls)
+    else:
+        depletion_potential = None
+
+    if parameters.use_gravity:
+        assert all_walls
+        gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density,
+                                          parameters.particle_density)
+    else:
+        gravitational_potential = None
+
+    num_nbs = 6
+    q_order = 6
+    cvmodule = torch.jit.script(Q6Module(num_nbs, q_order))
+    cv = TorchForce(cvmodule)
+    cv.setUsesPeriodicBoundaryConditions(False)
+
+    cvforce = openmm.CustomCVForce('cv')
+    cvforce.addCollectiveVariable('cv', cv)
+    system.addForce(cvforce)
+        
+    # --------------------------- Add all particles and constraints to the system. -------------------------------------
+    for mass in frame.particles.mass:
+        system.addParticle(mass)
+
+    for i in range(frame.constraints.N):
+        if not len(frame.constraints.group[i]) == 2:
+            raise ValueError("Every constraint must have exactly two particles.")
+        system.addConstraint(frame.constraints.group[i][0], frame.constraints.group[i][1], frame.constraints.value[i])
+
+    # ------------------------------------- Add all particles to the forces. -------------------------------------------
+    # Be careful to add the particles in the same order as to the system.
+    for i in range(frame.particles.N):
+        is_substrate = frame.particles.mass[i] == 0.0
+        colloid_potentials.add_particle(radius=radii[i], surface_potential=surface_potentials[i],
+                                        substrate_flag=is_substrate)
+        if include_walls and not is_substrate:
+            slj_walls.add_particle(index=i, radius=radii[i])
+        if parameters.use_depletion:
+            depletion_potential.add_particle(radius=radii[i], substrate_flag=is_substrate)
+        if parameters.use_gravity and not is_substrate:
+            gravitational_potential.add_particle(index=i, radius=radii[i])
+
+    for i in range(frame.constraints.N):
+        colloid_potentials.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
+        if parameters.use_depletion:
+            depletion_potential.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
+
+    # -------------------------------------- Add all forces to the system. ---------------------------------------------
+    for force in colloid_potentials.yield_potentials():
+        system.addForce(force)
+
+    if include_walls:
+        for force in slj_walls.yield_potentials():
+            system.addForce(force)
+
+    if parameters.use_depletion:
+        for force in depletion_potential.yield_potentials():
+            system.addForce(force)
+
+    if parameters.use_gravity:
+        assert all_walls
+        for force in gravitational_potential.yield_potentials():
+            system.addForce(force)
+        assert not system.usesPeriodicBoundaryConditions()
+        
+    # -------------------------------------- Set up the simulation. ----------------------------------------------------
+    # Keep track of which force groups to integrate
+    forces_to_integrate = set()
+    if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":
+        # Set different force groups for the nonbonded potentials to allow for different cutoffs on the OpenCL and CUDA
+        # platforms.
+        cutoffs = []
+        for force in system.getForces():
+            if isinstance(force, (openmm.NonbondedForce, openmm.CustomNonbondedForce)):
+                assert (force.getNonbondedMethod() == openmm.NonbondedForce.CutoffPeriodic
+                        or force.getNonbondedMethod() == openmm.NonbondedForce.CutoffNonPeriodic)
+                cutoff_distance = force.getCutoffDistance()
+                cutoff_distance_index = -1
+                for other_cutoff_index in range(len(cutoffs)):
+                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(length_unit)) < 1.0e-6:
+                        cutoff_distance_index = other_cutoff_index
+                if cutoff_distance_index == -1:
+                    cutoffs.append(cutoff_distance)
+                    cutoff_distance_index = len(cutoffs) - 1
+                else:
+                    force.setCutoffDistance(cutoffs[cutoff_distance_index])
+                force.setForceGroup(cutoff_distance_index)
+                forces_to_integrate.add(cutoff_distance_index)
+
+    # Include all forces except the CV force
+    cvforce.setForceGroup(max(list(forces_to_integrate))+1)
+    integrator.setIntegrationForceGroups(forces_to_integrate)
+    
+    if parameters.platform_name == "CUDA":
+        simulation = app.Simulation(topology, system, integrator, platform,
+                                    platformProperties={"Precision": "mixed"})
+    else:
+        simulation = app.Simulation(topology, system, integrator, platform)
+
+        
+    # Would make more sense to put in set_up_reporters but need access to the initialized CV object above...
+    simulation.reporters.append(CVReporter('cv-values.txt',parameters.state_data_interval,cvforce))
+    # Regular state data reporter does not work well seemingly when force groups are set...
+    simulation.reporters.append(EnergyReporter('potential-energy.txt',parameters.state_data_interval,system))
+    
+    return simulation
+
+
+def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
+                     total_number_steps: int, initial_frame: gsd.hoomd.Frame) -> None:
+    simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
+                                            initial_frame.particles.diameter / 2.0 * length_unit,
+                                            initial_frame.particles.charge * electric_potential_unit, simulation,
+                                            append_file=append_file,
+                                            cell=get_cell_from_box(initial_frame.configuration.box) * length_unit))
+    simulation.reporters.append(StatusReporter(max(1, total_number_steps // 100), total_number_steps))
+    simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,
+                                                      parameters.state_data_interval, time=True,
+                                                      kineticEnergy=True, potentialEnergy=True, temperature=True,
+                                                      speed=True, append=append_file))
+
+    if parameters.update_reporter is not None:
+        update_reporter = getattr(update_reporters, parameters.update_reporter)
+        try:
+            simulation.reporters.append(update_reporter(simulation=simulation, append_file=append_file,
+                                                        **parameters.update_reporter_parameters))
+        except TypeError:
+            raise TypeError(
+                f"UpdateReporter does not accept the given arguments {parameters.update_reporter_parameters}. "
+                f"The expected signature is {inspect.signature(update_reporter)} (the simulation argument need not be "
+                f"specified).")
+
+    
+        
+    # The CheckpointReporter should always be last to ensure that all other reporters have been executed before it.
+    simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
+                                                       parameters.checkpoint_interval))
+
+
+def colloids_run(argv: Sequence[str]) -> app.Simulation:
+    parser = argparse.ArgumentParser(description="Run OpenMM for a colloids system.")
+    parser.add_argument("yaml_file", help="YAML file with simulation parameters", type=str)
+    parser.add_argument("--example", help="write an example YAML file and exit", action=ExampleAction)
+    args = parser.parse_args(args=argv)
+
+    if not args.yaml_file.endswith(".yaml"):
+        raise ValueError("The YAML file must have the .yaml extension.")
+
+    parameters = RunParameters.from_yaml(args.yaml_file)
+
+    frame = read_gsd_file(parameters.initial_configuration, parameters.frame_index)
+
+    check_frame(parameters, frame)
+
+    simulation = set_up_simulation(parameters, frame)
+
+    simulation.context.setPositions(frame.particles.position)
+    if parameters.velocity_seed is not None:
+        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
+                                                      parameters.velocity_seed)
+    else:
+        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature)
+
+    if parameters.minimize_energy_initially:
+        # TODO: Do we want this?
+        # Add reporter during minimization?
+        # See https://openmm.github.io/openmm-cookbook/dev/notebooks/cookbook/report_minimization.html
+        simulation.minimizeEnergy()
+
+    set_up_reporters(parameters, simulation, False, parameters.run_steps, frame)
+
+    simulation.step(parameters.run_steps)
+
+    # TODO: Automatically plot energies etc.
+    # TODO: CHECK ALL SURFACE SEPARATIONS
+
+    if parameters.final_configuration_gsd_filename is not None:
+        write_gsd_file(parameters.final_configuration_gsd_filename, simulation,
+                       frame.particles.diameter / 2.0 * length_unit,
+                       frame.particles.charge * electric_potential_unit,
+                       get_cell_from_box(frame.configuration.box) * length_unit)
+
+    return simulation
+
+
+def main():
+    colloids_run(sys.argv[1:])
+
+
+if __name__ == '__main__':
+    main()

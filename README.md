@@ -126,3 +126,12 @@ of these simulations with the command:
 ```bash
 colloids-analyze analysis.yaml Run1/run.yaml Run2/run.yaml Run3/run.yaml
 ```
+
+### example - seed
+
+```bash
+cd examples/seed
+python cluster.py
+colloids-create configuration_parameters.yaml initial_configuration.gsd
+colloids-run run_parameters.yaml
+```

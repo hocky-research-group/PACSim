@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import gsd.hoomd
+import warnings
 
 class TrajectoryWrapper:
     """
@@ -125,6 +126,8 @@ class TrajectoryWrapper:
 
         # Filter and remap constraints
         if hasattr(frame, 'constraints') and hasattr(frame.constraints, 'group') and frame.constraints.group is not None:
+            warnings.warn("Subsetting trajectories with constraints may lead to the creation of cluster fragments.", UserWarning)
+
             constraints = frame.constraints.group
             mask = np.all(index_matching_array[constraints] != -1, axis=1)
             new_constraints = index_matching_array[constraints[mask]]
@@ -247,6 +250,9 @@ class TrajectoryWrapper:
         current_positions = current_frame.particles.position 
         current_radii = current_frame.particles.diameter / 2
 
+        if np.any(np.abs(np.mean(seed_positions, axis=0)) > (0.5 * current_box)):
+            warnings.warn("Seed positions are outside half the current unit cell size. Particle overlap may occur.", UserWarning)
+
         if seed_fractional_coords is not None:
             seed_location = current_box * seed_fractional_coords
         else:
@@ -254,6 +260,8 @@ class TrajectoryWrapper:
 
         seed_location -= current_box / 2  
         seed_positions += (seed_location - np.mean(seed_positions, axis=0))
+        seed_positions %= current_box
+        seed_positions -= current_box / 2
 
         distance_matrix = np.linalg.norm(current_positions[:, None] - seed_positions[None, :], axis=2)
         overlap_matrix = (distance_matrix - current_radii[:, None] - seed_radii[None, :]) < epsilon

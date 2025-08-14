@@ -153,7 +153,8 @@ def main():
             seed_trajectory = TrajectoryWrapper(filename=seed_file)
 
             base_trajectory.seed_particles(seed_trajectory, epsilon=overlap_distance, seed_fractional_coords=seed_fractional_coordinates)
-            frame = base_trajectory[base_trajectory.current_frame]
+        
+        frame = base_trajectory[base_trajectory.current_frame]
 
     with gsd.hoomd.open(name=args.save_file, mode="w") as f:
         f.append(frame)

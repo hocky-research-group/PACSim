@@ -1,4 +1,3 @@
-import pdb
 import argparse
 import inspect
 import sys
@@ -18,53 +17,7 @@ from colloids.units import electric_potential_unit, length_unit
 
 import torch
 from openmmtorch import TorchForce
-from rsh import rsh_cart_6
 
-
-def calc_stein_single(i: int, pos, num_nbs: int, order: int, device: torch.device):
-    disps = pos - pos[i]
-    dists = torch.square(disps)
-    dists = torch.sum(dists, dim=(1))
-    dists = torch.sqrt(dists)
-    
-    inds_nbs = torch.argsort(dists)[1:num_nbs+1]
-    disps = pos[inds_nbs] - pos[i]
-    dists = torch.sqrt(torch.sum(torch.square(disps), dim=(1)))
-    disps_nbs = disps.T/dists
-    disps_nbs = disps_nbs.T
-
-    Y_nm = rsh_cart_6(disps_nbs, device)
-    q_nm_2 = torch.square(torch.mean(Y_nm, dim=(0)))
-    q_n = torch.zeros(order+1, device=device)
-    for n in range(order+1):
-        for m in range(-n, n+1):
-            q_n[n] += q_nm_2[n*(n+1) + m]
-        q_n[n] = torch.sqrt(4*torch.pi/(2*n+1)*q_n[n])
-    return q_n[order], inds_nbs
-
-def calc_stein(pos, num_nbs: int, order: int, device: torch.device):
-    natoms = len(pos)
-
-    q_n, inds_nbs = calc_stein_single(0, pos, num_nbs, order, device)
-    for i in range(1, natoms):
-        q_n_i, _ = calc_stein_single(i, pos, num_nbs, order, device)
-        q_n = q_n + q_n_i
-    return q_n/natoms
-
-class Q6Module(torch.nn.Module):
-    def __init__(self, num_nbs, order):
-        super().__init__()
-        if torch.cuda.is_available():
-            self.device = torch.device("cuda")
-        else:
-            self.device = torch.device("cpu")
-        self.num_nbs = num_nbs
-        self.order = order
-
-    def forward(self, positions):
-        positions = positions.float()
-        q_n = calc_stein(positions, self.num_nbs, self.order, self.device)
-        return q_n
 
 class CVReporter(object):
     def __init__(self, file, reportInterval, cv):
@@ -83,7 +36,7 @@ class CVReporter(object):
     def report(self, simulation, state):
         cv_val = self._cv.getCollectiveVariableValues(simulation.context)[0]
         self._out.write('%d ' % simulation.currentStep)
-        self._out.write('%.5f ' % (cv_val))
+        self._out.write('%.6f ' % (cv_val))
         self._out.write('\n')
         self._out.flush()
 
@@ -261,15 +214,14 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     else:
         gravitational_potential = None
 
-    num_nbs = 6
-    q_order = 6
-    cvmodule = torch.jit.script(Q6Module(num_nbs, q_order))
-    cv = TorchForce(cvmodule)
-    cv.setUsesPeriodicBoundaryConditions(False)
 
-    cvforce = openmm.CustomCVForce('cv')
-    cvforce.addCollectiveVariable('cv', cv)
-    system.addForce(cvforce)
+    if parameters.use_torch:
+        cvmodule = torch.jit.load(parameters.torch_script)
+        cv = TorchForce(cvmodule)
+        cv.setUsesPeriodicBoundaryConditions(False)
+        cvforce = openmm.CustomCVForce('cv')
+        cvforce.addCollectiveVariable('cv', cv)
+        system.addForce(cvforce)
         
     # --------------------------- Add all particles and constraints to the system. -------------------------------------
     for mass in frame.particles.mass:
@@ -318,7 +270,9 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         
     # -------------------------------------- Set up the simulation. ----------------------------------------------------
     # Keep track of which force groups to integrate
-    forces_to_integrate = set()
+    if parameters.use_torch:
+        forces_to_integrate = set()
+        
     if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":
         # Set different force groups for the nonbonded potentials to allow for different cutoffs on the OpenCL and CUDA
         # platforms.
@@ -338,23 +292,28 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
                 else:
                     force.setCutoffDistance(cutoffs[cutoff_distance_index])
                 force.setForceGroup(cutoff_distance_index)
-                forces_to_integrate.add(cutoff_distance_index)
+                if parameters.use_torch:
+                    forces_to_integrate.add(cutoff_distance_index)
 
     # Include all forces except the CV force
-    cvforce.setForceGroup(max(list(forces_to_integrate))+1)
-    integrator.setIntegrationForceGroups(forces_to_integrate)
+    if parameters.use_torch:
+        cvforce.setForceGroup(max(list(forces_to_integrate))+1)
+        integrator.setIntegrationForceGroups(forces_to_integrate)
     
     if parameters.platform_name == "CUDA":
+        # simulation = app.Simulation(topology, system, integrator, platform,
+        #                             platformProperties={"Precision": "mixed"})
         simulation = app.Simulation(topology, system, integrator, platform,
-                                    platformProperties={"Precision": "mixed"})
+                                    platformProperties={"Precision": "single"})
     else:
         simulation = app.Simulation(topology, system, integrator, platform)
 
-        
-    # Would make more sense to put in set_up_reporters but need access to the initialized CV object above...
-    simulation.reporters.append(CVReporter('cv-values.txt',parameters.state_data_interval,cvforce))
-    # Regular state data reporter does not work well seemingly when force groups are set...
-    simulation.reporters.append(EnergyReporter('potential-energy.txt',parameters.state_data_interval,system))
+
+    if parameters.use_torch:
+        # Would make more sense to put in set_up_reporters but need access to the initialized CV object above...
+        simulation.reporters.append(CVReporter('cv-values.txt',parameters.state_data_interval,cvforce))
+        # Regular state data reporter does not work well seemingly when force groups are set so writing out separate energy reporter...
+        simulation.reporters.append(EnergyReporter('potential-energy.txt',parameters.state_data_interval,system))
     
     return simulation
 
@@ -408,11 +367,12 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
     simulation = set_up_simulation(parameters, frame)
 
     simulation.context.setPositions(frame.particles.position)
-    if parameters.velocity_seed is not None:
-        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
-                                                      parameters.velocity_seed)
-    else:
-        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature)
+    simulation.context.setVelocities(frame.particles.velocity)
+    # if parameters.velocity_seed is not None:
+    #     simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
+    #                                                   parameters.velocity_seed)
+    # else:
+    #     simulation.context.setVelocitiesToTemperature(parameters.potential_temperature)
 
     if parameters.minimize_energy_initially:
         # TODO: Do we want this?

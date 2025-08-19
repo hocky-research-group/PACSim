@@ -246,6 +246,14 @@ class RunParameters(Parameters):
     :param plumed_script
         A plumed input file to be used for interfacing with a simulation.
     :type plumed_script: Optional[str]
+    :param use_torch: 
+        A boolean indicating whether to interface a simulation with a Pytorch model.
+        If true, torch_script must be specified and must point to the file where the model has been serialized and saved via TorchScript.
+        Defaults to False.
+    :type use_torch: bool
+    :param torch_script
+        A file name for the Pytorch model saved via TorchScript to be used for interfacing with a simulation.
+    :type torch_script: Optional[str]
 
 
     :raises TypeError:
@@ -298,6 +306,8 @@ class RunParameters(Parameters):
     update_reporter_parameters: Optional[dict[str, Any]] = None
     use_plumed: bool = False
     plumed_script: Optional[str] = None
+    use_torch: bool = False
+    torch_script: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -440,6 +450,12 @@ class RunParameters(Parameters):
         else:
             if self.plumed_script is not None:
                 raise ValueError("PLUMED input file must not be specified if PLUMED is not being used.")
+        if self.use_torch:
+            if self.torch_script is None:
+                raise ValueError("TorchScript input file must be specified if using a Pytorch model.")
+        else:
+            if self.torch_script is not None:
+                raise ValueError("TorchScript input file must not be specified if not using a Pytorch model.")
 
 if __name__ == '__main__':
     RunParameters(initial_configuration="tests/first_frame.xyz").to_yaml("example.yaml")

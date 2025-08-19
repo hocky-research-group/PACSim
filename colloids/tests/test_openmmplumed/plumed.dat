@@ -1,0 +1,15 @@
+# Calculate the Steinhardt Q6 vector for each of the atoms in the system
+q6: Q6 SPECIES=1-256 SWITCH={GAUSSIAN R_0=50.0 D_0=200.0} NOPBC MEAN
+PRINT ARG=q6.mean FILE=colvar STRIDE=10000
+DUMPMULTICOLVAR DATA=q6 FILE=Q6MULTICOLVAR.xyz STRIDE=10000
+# # Calculate the local Steinhardt parameter for each of the atoms in the system
+# lq6: LOCAL_Q6 ...
+#     SPECIES=q6
+#     SWITCH={GAUSSIAN D_0=0.61 R_0=0.01} 
+#     MEAN 
+#     HISTOGRAM={GAUSSIAN LOWER=-1.0 UPPER=1.0 NBINS=40 SMEAR=0.1}
+#     LOWMEM
+#     NOPBC
+# ...
+# PRINT ARG=lq6.* FILE=lq6 STRIDE=100
+# DUMPMULTICOLVAR DATA=lq6 FILE=LQ6MULTICOLVAR.xyz STRIDE=1000

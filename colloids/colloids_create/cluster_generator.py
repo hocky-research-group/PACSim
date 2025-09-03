@@ -13,16 +13,16 @@ class ClusterGenerator(ConfigurationGenerator):
     Generator for an initial configuration in a gsd.hoomd.Frame instance for a colloid simulation based on a cluster
     of colloids.
 
-    The cluster is specified by an Atoms object stored in a lammps-data file. See https://docs.lammps.org/2001/data_format.html
-    for information about this file format.
+    The cluster is specified by an Atoms object generated from a lammps-data file.
+    See https://docs.lammps.org/2001/data_format.html for information about this file format.
 
     To generate the initial configuration, the given single cluster of colloids is centered and repeated in all three
     directions of its lattice vectors. Every replica of the cluster can optionally be randomly rotated.
 
-    
     To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors. This will also 
-    scale the box size. Additionally, one can increase a padding factor that scales just the overall box size and thus increases 
-    the distance between the outwards facing colloids and the walls. To make the simulation box smaller, use a padding factor less than 1.
+    scale the box size. Additionally, one can increase a padding factor that scales just the overall box size and thus
+    increases the distance between the outwards facing colloids and the walls. To make the simulation box smaller, use
+    a padding factor less than 1.
 
     This dataclass assumes that the distances in the cluster are in units of nanometers.
 
@@ -40,25 +40,23 @@ class ClusterGenerator(ConfigurationGenerator):
     :type lattice_repeats: Union[int, list[int]]
     :param cluster_padding_factor:
         The factor by which the lattice vectors of every replicated cluster are scaled to space out the clusters.
-        This will also scale the box dimensions specified in the cluster specification file. 
         The cluster padding factor should be greater than zero.
     :type cluster_padding_factor: float
     :param padding_factor:
         The factor by which the overall lattice vectors are scaled to increase the distance between the outwards facing
-        colloids and the walls. This will scale the box dimensions specified in the cluster specification file without changing 
-        the spacing in between clusters.
+        colloids and the walls. This will scale the box dimensions specified in the cluster specification file without
+        changing the spacing in between clusters.
         The padding factor should be greater than zero.
     :type padding_factor: float
     :param random_rotation:
         Specifies whether replicas of the original cluster should be rotated in the initial configuration. 
-        If False, the orientation of the original cluster is preserved for all repicas when generating the initial configuration.
+        If False, the orientation of the original cluster is preserved for all replicas when generating the initial
+        configuration.
     :type random_rotation: bool
 
     :raises ValueError:
         If the cluster padding factor is not greater than zero.
         If the padding factor is not greater than zero.
-        If the cluster padding factor or padding factor is too small, causing parts of the cluster
-        to lie outside the original box.
     """
 
     def __init__(self, cluster: Atoms, lattice_repeats: Union[int, Sequence[int]], cluster_padding_factor: float,

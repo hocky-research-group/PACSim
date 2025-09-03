@@ -20,14 +20,15 @@ class ConfigurationParameters(Parameters):
     The base configuration is constructed from a single cluster of colloids. The cluster is defined in a lammps-data
     file together with lattice vectors.
     
-    The cluster is first centered and then repeated in all three directions of the lattice vectors to create the base configuration. 
-    Every replica of the cluster can optionally be randomly rotated.
+    The cluster is first centered and then repeated in all three directions of the lattice vectors to create the base
+    configuration. Every replica of the cluster can optionally be randomly rotated.
 
     All colloid positions in the centered cluster must lie in the unit cell defined by the lattice vectors.
 
     To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors. This will also 
-    scale the box size. Additionally, one can increase a padding factor that scales just the overall box size and thus increases 
-    the distance between the outwards facing colloids and the walls. To make the simulation box smaller, use a padding factor less than 1.
+    scale the box size. Additionally, one can increase a padding factor that scales just the overall box size and thus
+    increases the distance between the outwards facing colloids and the walls. To make the simulation box smaller, use
+    a padding factor less than 1.
 
     This dataclass assumes that the style of units in the lammps-data file is "nano" (see
     https://docs.lammps.org/units.html), that is, positions are in nanometers.
@@ -38,15 +39,17 @@ class ConfigurationParameters(Parameters):
     In the lammps-data file, only the lattice vectors, the positions of the colloids in the Atoms section, and the bonds
     in the Bonds section are used. All other sections and information are ignored. In particular, the masses, radii, and
     surface potentials of the different types of colloidal particles appearing in the lammps-data file should be
-    specified in the masses, radii, and surface_potentials dictionaries in the .yaml file of this data class (and, for instance, 
-    not in the Masses section of the lammps-data file). See https://docs.lammps.org/Howto_triclinic.html for more information about 
-    the lattice vectors in the lammps-data file.
+    specified in the masses, radii, and surface_potentials dictionaries in the yaml file of this data class (and, for
+    instance, not in the Masses section of the lammps-data file).
+
+    See https://docs.lammps.org/Howto_triclinic.html for more information about the lattice vectors in the lammps-data
+    file.
 
     In the Atoms section of the lammps-data file, the different columns from left to right are as follows: 
         Atom Index (should go from 1 to number of atoms).
         Molecule-ID (ignored)
-        Atom type (these are the types appearing as keys in the mass/diameter/surface potential dictionaries in the .yaml file)
-        Charge (ignored, can be whatever)
+        Atom type (these are the types appearing as keys in the mass/diameter/surface potential dictionaries in the yaml file)
+        Charge (ignored)
         x position
         y position
         z position

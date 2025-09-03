@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 import math
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 import warnings
 import freud.cluster
 import numpy as np
@@ -34,9 +34,9 @@ class UpdateReporterAbstract(ABC):
     :type final_update_step: int
     :param start_value:
         The start value of the global parameter.
-        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
-        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
-    :type start_value: unit.Quantity
+        OpenMM does not store the units of global parameters, so if using a quantity with a unit, the user must make
+        sure to pass in a sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type start_value: Union[unit.Quantity, float]
     :param global_parameter_name:
         The name of the global parameter to be updated.
         This must be one of the global parameters passed into any of the OpenMM Force objects.
@@ -66,7 +66,7 @@ class UpdateReporterAbstract(ABC):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step, global_parameter_name: str,
-                 start_value: unit.Quantity, print_interval: int, simulation: openmm.app.Simulation,
+                 start_value: Union[unit.Quantity, float], print_interval: int, simulation: openmm.app.Simulation,
                  append_file: bool = False):
         """Constructor of the UpdateReporterAbstract class."""
         if not filename.endswith(".csv"):
@@ -83,7 +83,10 @@ class UpdateReporterAbstract(ABC):
         self._file = open(filename, "a" if append_file else "w")
         if not append_file:
             print(f"timestep,{self._global_parameter_name}", file=self._file, flush=True)
-        self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
+        if isinstance(start_value, unit.Quantity):
+            self._start_value = start_value.value_in_unit_system(unit.md_unit_system)
+        else:
+            self._start_value = start_value
         # Check if the start value of the global parameter matches the value in the OpenMM simulation.
         # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
         # the start value is not necessarily the same as the value in the OpenMM simulation.
@@ -194,14 +197,14 @@ class RampUpdateReporter(UpdateReporterAbstract):
     :type global_parameter_name: str
     :param start_value:
         The start value of the global parameter.
-        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
-        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
-    :type start_value: unit.Quantity
+        OpenMM does not store the units of global parameters, so if using a quantity with a unit, the user must make
+        sure to pass in a sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type start_value: Union[unit.Quantity, float]
     :param end_value:
         The end value of the global parameter.
-        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
-        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
-    :type end_value: unit.Quantity
+        OpenMM does not store the units of global parameters, so if using a quantity with a unit, the user must make
+        sure to pass in a sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type end_value: Union[unit.Quantity, float]
     :param print_interval:
         The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is printed
         to the output .csv file.
@@ -227,15 +230,20 @@ class RampUpdateReporter(UpdateReporterAbstract):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
-                 start_value: unit.Quantity, end_value: unit.Quantity, print_interval: int,
+                 start_value: Union[unit.Quantity, float], end_value: Union[unit.Quantity, float], print_interval: int,
                  simulation: openmm.app.Simulation, append_file: bool = False):
         """Constructor of the LinearMonotonicUpdateReporter class."""
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
                          print_interval=print_interval, simulation=simulation, append_file=append_file)
-        if not start_value.unit.is_compatible(end_value.unit):
-            raise ValueError(f"The start and end values have incompatible units.")
-        self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
+        if isinstance(end_value, unit.Quantity):
+            if not start_value.unit.is_compatible(end_value.unit):
+                raise ValueError(f"The start and end values have incompatible units.")
+            self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
+        else:
+            if not isinstance(end_value, type(start_value)):
+                raise ValueError(f"The start and end values have incompativle units.")
+            self._end_value = end_value
 
     def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
         """
@@ -256,9 +264,10 @@ class RampUpdateReporter(UpdateReporterAbstract):
 
 
 class RampTemperatureUpdateReporter(object):
-    def __init__(self, filename: str, update_interval: int, final_update_step: int, start_value: unit.Quantity,
-                 end_value: unit.Quantity, print_interval: int, simulation: openmm.app.Simulation,
-                 append_file: bool = False):
+    """TODO: DOCUMENT"""
+    def __init__(self, filename: str, update_interval: int, final_update_step: int,
+                 start_value: Union[unit.Quantity, float], end_value: Union[unit.Quantity, float], print_interval: int,
+                 simulation: openmm.app.Simulation, append_file: bool = False):
         """Constructor of the RampTemperatureUpdateReporter class."""
         if not filename.endswith(".csv"):
             raise ValueError("The file must have the .csv extension.")
@@ -279,6 +288,7 @@ class RampTemperatureUpdateReporter(object):
         self._file = open(filename, "a" if append_file else "w")
         if not append_file:
             print(f"timestep,temperature", file=self._file, flush=True)
+        # TODO: CHANGE ACCORDING TO OTHER CLASSES
         self._start_value = start_value.value_in_unit(temperature_unit)
         self._end_value = end_value.value_in_unit(temperature_unit)
         # Check if the start value of the global parameter matches the value in the OpenMM simulation.
@@ -608,16 +618,16 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
         The name of the global parameter to be updated.
         This must be one of the global parameters passed into any of the OpenMM Force objects.
     :type global_parameter_name: str
-    :param start_value:
+   :param start_value:
         The start value of the global parameter.
-        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
-        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
-    :type start_value: unit.Quantity
+        OpenMM does not store the units of global parameters, so if using a quantity with a unit, the user must make
+        sure to pass in a sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type start_value: Union[unit.Quantity, float]
     :param end_value:
         The end value of the global parameter.
-        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
-        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
-    :type end_value: unit.Quantity
+        OpenMM does not store the units of global parameters, so if using a quantity with a unit, the user must make
+        sure to pass in a sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type end_value: Union[unit.Quantity, float]
     :param switch_step:
         The number of steps after which this reporter switches from increasing to decreasing (or decreasing to
         increasing) the value of the global parameter.
@@ -650,14 +660,19 @@ class TriangleUpdateReporter(UpdateReporterAbstract):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
-                 start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int, print_interval: int,
-                 simulation: openmm.app.Simulation, append_file: bool = False):
+                 start_value: Union[unit.Quantity, float], end_value: Union[unit.Quantity, float], switch_step: int,
+                 print_interval: int, simulation: openmm.app.Simulation, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
                          print_interval=print_interval, simulation=simulation, append_file=append_file)
-        if not start_value.unit.is_compatible(end_value.unit):
-            raise ValueError(f"The start and end values have incompatible units.")
-        self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
+        if isinstance(end_value, unit.Quantity):
+            if not start_value.unit.is_compatible(end_value.unit):
+                raise ValueError(f"The start and end values have incompatible units.")
+            self._end_value = end_value.value_in_unit_system(unit.md_unit_system)
+        else:
+            if not isinstance(end_value, type(start_value)):
+                raise ValueError(f"The start and end values have incompativle units.")
+            self._end_value = end_value
         if not final_update_step >= switch_step >= update_interval:
             raise ValueError("The switch step must be greater than or equal to the update frequency,"
                              "and less than or equal to the final update step.")
@@ -718,14 +733,14 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
     :type global_parameter_name: str
     :param start_value:
         The start value of the global parameter.
-        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
-        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
-    :type start_value: unit.Quantity
+        OpenMM does not store the units of global parameters, so if using a quantity with a unit, the user must make
+        sure to pass in a sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type start_value: Union[unit.Quantity, float]
     :param end_value:
         The end value of the global parameter.
-        OpenMM does not store the units of global parameters, so the user must make sure to pass in a quantity with a
-        sensible unit here. This quantity will only be converted to the unit system of OpenMM.
-    :type end_value: unit.Quantity
+        OpenMM does not store the units of global parameters, so if using a quantity with a unit, the user must make
+        sure to pass in a sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type end_value: Union[unit.Quantity, float]
     :param switch_step:
         The number of steps after which this reporter switches from increasing to decreasing (or decreasing to
         increasing) the value of the global parameter.
@@ -758,14 +773,19 @@ class SquaredSinusoidalUpdateReporter(UpdateReporterAbstract):
     """
 
     def __init__(self, filename: str, update_interval: int, final_update_step: int, global_parameter_name: str,
-                 start_value: unit.Quantity, end_value: unit.Quantity, switch_step: int, print_interval: int,
-                 simulation: openmm.app.Simulation, append_file: bool = False):
+                 start_value: Union[unit.Quantity, float], end_value: Union[unit.Quantity, float], switch_step: int,
+                 print_interval: int, simulation: openmm.app.Simulation, append_file: bool = False):
         super().__init__(filename=filename, update_interval=update_interval, final_update_step=final_update_step,
                          global_parameter_name=global_parameter_name, start_value=start_value,
                          print_interval=print_interval, simulation=simulation, append_file=append_file)
-        if not start_value.unit.is_compatible(end_value.unit):
-            raise ValueError(f"The start value and amplitude have incompatible units.")
-        end_value_float = end_value.value_in_unit_system(unit.md_unit_system)
+        if isinstance(end_value, unit.Quantity):
+            if not start_value.unit.is_compatible(end_value.unit):
+                raise ValueError(f"The start value and amplitude have incompatible units.")
+            end_value_float = end_value.value_in_unit_system(unit.md_unit_system)
+        else:
+            if not isinstance(end_value, type(start_value)):
+                raise ValueError(f"The start value and amplitude have incompativle units.")
+            end_value_float = end_value
         self._amplitude = end_value_float - self._start_value
         if not final_update_step >= switch_step >= update_interval:
             raise ValueError("The switch step must be greater than or equal to the update frequency,"

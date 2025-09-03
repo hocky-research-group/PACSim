@@ -18,14 +18,17 @@ class ConfigurationParameters(Parameters):
     yaml file.
 
     The base configuration is constructed from a single cluster of colloids. The cluster is defined in a lammps-data
-    file together with lattice vectors. The cluster is first centered and then repeated in all three directions of the
-    lattice vectors to create the base configuration. Every replica of the cluster can optionally be randomly rotated.
+    file together with lattice vectors.
+    
+    The cluster is first centered and then repeated in all three directions of the lattice vectors to create the base
+    configuration. Every replica of the cluster can optionally be randomly rotated.
 
     All colloid positions in the centered cluster must lie in the unit cell defined by the lattice vectors.
 
-    To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors. Additionally,
-    one can increase a padding factor that scales the overall box size and thus increases the distance between the
-    outwards facing colloids and the walls.
+    To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors. This will also 
+    scale the box size. Additionally, one can increase a padding factor that scales just the overall box size and thus
+    increases the distance between the outwards facing colloids and the walls. To make the simulation box smaller, use
+    a padding factor less than 1.
 
     This dataclass assumes that the style of units in the lammps-data file is "nano" (see
     https://docs.lammps.org/units.html), that is, positions are in nanometers.
@@ -36,8 +39,26 @@ class ConfigurationParameters(Parameters):
     In the lammps-data file, only the lattice vectors, the positions of the colloids in the Atoms section, and the bonds
     in the Bonds section are used. All other sections and information are ignored. In particular, the masses, radii, and
     surface potentials of the different types of colloidal particles appearing in the lammps-data file should be
-    specified in the masses, radii, and surface_potentials dictionaries of this data class (and, for instance, not in
-    the Masses section of the lammps-data file).
+    specified in the masses, radii, and surface_potentials dictionaries in the yaml file of this data class (and, for
+    instance, not in the Masses section of the lammps-data file).
+
+    See https://docs.lammps.org/Howto_triclinic.html for more information about the lattice vectors in the lammps-data
+    file.
+
+    In the Atoms section of the lammps-data file, the different columns from left to right are as follows: 
+        Atom Index (should go from 1 to number of atoms).
+        Molecule-ID (ignored)
+        Atom type (these are the types appearing as keys in the mass/diameter/surface potential dictionaries in the yaml file)
+        Charge (ignored)
+        x position
+        y position
+        z position
+    
+    In the Bonds section of the lammps-data file, the different columns from left to right are as follows: 
+        Bond index (should go from 1 to number of bonds)
+        Bond ID (ignored)
+        Index of first atom involved in the bond.
+        Index of second atom involved in the bond.
 
     After the base configuration has been created, it can be modified by adding a substrate at the bottom of the
     simulation box.
@@ -106,6 +127,7 @@ class ConfigurationParameters(Parameters):
         If the masses, radii, or surface potentials dictionaries do not have strings as keys.
         If the substrate type is not a string.
     :raises ValueError:
+        If the cluster specification file does not end in ".lmp."
         If the number of lattice repeats is not positive.
         If the (cluster) padding factor is not greater than zero.
         If the masses are not greater than or equal to zero.
@@ -132,6 +154,9 @@ class ConfigurationParameters(Parameters):
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
+        if not self.cluster_specification.endswith(".lmp"):
+            raise ValueError("The cluster specification file must be of the lammps-data file format.")
+        
         for t in self.masses:
             if not isinstance(t, str):
                 raise TypeError("The types of the masses dictionary must be strings.")

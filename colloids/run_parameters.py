@@ -243,7 +243,7 @@ class RunParameters(Parameters):
         If true, plumed_script must be specified and must point to a plumed input file.
         Defaults to False.
     :type use_plumed: bool
-    :param plumed_script
+    :param plumed_script:
         A plumed input file to be used for interfacing with a simulation.
     :type plumed_script: Optional[str]
 

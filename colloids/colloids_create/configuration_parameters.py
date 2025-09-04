@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional, Union
+from typing import Optional, Union
 import warnings
 from ase.io.lammpsdata import read_lammps_data
 import numpy as np
@@ -159,8 +159,6 @@ class ConfigurationParameters(Parameters):
         default_factory=lambda: {"1": 44.0 * electric_potential_unit, "2": -54.0 * electric_potential_unit})
     use_substrate: bool = False
     substrate_type: Optional[str] = None
-    use_random_snowman_heads: bool = False  # TODO: DOCUMENT
-    random_snowman_heads_parameters: Optional[dict[str, Any]] = None
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
@@ -236,14 +234,14 @@ class ConfigurationParameters(Parameters):
                                      f"dictionary.")
         for t in self.masses:
             if t not in found_types and t != self.substrate_type:
-                raise ValueError(f"Non-substrate type {t} of the masses dictionary is not in the lammps-data file.")
+                warnings.warn(f"Non-substrate type {t} of the masses dictionary is not in the lammps-data file.")
         for t in self.radii:
             if t not in found_types and t != self.substrate_type:
-                raise ValueError(f"Non-substrate type {t} of the radii dictionary is not in the lammps-data file.")
+                warnings.warn(f"Non-substrate type {t} of the radii dictionary is not in the lammps-data file.")
         for t in self.surface_potentials:
             if t not in found_types and t != self.substrate_type:
-                raise ValueError(f"Non-substrate type {t} of the surface potentials dictionary is not in the "
-                                 f"lammps-data file.")
+                warnings.warn(f"Non-substrate type {t} of the surface potentials dictionary is not in the lammps-data "
+                              f"file.")
 
         if isinstance(self.lattice_repeats, int):
             if self.lattice_repeats <= 0:
@@ -277,11 +275,3 @@ class ConfigurationParameters(Parameters):
         else:
             if self.substrate_type is not None:
                 raise ValueError("The substrate type must not be specified if a substrate is not used.")
-
-        if self.use_random_snowman_heads:
-            if self.random_snowman_heads_parameters is None:
-                raise ValueError("Random snowman heads parameters must be specified if random snowman heads are on.")
-        else:
-            if self.random_snowman_heads_parameters is not None:
-                raise ValueError(
-                    "Random snowman heads parameters must not be specified if random snowman heads are off.")

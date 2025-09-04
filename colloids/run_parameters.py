@@ -75,7 +75,7 @@ class RunParameters(Parameters):
         The parameters that are forwarded to initialize the OpenMM integrator.
         Each integrator has specific parameters, and the parameters passed in here must be compatible with the chosen
         integrator. See the corresponding integrator in the OpenMM documentation
-        http://docs.openmm.org/latest/api-python/library.html#integrators for the possible arguments (or, alternatively,
+        https://docs.openmm.org/latest/api-python/library.html#integrators for the possible arguments (or, alternatively,
         the colloids.integrators module).
         Defaults to sensible values for the LangevinIntegrator (temperature of 298 K, frictionCoeff of
         0.001574074286750681 / ps, stepSize of 0.00317647015905543 ps, and no specified random number seed).

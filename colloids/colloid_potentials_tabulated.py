@@ -142,7 +142,7 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         else:
             return prefactor * np.exp(-h_values / debye_length)
 
-    def _set_up_potentials(self) -> (CustomNonbondedForce, CustomNonbondedForce, CustomNonbondedForce):
+    def _set_up_potentials(self) -> tuple[CustomNonbondedForce, CustomNonbondedForce, CustomNonbondedForce]:
         """Set up the CustomNonbondedForce instances based on tabulated functions."""
         r_values_11 = np.linspace(
             1.00005 * 2.0 * self._radius_one.value_in_unit(length_unit),

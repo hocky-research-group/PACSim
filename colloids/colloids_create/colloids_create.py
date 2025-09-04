@@ -1,5 +1,4 @@
 import argparse
-import inspect
 import warnings
 from ase.io.lammpsdata import read_lammps_data
 import gsd.hoomd
@@ -8,7 +7,6 @@ from openmm import unit
 from colloids.colloids_create.configuration_parameters import ConfigurationParameters
 from colloids.colloids_create.cluster_generator import ClusterGenerator
 from colloids.colloids_create.substrate_modifier import SubstrateModifier
-from colloids.colloids_create.random_snowman_heads_modifier import RandomSnowmanHeadsModifier
 from colloids.units import electric_potential_unit, length_unit, mass_unit
 
 
@@ -144,17 +142,6 @@ def main():
     frame.particles.diameter = np.array(
         [2.0 * configuration_parameters.radii[frame.particles.types[i]].value_in_unit(length_unit)
          for i in frame.particles.typeid], dtype=np.float32)
-
-    if configuration_parameters.use_random_snowman_heads:
-        try:
-            random_snowman_heads_modifier = RandomSnowmanHeadsModifier(
-                **configuration_parameters.random_snowman_heads_parameters)
-            random_snowman_heads_modifier.modify_configuration(frame)
-        except TypeError:
-            raise TypeError(
-                f"RandomSnowmanHeadsModifier does not accept the given arguments "
-                f"{configuration_parameters.random_snowman_heads_parameters}. "
-                f"The expected signature is {inspect.signature(RandomSnowmanHeadsModifier)}.")
 
     with gsd.hoomd.open(name=args.save_file, mode="w") as f:
         f.append(frame)

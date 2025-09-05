@@ -261,8 +261,8 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
         except TypeError:
             raise TypeError(
                 f"UpdateReporter does not accept the given arguments {parameters.update_reporter_parameters}. "
-                f"The expected signature is {inspect.signature(update_reporter)} (the simulation argument need not be "
-                f"specified).")
+                f"The expected signature is {inspect.signature(update_reporter)} (the simulation and append_file "
+                f"arguments should not be specified).")
     # The CheckpointReporter should always be last to ensure that all other reporters have been executed before it.
     simulation.reporters.append(app.CheckpointReporter(parameters.checkpoint_filename,
                                                        parameters.checkpoint_interval))

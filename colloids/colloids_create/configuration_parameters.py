@@ -236,14 +236,14 @@ class ConfigurationParameters(Parameters):
                                      f"dictionary.")
         for t in self.masses:
             if t not in found_types and t != self.substrate_type:
-                raise ValueError(f"Non-substrate type {t} of the masses dictionary is not in the lammps-data file.")
+                warnings.warn(f"Non-substrate type {t} of the masses dictionary is not in the lammps-data file.")
         for t in self.radii:
             if t not in found_types and t != self.substrate_type:
-                raise ValueError(f"Non-substrate type {t} of the radii dictionary is not in the lammps-data file.")
+                warnings.warn(f"Non-substrate type {t} of the radii dictionary is not in the lammps-data file.")
         for t in self.surface_potentials:
             if t not in found_types and t != self.substrate_type:
-                raise ValueError(f"Non-substrate type {t} of the surface potentials dictionary is not in the "
-                                 f"lammps-data file.")
+                warnings.warn(f"Non-substrate type {t} of the surface potentials dictionary is not in the lammps-data "
+                              f"file.")
 
         if isinstance(self.lattice_repeats, int):
             if self.lattice_repeats <= 0:

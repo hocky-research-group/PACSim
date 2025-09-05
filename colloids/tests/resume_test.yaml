@@ -58,7 +58,7 @@ update_reporter_parameters:
   print_interval: !Copy
     key: state_data_interval
   final_update_step: 100
-  global_parameter_name: debye_length
+  parameter_name: debye_length
   start_value: !Copy
     key: debye_length
   end_value: !Quantity

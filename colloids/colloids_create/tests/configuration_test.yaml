@@ -1,4 +1,7 @@
-cluster_specification: "reference_cluster.lmp"
+cluster_specifications:
+  - "reference_cluster.lmp"
+cluster_relative_weights:
+  - 1.0
 lattice_repeats: 15
 cluster_padding_factor: 1.0
 padding_factor: 1.0

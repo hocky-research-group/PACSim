@@ -135,6 +135,19 @@ class GSDReporter(object):
             frame.particles.mass = [simulation.system.getParticleMass(atom_index).value_in_unit(mass_unit)
                                     for atom_index in range(simulation.topology.getNumAtoms())]
             frame.configuration.dimensions = 3
+
+            frame.constraints.N = simulation.system.getNumConstraints()
+            constraint_parameters = [simulation.system.getConstraintParameters(i) for i in range(frame.constraints.N)]
+            assert all(len(c) == 3 for c in constraint_parameters)
+            constraints = np.array([[c[0], c[1]] for c in constraint_parameters], dtype=np.uint32)
+            frame.constraints.group = constraints
+            frame.constraints.value = np.array([c[2].value_in_unit(length_unit) for c in constraint_parameters],
+                                               dtype=np.float32)
+
+            frame.bonds.N = simulation.system.getNumConstraints()
+            frame.bonds.types = ["b"]
+            frame.bonds.typeid = np.zeros((frame.bonds.N,), dtype=np.uint32)
+            frame.bonds.group = constraints
         else:
             # Copy constant properties from initial frame.
             assert len(self._file) > 0

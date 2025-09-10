@@ -3,7 +3,7 @@ import numpy as np
 import numpy.typing as npt
 from openmm import app
 from openmm import unit
-from colloids.units import electric_potential_unit, length_unit, mass_unit
+from colloids.units import electric_potential_unit, length_unit, mass_unit, time_unit
 
 
 def get_cell_from_box(box: npt.NDArray[float]) -> npt.NDArray[float]:
@@ -29,9 +29,10 @@ def read_gsd_file(filename: str, frame_index: int) -> gsd.hoomd.Frame:
 # noinspection PyUnresolvedReferences
 def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radii: npt.NDArray[unit.Quantity],
                    surface_potentials: npt.NDArray[unit.Quantity], cell: npt.NDArray[unit.Quantity]) -> None:
-    # TODO: WRITE VELOCITIES
-    positions = (
-        openmm_simulation.context.getState(getPositions=True, enforcePeriodicBox=False).getPositions(asNumpy=True))
+    state = openmm_simulation.context.getState(getPositions=True, getVelocities=True, enforcePeriodicBox=False)
+    positions = state.getPositions(asNumpy=True)
+    velocities = state.getVelocities(asNumpy=True)
+
     topology = openmm_simulation.topology
     assert topology.getNumChains() == 1
     assert topology.getNumResidues() == 1
@@ -44,6 +45,7 @@ def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radii: npt.
     frame = gsd.hoomd.Frame()
     frame.particles.N = topology.getNumAtoms()
     frame.particles.position = positions.value_in_unit(length_unit)
+    frame.particles.velocity = velocities.value_in_unit(length_unit / time_unit)
     # Use a dictionary instead of a set to preserve the order of the types.
     # See https://stackoverflow.com/questions/1653970/does-python-have-an-ordered-set
     # Works since Python 3.7.

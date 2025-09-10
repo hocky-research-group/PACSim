@@ -83,6 +83,10 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         If the cutoff factor is not greater than zero.
     """
 
+    _potential_11_name = "pacs_11_energy"
+    _potential_22_name = "pacs_22_energy"
+    _potential_12_name = "pacs_12_energy"
+
     def __init__(self, radius_one: unit.Quantity, radius_two: unit.Quantity,
                  surface_potential_one: unit.Quantity, surface_potential_two: unit.Quantity,
                  colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
@@ -324,8 +328,8 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
 
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """
-        Generate all potentials in the systems that are necessary to properly include the steric and electrostatic pair
-        potentials between colloids in a solution in an openmm system.
+        Generate all potentials that are necessary to properly include the steric and electrostatic pair potentials
+        between colloids in a solution in an OpenMM system.
 
         This method has to be called after the method add_particle was called for every particle in the system.
 
@@ -338,8 +342,11 @@ class ColloidPotentialsTabulated(ColloidPotentialsAbstract):
         """
         super().yield_potentials()
         self._potential_11.addInteractionGroup(self._indices_one, self._indices_one)
+        self._potential_11.setName(self._potential_11_name)
         self._potential_22.addInteractionGroup(self._indices_two, self._indices_two)
+        self._potential_22.setName(self._potential_22_name)
         self._potential_12.addInteractionGroup(self._indices_one, self._indices_two)
+        self._potential_12.setName(self._potential_12_name)
         yield self._potential_11
         yield self._potential_22
         yield self._potential_12

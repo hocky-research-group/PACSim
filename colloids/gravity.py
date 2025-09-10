@@ -38,6 +38,7 @@ class Gravity(OpenMMPotentialAbstract):
 
     _acceleration_unit = length_unit / time_unit ** 2
     _density_unit = unit.gram / length_unit ** 3
+    _name = "gravitational_energy"
 
     def __init__(self, gravitational_acceleration: unit.Quantity, water_density: unit.Quantity,
                  particle_density: unit.Quantity) -> None:
@@ -107,7 +108,7 @@ class Gravity(OpenMMPotentialAbstract):
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """
-        Generate all potentials in the systems that are necessary to properly include the gravitational potential.
+        Generate all potentials that are necessary to properly include the gravitational potential in the OpenMM system.
 
         This method has to be called after the method add_particle was called for every particle in the system.
 
@@ -119,4 +120,5 @@ class Gravity(OpenMMPotentialAbstract):
             If the method add_particle was not called before this method (via the abstract base class).
         """
         super().yield_potentials()
+        self._gravitational_potential.setName(self._name)
         yield self._gravitational_potential

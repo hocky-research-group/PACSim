@@ -223,43 +223,27 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
 
     # -------------------------------------- Add all forces to the system. ---------------------------------------------
     for force in colloid_potentials.yield_potentials():
+        force.setForceGroup(system.getNumForces())
         system.addForce(force)
 
     if include_walls:
         for force in slj_walls.yield_potentials():
+            force.setForceGroup(system.getNumForces())
             system.addForce(force)
 
     if parameters.use_depletion:
         for force in depletion_potential.yield_potentials():
+            force.setForceGroup(system.getNumForces())
             system.addForce(force)
 
     if parameters.use_gravity:
         assert all_walls
         for force in gravitational_potential.yield_potentials():
+            force.setForceGroup(system.getNumForces())
             system.addForce(force)
         assert not system.usesPeriodicBoundaryConditions()
 
     # -------------------------------------- Set up the simulation. ----------------------------------------------------
-    if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":
-        # Set different force groups for the nonbonded potentials to allow for different cutoffs on the OpenCL and CUDA
-        # platforms.
-        cutoffs = []
-        for force in system.getForces():
-            if isinstance(force, (openmm.NonbondedForce, openmm.CustomNonbondedForce)):
-                assert (force.getNonbondedMethod() == openmm.NonbondedForce.CutoffPeriodic
-                        or force.getNonbondedMethod() == openmm.NonbondedForce.CutoffNonPeriodic)
-                cutoff_distance = force.getCutoffDistance()
-                cutoff_distance_index = -1
-                for other_cutoff_index in range(len(cutoffs)):
-                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(length_unit)) < 1.0e-6:
-                        cutoff_distance_index = other_cutoff_index
-                if cutoff_distance_index == -1:
-                    cutoffs.append(cutoff_distance)
-                    cutoff_distance_index = len(cutoffs) - 1
-                else:
-                    force.setCutoffDistance(cutoffs[cutoff_distance_index])
-                force.setForceGroup(cutoff_distance_index)
-
     if parameters.platform_name == "CUDA":
         simulation = app.Simulation(topology, system, integrator, platform,
                                     platformProperties={"Precision": "mixed"})

@@ -1,7 +1,7 @@
 import argparse
 import inspect
 import sys
-from typing import Sequence
+from typing import Optional, Sequence
 import warnings
 import gsd.hoomd
 import numpy as np
@@ -16,6 +16,36 @@ from colloids.run_parameters import RunParameters
 from colloids.status_reporter import StatusReporter
 import colloids.update_reporters as update_reporters
 from colloids.units import electric_potential_unit, length_unit
+
+
+def simple_formatwarning(msg: str, category: Warning, filename: str, lineno: int, line: Optional[str] = None) -> str:
+    """
+    Simpler format for warnings that excludes the line with the code that caused the warning.
+
+    :param msg:
+        The warning message.
+    :type msg: str
+    :param category:
+        The warning category.
+    :type category: Warning
+    :param filename:
+        The filename where the warning occurred.
+    :type filename: str
+    :param lineno:
+        The line number where the warning occurred.
+    :type lineno: int
+    :param line:
+        The line of code that caused the warning (not used).
+    :type line: Optional[str]
+
+    :return:
+        The formatted warning message.
+    :rtype: str
+    """
+    return f"{filename}:{lineno}: {category.__name__}: {msg}\n"
+
+
+warnings.formatwarning = simple_formatwarning
 
 
 class ExampleAction(argparse.Action):
@@ -291,8 +321,10 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
         if not np.all(frame.particles.velocity == 0.0):
             warnings.warn("The initial velocities in the GSD file are ignored because a velocity seed is provided.")
         if parameters.velocity_seed < 0:
+            print("Using random velocity seed.")
             simulation.context.setVelocitiesToTemperature(parameters.potential_temperature)
         else:
+            print("Using velocity seed:", parameters.velocity_seed)
             simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
                                                           parameters.velocity_seed)
     else:

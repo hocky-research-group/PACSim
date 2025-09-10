@@ -4,6 +4,7 @@ import sys
 from typing import Sequence
 import warnings
 import gsd.hoomd
+import numpy as np
 import openmm
 from openmm import app
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
@@ -23,7 +24,6 @@ class ExampleAction(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         # TODO ADD OPTION FOR PLATFORM PROPERTIES?
-        # TODO PUT EQUILIBRATION STEPS?
         default_parameters = RunParameters()
         default_parameters.to_yaml("example.yaml")
         parser.exit()
@@ -286,14 +286,23 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
     simulation = set_up_simulation(parameters, frame)
 
     simulation.context.setPositions(frame.particles.position)
+
     if parameters.velocity_seed is not None:
-        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
-                                                      parameters.velocity_seed)
+        if not np.all(frame.particles.velocity == 0.0):
+            warnings.warn("The initial velocities in the GSD file are ignored because a velocity seed is provided.")
+        if parameters.velocity_seed < 0:
+            simulation.context.setVelocitiesToTemperature(parameters.potential_temperature)
+        else:
+            simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
+                                                          parameters.velocity_seed)
     else:
-        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature)
+        if np.all(frame.particles.velocity == 0.0):
+            warnings.warn(
+                "All initial velocities in the GSD file are zero. Set a velocity seed to assign random "
+                "values based on the temperature (use a negative seed to generate a random seed automatically).")
+        simulation.context.setVelocities(frame.particles.velocity)
 
     if parameters.minimize_energy_initially:
-        # TODO: Do we want this?
         # Add reporter during minimization?
         # See https://openmm.github.io/openmm-cookbook/dev/notebooks/cookbook/report_minimization.html
         simulation.minimizeEnergy()
@@ -310,9 +319,6 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
     set_up_reporters(parameters, simulation, False, parameters.run_steps, frame)
 
     simulation.step(parameters.run_steps)
-
-    # TODO: Automatically plot energies etc.
-    # TODO: CHECK ALL SURFACE SEPARATIONS
 
     if parameters.final_configuration_gsd_filename is not None:
         write_gsd_file(parameters.final_configuration_gsd_filename, simulation,

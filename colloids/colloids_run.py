@@ -63,7 +63,9 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
                               "Analytical computation of depletion potential may be invalid."
                               "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
                               "pp 10079 - 10106.")
-    use_substrate = any(mass == 0.0 for mass in frame.particles.mass)
+    
+    # Explicit substrate is detected by immobile particles with mass 0.0.
+    use_substrate = any([mass == 0.0 for mass in frame.particles.mass,parameters.use_implicit_substrate])
     if use_substrate:
         if not all(parameters.wall_directions):
             raise ValueError("A substrate can only be used if all walls are active.")
@@ -122,9 +124,6 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         topology.setPeriodicBoxVectors(final_cell)
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
-
-    # Substrate is detected by immobile particles with mass 0.0.
-    use_substrate = any(mass == 0.0 for mass in frame.particles.mass)
 
     # TODO: Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
@@ -203,6 +202,12 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         for force in depletion_potential.yield_potentials():
             system.addForce(force)
 
+    if add_implicit_substrate:
+        substrate_wall = SubstrateWall(colloid_potentials_parameters=potentials_parameters, 
+                                        wall_distance=wall_distances[2],
+                                        wall_charge=parameters.substrate_wall_charge, 
+                                        use_log=parameters.use_log)
+    
     if parameters.use_gravity:
         assert all_walls
         for force in gravitational_potential.yield_potentials():

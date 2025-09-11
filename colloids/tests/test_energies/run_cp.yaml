@@ -45,6 +45,8 @@ trajectory_interval: 500000
 update_reporter: null
 update_reporter_parameters: null
 use_depletion: false
+use_implicit_substrate: false
+substrate_wall_charge: null
 use_gravity: false
 use_log: false
 velocity_seed: null

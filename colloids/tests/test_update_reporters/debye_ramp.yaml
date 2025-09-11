@@ -60,6 +60,8 @@ update_reporter_parameters:
     unit: nanometer
     value: 6.0
 use_depletion: false
+use_implicit_substrate: false
+substrate_wall_charge: null
 use_gravity: false
 use_log: false
 velocity_seed: 2

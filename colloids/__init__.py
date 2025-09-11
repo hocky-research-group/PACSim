@@ -4,4 +4,4 @@ from .colloid_potentials_parameters import ColloidPotentialsParameters
 from .colloid_potentials_tabulated import ColloidPotentialsTabulated
 from .depletion_potential import DepletionPotential
 from .gravity import Gravity
-from .shifted_lennard_jones_walls import ShiftedLennardJonesWalls
+from .walls import ShiftedLennardJonesWalls, SubstrateWall

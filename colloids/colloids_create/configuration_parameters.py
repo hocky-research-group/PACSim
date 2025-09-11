@@ -115,34 +115,34 @@ class ConfigurationParameters(Parameters):
         The unit of the surface potentials must be compatible with millivolts.
         Defaults to {"1": 44.0 * millivolt, "2": -54.0 * millivolt}.
     :type surface_potentials: dict[str, unit.Quantity]
-    :param use_substrate:
-        A boolean indicating whether to place a substrate at the bottom of the simulation box.
-        In a simulation with colloids_run, a substrate can only be used when all walls are active. The bottom wall is
-        then replaced by the substrate. Also, a substrate can only be used with the algebraic colloid potentials.
-        Defaults to False.
-    :type use_substrate: bool
-    :param substrate_type:
+    :param use_explicit_substrate:
+        A boolean indicating whether to explicitly add substrate particles at the bottom of the simulation box.
+        A substrate can only be used when all walls are active. The bottom wall is then replaced by the substrate.
+        Defaults to False (no explicit substrate).
+    :type use_explicit_substrate: bool Optional[str]
+    :param substrate_particle_type:
         The type of the substrate that is used at the bottom of the simulation box.
-        If a substrate is used, the substrate type must not be None, and it must appear in the radii, masses, and
-        surface_potentials dictionaries.
+        For an explicit substrate, this type must appear in the radii, masses, and surface_potentials dictionaries to
+        specify the properties of the explicit substrate particles. An explicit substrate can only be used with the
+        algebraic colloid potentials (use_tabulated=False).
         Defaults to None.
-    :type substrate_type: Optional[Union[str, int]]
+    :type substrate_particle_type: Optional[Union[str, int]]
 
     :raises TypeError:
         If the lattice repeats are not an integer or a list of three integers.
         If the masses, radii, or surface potentials do not have the correct units.
         If the masses, radii, or surface potentials dictionaries do not have strings as keys.
-        If the substrate type is not a string.
+        If the substrate particle type is not a string.
     :raises ValueError:
         If the cluster specification file does not end in ".lmp."
         If the number of lattice repeats is not positive.
         If the (cluster) padding factor is not greater than zero.
         If the masses are not greater than or equal to zero.
         If the radii are not greater than zero.
-        If the substrate type is not specified when a substrate is used or vice versa.
+        If the substrate particle type is not specified when an explicit substrate is used or vice versa.
         If a non-substrate type of the masses, radii, or surface potentials dictionaries is not in the lammps-data file.
         If a type of the lammps-data file is not in the masses, radii, or surface potentials dictionaries.
-        If the substrate type is not in the radii, masses, or surface potentials dictionaries.
+        If the substrate particle type is not in the radii, masses, or surface potentials dictionaries.
         If the mass of the substrate type is not zero.
     """
     cluster_specifications: list[str] = field(default_factory=lambda: ["cluster.lmp"])
@@ -157,8 +157,9 @@ class ConfigurationParameters(Parameters):
                                                                      "2": 95.0 * length_unit})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"1": 44.0 * electric_potential_unit, "2": -54.0 * electric_potential_unit})
-    use_substrate: bool = False
-    substrate_type: Optional[str] = None
+    use_explicit_substrate: bool
+    substrate_particle_type: Optional[Union[str, int]] = None
+    
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
@@ -233,13 +234,13 @@ class ConfigurationParameters(Parameters):
                     raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in surface potentials "
                                      f"dictionary.")
         for t in self.masses:
-            if t not in found_types and t != self.substrate_type:
+            if t not in found_types and t != self.substrate_particle_type:
                 warnings.warn(f"Non-substrate type {t} of the masses dictionary is not in the lammps-data file.")
         for t in self.radii:
-            if t not in found_types and t != self.substrate_type:
+            if t not in found_types and t != self.substrate_particle_type:
                 warnings.warn(f"Non-substrate type {t} of the radii dictionary is not in the lammps-data file.")
         for t in self.surface_potentials:
-            if t not in found_types and t != self.substrate_type:
+            if t not in found_types and t != self.substrate_particle_type:
                 warnings.warn(f"Non-substrate type {t} of the surface potentials dictionary is not in the lammps-data "
                               f"file.")
 
@@ -259,19 +260,23 @@ class ConfigurationParameters(Parameters):
         if self.padding_factor <= 0.0:
             raise ValueError("Padding factor must be greater than zero.")
 
-        if self.use_substrate:
-            if self.substrate_type is None:
-                raise ValueError("The substrate type must be specified if a substrate is used.")
-            if not isinstance(self.substrate_type, str):
-                raise TypeError("The substrate type must be a string.")
-            if self.substrate_type not in self.radii:
-                raise ValueError("The substrate type must be in the radii dictionary.")
-            if self.substrate_type not in self.masses:
-                raise ValueError("The substrate type must be in the masses dictionary.")
-            if self.substrate_type not in self.surface_potentials:
+        if self.use_explicit_substrate :
+            if not all(self.wall_directions):
+                raise ValueError("A substrate can only be used if all walls are active.")
+            if self.substrate_particle_type is None:
+                raise ValueError("The substrate particle type must be specified if a substrate is used.")
+            if self.substrate_particle_type not in self.radii:
+                raise ValueError("The substrate type must be in the radii dictionary for an explicit substrate.")
+            if self.substrate_particle_type not in self.masses:
+                raise ValueError("The substrate type must be in the masses dictionary for an explicit substrate.")
+            if self.masses[self.substrate_particle_type] != 0.0 * unit.amu:
+                warnings.warn("The mass of the substrate type is not zero. Explicit substrate particles will move "
+                                "during the simulation.")
+            if self.use_tabulated:
+                raise ValueError("An explicit substrate can only be used with the algebraic colloid potentials.")
+            if self.substrate_particle_type not in self.surface_potentials:
                 raise ValueError("The substrate type must be in the surface potentials dictionary.")
-            if self.masses[self.substrate_type] != 0.0 * mass_unit:
-                warnings.warn("The mass of the substrate type is not zero. Substrate will move during the simulation.")
         else:
-            if self.substrate_type is not None:
-                raise ValueError("The substrate type must not be specified if a substrate is not used.")
+            if self.substrate_particle_type is not None:
+                raise ValueError("The substrate particle type must not be specified in the configuration input file "
+                                    "if an explicit substrate is not used.")

@@ -6,7 +6,7 @@ from openmm import unit
 from colloids.abstracts import Parameters
 import colloids.integrators as integrators
 import colloids.update_reporters as update_reporters
-from colloids.units import energy_unit, length_unit, temperature_unit, time_unit
+from colloids.units import energy_unit, length_unit, temperature_unit, time_unit, electric_potential_unit
 
 
 @dataclass(order=True, frozen=True)
@@ -32,7 +32,7 @@ class RunParameters(Parameters):
     - frame.particles.typeid -> Type index within the frame.particles.types tuple of each particle in the frame.
     - frame.particles.diameter -> Diameter in nanometer of each particle in the frame that is used to infer the radius.
     - frame.particles.charge -> Surface potential in millivolt of each particle in the frame.
-    - frame.particles.mass -> Mass in atomic mass units of each particle in the frame. A zero mass signals non-mobile
+    - frame.particles.mass -> Mass in atomic mass units of each particle in the frame. A zero mass signals immobile
                               particles and are interpreted as the substrate.
     - frame.configuration.box -> Box dimensions of the frame. The first three entries are the box lengths in x, y, and z
                                  directions in nanometers. The next three entries are the tilt factors xy, xz, and yz.
@@ -192,6 +192,18 @@ class RunParameters(Parameters):
         If any wall direction is True, alpha must be not None and 0 <= alpha <= 1.
         Note that the force of this potential is only continuous if alpha = 1.
     :type alpha: Optional[float]
+    :param use_implicit_substrate:
+        A boolean indicating whether to implicitly model a substrate implicitly as a charged wall. 
+        An implicit substrate can only be used when all walls are active. The bottom wall is then replaced by the substrate.
+        An implicit substrate can only be used if explicit particles have not been added to the simulation box (specified in the
+        configuration input files).
+        Defaults to False.
+    :type use_implicit_substrate: bool
+    :param substrate_wall_charge:
+        The charge of the substrate wall at the bottom of the simulation box. If using an implicit substrate, substrate wall charge
+        must not be None and the units must be compatible with millivolts.
+        Defaults to None.
+    :type substrate_wall_charge: Optional[unit.Quantity]
     :param use_depletion:
         A boolean indicating whether to turn on the depletion attraction for the simulation.
         If depletion attraction is on, depletion_phi and depletant_radius must be specified.
@@ -285,6 +297,8 @@ class RunParameters(Parameters):
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
+    use_implicit_substrate: bool = False
+    substrate_wall_charge: Optional[unit.Quantity]
     use_depletion: bool = False
     depletion_phi: Optional[float] = None
     depletant_radius: Optional[unit.Quantity] = None
@@ -389,6 +403,17 @@ class RunParameters(Parameters):
                 raise ValueError("Depletion phi must not be specified if depletion potential is not on.")
             if self.depletant_radius is not None:
                 raise ValueError("Depletant radius must not be specified if depletion potential is not on.")
+        if self.use_implicit_substrate:
+            if not all(self.wall_directions):
+                raise ValueError("A substrate can only be used if all walls are active.")
+            if self.substrate_wall_charge is None:
+                raise ValueError("Substrate wall charge must be specified if using implicit substrate.")
+            if not self.substrate_wall_charge.unit.is_compatible(electric_potential_unit):
+                raise TypeError(
+                    "The substrate wall charge must have a unit compatible with millivolts.")
+         else:
+            if self.substrate_wall_charge is not None:
+                raise Value Error("Substrate wall charge must not be specified if not using implicit substrate.")
         if self.use_gravity:
             if self.gravitational_acceleration is None:
                 raise ValueError("Gravitational acceleration must be specified if gravity is on.")

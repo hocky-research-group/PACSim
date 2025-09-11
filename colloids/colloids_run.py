@@ -1,9 +1,10 @@
 import argparse
 import inspect
 import sys
-from typing import Sequence
+from typing import Optional, Sequence
 import warnings
 import gsd.hoomd
+import numpy as np
 import openmm
 from openmm import app
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
@@ -17,13 +18,42 @@ import colloids.update_reporters as update_reporters
 from colloids.units import electric_potential_unit, length_unit
 
 
+def simple_formatwarning(msg: str, category: Warning, filename: str, lineno: int, line: Optional[str] = None) -> str:
+    """
+    Simpler format for warnings that excludes the line with the code that caused the warning.
+
+    :param msg:
+        The warning message.
+    :type msg: str
+    :param category:
+        The warning category.
+    :type category: Warning
+    :param filename:
+        The filename where the warning occurred.
+    :type filename: str
+    :param lineno:
+        The line number where the warning occurred.
+    :type lineno: int
+    :param line:
+        The line of code that caused the warning (not used).
+    :type line: Optional[str]
+
+    :return:
+        The formatted warning message.
+    :rtype: str
+    """
+    return f"{filename}:{lineno}: {category.__name__}: {msg}\n"
+
+
+warnings.formatwarning = simple_formatwarning
+
+
 class ExampleAction(argparse.Action):
     def __init__(self, option_strings, dest, **kwargs):
         super().__init__(option_strings, dest, nargs=0, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
         # TODO ADD OPTION FOR PLATFORM PROPERTIES?
-        # TODO PUT EQUILIBRATION STEPS?
         default_parameters = RunParameters()
         default_parameters.to_yaml("example.yaml")
         parser.exit()
@@ -192,14 +222,17 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
 
     # -------------------------------------- Add all forces to the system. ---------------------------------------------
     for force in colloid_potentials.yield_potentials():
+        force.setForceGroup(system.getNumForces())
         system.addForce(force)
 
     if include_walls:
         for force in slj_walls.yield_potentials():
+            force.setForceGroup(system.getNumForces())
             system.addForce(force)
 
     if parameters.use_depletion:
         for force in depletion_potential.yield_potentials():
+            force.setForceGroup(system.getNumForces())
             system.addForce(force)
 
     if add_implicit_substrate:
@@ -211,30 +244,11 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     if parameters.use_gravity:
         assert all_walls
         for force in gravitational_potential.yield_potentials():
+            force.setForceGroup(system.getNumForces())
             system.addForce(force)
         assert not system.usesPeriodicBoundaryConditions()
 
     # -------------------------------------- Set up the simulation. ----------------------------------------------------
-    if parameters.platform_name == "CUDA" or parameters.platform_name == "OpenCL":
-        # Set different force groups for the nonbonded potentials to allow for different cutoffs on the OpenCL and CUDA
-        # platforms.
-        cutoffs = []
-        for force in system.getForces():
-            if isinstance(force, (openmm.NonbondedForce, openmm.CustomNonbondedForce)):
-                assert (force.getNonbondedMethod() == openmm.NonbondedForce.CutoffPeriodic
-                        or force.getNonbondedMethod() == openmm.NonbondedForce.CutoffNonPeriodic)
-                cutoff_distance = force.getCutoffDistance()
-                cutoff_distance_index = -1
-                for other_cutoff_index in range(len(cutoffs)):
-                    if abs((cutoff_distance - cutoffs[other_cutoff_index]).value_in_unit(length_unit)) < 1.0e-6:
-                        cutoff_distance_index = other_cutoff_index
-                if cutoff_distance_index == -1:
-                    cutoffs.append(cutoff_distance)
-                    cutoff_distance_index = len(cutoffs) - 1
-                else:
-                    force.setCutoffDistance(cutoffs[cutoff_distance_index])
-                force.setForceGroup(cutoff_distance_index)
-
     if parameters.platform_name == "CUDA":
         simulation = app.Simulation(topology, system, integrator, platform,
                                     platformProperties={"Precision": "mixed"})
@@ -276,6 +290,8 @@ def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, appe
 def colloids_run(argv: Sequence[str]) -> app.Simulation:
     parser = argparse.ArgumentParser(description="Run OpenMM for a colloids system.")
     parser.add_argument("yaml_file", help="YAML file with simulation parameters", type=str)
+    parser.add_argument("-c", "--checkpoint_file", help="OpenMM checkpoint file", type=str,
+                        default=None)
     parser.add_argument("--example", help="write an example YAML file and exit", action=ExampleAction)
     args = parser.parse_args(args=argv)
 
@@ -290,34 +306,48 @@ def colloids_run(argv: Sequence[str]) -> app.Simulation:
 
     simulation = set_up_simulation(parameters, frame)
 
-    simulation.context.setPositions(frame.particles.position)
-    if parameters.velocity_seed is not None:
-        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
-                                                      parameters.velocity_seed)
+    if args.checkpoint_file is not None:
+        if not args.checkpoint_file.endswith(".chk"):
+            raise ValueError("The checkpoint file must have the .chk extension.")
+
+        simulation.loadCheckpoint(args.checkpoint_file)
+
+        set_up_reporters(parameters, simulation, True, parameters.run_steps, frame)
     else:
-        simulation.context.setVelocitiesToTemperature(parameters.potential_temperature)
+        simulation.context.setPositions(frame.particles.position)
 
-    if parameters.minimize_energy_initially:
-        # TODO: Do we want this?
-        # Add reporter during minimization?
-        # See https://openmm.github.io/openmm-cookbook/dev/notebooks/cookbook/report_minimization.html
-        simulation.minimizeEnergy()
+        if parameters.velocity_seed is not None:
+            if not np.all(frame.particles.velocity == 0.0):
+                warnings.warn("The initial velocities in the GSD file are ignored because a velocity seed is provided.")
+            if parameters.velocity_seed < 0:
+                simulation.context.setVelocitiesToTemperature(parameters.potential_temperature)
+            else:
+                simulation.context.setVelocitiesToTemperature(parameters.potential_temperature,
+                                                              parameters.velocity_seed)
+        else:
+            if np.all(frame.particles.velocity == 0.0):
+                warnings.warn(
+                    "All initial velocities in the GSD file are zero. Set a velocity seed to assign random "
+                    "values based on the temperature (use a negative seed to generate a random seed automatically).")
+            simulation.context.setVelocities(frame.particles.velocity)
 
-    if parameters.equilibration_steps > 0:
-        simulation.reporters.append(StatusReporter(
-            max(1, parameters.equilibration_steps // 100), parameters.equilibration_steps, desc="Equilibration"))
-        simulation.step(parameters.equilibration_steps)
-        simulation.reporters = []
+        if parameters.minimize_energy_initially:
+            # Add reporter during minimization?
+            # See https://openmm.github.io/openmm-cookbook/dev/notebooks/cookbook/report_minimization.html
+            simulation.minimizeEnergy()
 
-    # Reset the current step to zero after the equilibration.
-    simulation.currentStep = 0
+        if parameters.equilibration_steps > 0:
+            simulation.reporters.append(StatusReporter(
+                max(1, parameters.equilibration_steps // 100), parameters.equilibration_steps, desc="Equilibration"))
+            simulation.step(parameters.equilibration_steps)
+            simulation.reporters = []
 
-    set_up_reporters(parameters, simulation, False, parameters.run_steps, frame)
+        # Reset the current step to zero after the equilibration.
+        simulation.currentStep = 0
+
+        set_up_reporters(parameters, simulation, False, parameters.run_steps, frame)
 
     simulation.step(parameters.run_steps)
-
-    # TODO: Automatically plot energies etc.
-    # TODO: CHECK ALL SURFACE SEPARATIONS
 
     if parameters.final_configuration_gsd_filename is not None:
         write_gsd_file(parameters.final_configuration_gsd_filename, simulation,

@@ -25,7 +25,6 @@ dependencies = [
 
 [project.scripts]
 colloids-run = "colloids.colloids_run:main"
-colloids-resume = "colloids.colloids_resume:main"
 colloids-create = "colloids.colloids_create.colloids_create:main"
 colloids-analyze = "colloids.colloids_analyze.colloids_analyze:main"
 colloids-tune = "colloids.colloids_tune.colloids_tune:main"

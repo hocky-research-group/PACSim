@@ -67,6 +67,8 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         If not all wall directions are active if a substrate is used.
     """
 
+    _name = "wall_energy"
+
     def __init__(self, wall_distances: Sequence[Optional[unit.Quantity]], epsilon: unit.Quantity, alpha: float,
                  wall_directions: Sequence[bool] = (True, True, True), use_substrate: bool = False) -> None:
         """Constructor of the ShiftedLennardJonesWalls class."""
@@ -228,7 +230,8 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """
-        Generate all potentials in the systems that are necessary to properly include the shifted Lennard-Jones walls.
+        Generate all potentials that are necessary to properly include the shifted Lennard-Jones walls in the OpenMM
+        system.
 
         This method has to be called after the method add_particle was called for every particle in the system.
 
@@ -240,6 +243,7 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
             If the method add_particle was not called before this method (via the abstract base class).
         """
         super().yield_potentials()
+        self._slj_potential.setName(self._name)
         yield self._slj_potential
 
 class SubstrateWall(OpenMMPotentialAbstract):

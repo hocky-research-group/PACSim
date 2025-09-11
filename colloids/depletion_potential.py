@@ -37,7 +37,9 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
         Whether this force should use periodic cutoffs for the depletion potential.
     :type periodic_boundary_conditions: bool
     """
-    
+
+    _name = "depletion_energy"
+
     def __init__(self, depletion_phi: float, depletant_radius: unit.Quantity, brush_length: unit.Quantity,
                  temperature: unit.Quantity, periodic_boundary_conditions: bool = True):
         """Constructor of the DepletionPotential class."""
@@ -126,7 +128,7 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
 
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """
-        Generate the depletion pair potential between colloids in a solution in an openmm system.
+        Generate the depletion pair potential between colloids in a solution in an OpenMM system.
 
         This method has to be called after the method add_particle is called for every particle in the system.
 
@@ -148,6 +150,7 @@ class DepletionPotential(OpenMMNonbondedPotentialAbstract):
             (2.0 * self._max_radius + 2.0 * self._depletant_radius + 2.0 * self._brush_length).value_in_unit(length_unit))
         self._depletion_potential.setUseLongRangeCorrection(False)
         self._depletion_potential.setUseSwitchingFunction(False)
+        self._depletion_potential.setName(self._name)
 
         yield self._depletion_potential
 

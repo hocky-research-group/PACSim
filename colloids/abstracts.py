@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, fields
 from typing import Any, Iterator
-from openmm import CustomNonbondedForce, unit
+from openmm import Force, unit
 import yaml
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 from colloids.units import electric_potential_unit, length_unit
@@ -53,19 +53,22 @@ class OpenMMPotentialAbstract(ABC):
 
     # noinspection PyTypeChecker
     @abstractmethod
-    def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
+    def yield_potentials(self) -> Iterator[Force]:
         """
-        Generate all potentials in the systems that are necessary to properly include the potential in an openmm system.
+        Generate all potentials that are necessary to properly include the potential in an OpenMM system.
 
         This method has to be called after the method add_particle was called for every particle in the system. Note
         that the overriding method in the inheriting class should call this method first because it checks that the
         method add_particle was called before.
 
-        The generated potentials can be added to the openmm system using the system.addForce method.
+        The generated potentials can be added to the OpenMM system using the system.addForce method.
+
+        Note that this method should name the OpenMM potentials with their setName method. This allows to properly log
+        their respective energies in the GSDReporter.
 
         :return:
             A generator that yields all potentials handled by this class.
-        :rtype: Iterator[CustomNonbondedForce]
+        :rtype: Iterator[Force]
 
         :raises RuntimeError:
             If the method add_particle was not called before this method.

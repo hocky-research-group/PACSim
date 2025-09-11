@@ -28,6 +28,8 @@ class RunParameters(Parameters):
 
     - frame.particles.N -> Total number of particles in the frame (including colloids, substrate, snowman heads, etc.).
     - frame.particles.position -> Positions of all particles in the frame.
+    - frame.particles.velocity -> Velocities of all particles in the frame. Can be overridden by sampling from a
+                                  Maxwell-Boltzmann distribution if velocity_seed is not None.
     - frame.particles.types -> Possible types of all particles in the frame.
     - frame.particles.typeid -> Type index within the frame.particles.types tuple of each particle in the frame.
     - frame.particles.diameter -> Diameter in nanometer of each particle in the frame that is used to infer the radius.
@@ -43,8 +45,6 @@ class RunParameters(Parameters):
     Note that gsd files can store constraints directly in the frame.constraints attribute. One has to be careful,
     however, that Ovito ignores the frame.constraints attribute. This means that one has to manually store the
     constraint distances into the GSD file once a gsd file is exported from Ovito
-
-    TODO: Also store velocities in gsd file.
 
     :param initial_configuration:
         The path to the initial configuration of the system in a gsd file.
@@ -118,8 +118,10 @@ class RunParameters(Parameters):
         Defaults to "harmonic".
     :type electrostatic_radius_average: str
     :param velocity_seed:
-        The seed for the random number generator that is used to sample the initial velocities.
-        If None, a random seed is used.
+        The seed for the random number generator that is used to sample the initial velocities replacing the velocities
+        in the gsd file.
+        If None, the velocities in the gsd file are used.
+        If negative, a random seed is used for the random number generator.
         Defaults to None.
     :type velocity_seed: Optional[int]
     :param equilibration_steps:

@@ -88,7 +88,9 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
     """
 
     _steric_prefactor_unit = energy_unit / (length_unit ** 3)
+    _steric_name = "steric_energy"
     _electrostatic_prefactor_unit = energy_unit / (length_unit * electric_potential_unit ** 2)
+    _electrostatic_name = "electrostatic_energy"
 
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters = ColloidPotentialsParameters(),
                  use_log: bool = True, cutoff_factor: float = 21.0, periodic_boundary_conditions: bool = True,
@@ -239,8 +241,8 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
 
     def yield_potentials(self) -> Iterator[CustomNonbondedForce]:
         """
-        Generate all potentials in the systems that are necessary to properly include the steric and electrostatic pair
-        potentials between colloids in a solution in an openmm system.
+        Generate all potentials that are necessary to properly include the steric and electrostatic pair potentials
+        between colloids in a solution in an OpenMM system.
 
         This method has to be called after the method add_particle was called for every particle in the system.
 
@@ -262,6 +264,7 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
             (2.0 * self._max_radius + 2.0 * self._parameters.brush_length).value_in_unit(length_unit))
         self._steric_potential.setUseLongRangeCorrection(False)
         self._steric_potential.setUseSwitchingFunction(False)
+        self._steric_potential.setName(self._steric_name)
 
         if self._periodic_boundary_conditions:
             self._electrostatic_potential.setNonbondedMethod(self._electrostatic_potential.CutoffPeriodic)
@@ -275,6 +278,7 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         self._electrostatic_potential.setSwitchingDistance(
             (2.0 * self._max_radius
              + (self._cutoff_factor - 1.0) * self._parameters.debye_length).value_in_unit(length_unit))
+        self._electrostatic_potential.setName(self._electrostatic_name)
 
         yield self._steric_potential
         yield self._electrostatic_potential

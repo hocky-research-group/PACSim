@@ -108,6 +108,14 @@ class GSDReporter(object):
         self._file = gsd.hoomd.open(name=filename, mode="r+" if self._append_file else "w")
         self._frame = self._set_up_frame(simulation)
         self._cell = cell
+        self._force_group_names = {}
+        for force in simulation.system.getForces():
+            force_group = force.getForceGroup()
+            if force_group in self._force_group_names:
+                self._force_group_names[force_group] += f"+{force.getName()}"
+            else:
+                self._force_group_names[force_group] = force.getName()
+
         if not self._append_file:
             # Include initial configuration in frame.
             self.report(simulation, simulation.context.getState(getPositions=True, getVelocities=True, getEnergy=True,
@@ -211,11 +219,17 @@ class GSDReporter(object):
             periodic_box_vectors[2][1] / periodic_box_vectors[2][2]
         ]
         # To prevent warnings about implicit data copies, the scalar values should be stored explicitly in a 1D array.
-        self._frame.log = {
+        log = {
             "time": np.array([state.getTime().value_in_unit(time_unit)]),
             "potential_energy": np.array([state.getPotentialEnergy().value_in_unit(energy_unit)]),
             "kinetic_energy": np.array([state.getKineticEnergy().value_in_unit(energy_unit)])
         }
+        for force_group, force_name in self._force_group_names.items():
+            force_group_state = simulation.context.getState(getEnergy=True, groups={force_group})
+            assert force_name not in log
+            log[force_name] = np.array([force_group_state.getPotentialEnergy().value_in_unit(energy_unit)])
+
+        self._frame.log = log
         self._file.append(self._frame)
         self._file.flush()
 

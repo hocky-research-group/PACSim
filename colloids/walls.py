@@ -4,7 +4,7 @@ from colloids.abstracts import OpenMMPotentialAbstract
 from colloids import ColloidPotentialsParameters
 import warnings
 from colloids.units import energy_unit, length_unit
-
+import math
 
 class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     """
@@ -314,6 +314,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
 
         """Set up the basic functional form of the steric potential from the Alexander-de Gennes polymer brush model."""
         # 2 / (1 / radius1 + 1 / radius2) = 2 * radius1 if radius2 = infinity.
+
         steric_potential = (
             "step(two_l - h) * "
             "steric_prefactor * 2 * radius * brush_length * brush_length * ("
@@ -326,18 +327,18 @@ class SubstrateWall(OpenMMPotentialAbstract):
         if self._use_log:
             # 2 / (1 / radius1 + 1 / radius2) = 2 * radius1 if radius2 = infinity.
             electrostatic_potential = (
-                "electrostatic_prefactor * 2 * radius * psi * substrate_psi * log(1.0 + exp(-h / debye_length));")
+                "electrostatic_prefactor * 2 * radius * psi * substrate_psi * log(1.0 + exp(-h / debye_length);")
 
         else:
             # 2 / (1 / radius1 + 1 / radius2) = 2 * radius1 if radius2 = infinity.
             electrostatic_potential = (
                 "electrostatic_prefactor * 2 * radius * psi * substrate_psi * exp(-h / debye_length);")
 
-        substrate_string = steric_potential + electrostatic_potential
+        substrate_string = "+".join([steric_potential, electrostatic_potential]) #steric_potential + electrostatic_potential
         # +z so that close to zero when z~-L/2.
         # substrate_wall_distance is L / 2 - radius.
         substrate_string += ("h = substrate_wall_distance + z;"
-                             "two_l = 2.0 * brush_length;")
+                             "two_l = 2.0 * brush_length")
 
         substrate_wall_potential = CustomExternalForce(substrate_string)
 

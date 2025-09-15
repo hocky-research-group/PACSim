@@ -8,7 +8,7 @@ import numpy as np
 import openmm
 from openmm import app
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
-                      DepletionPotential, Gravity)
+                      SubstrateWall, DepletionPotential, Gravity)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import get_cell_from_box, read_gsd_file, write_gsd_file
 import colloids.integrators as integrators
@@ -240,8 +240,8 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
 
     if parameters.use_implicit_substrate:
         substrate_wall = SubstrateWall(colloid_potentials_parameters=potentials_parameters, 
-                                        wall_distance=wall_distances[2],
-                                        wall_charge=parameters.substrate_wall_charge, 
+                                        wall_distance_z=wall_distances[2],
+                                        substrate_charge=parameters.substrate_wall_charge, 
                                         use_log=parameters.use_log)
     
     if parameters.use_gravity:

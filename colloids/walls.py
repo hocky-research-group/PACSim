@@ -1,6 +1,7 @@
 from typing import Iterator, Optional, Sequence
 from openmm import CustomExternalForce, unit
 from colloids.abstracts import OpenMMPotentialAbstract
+from colloids import ColloidPotentialsParameters
 import warnings
 from colloids.units import energy_unit, length_unit
 

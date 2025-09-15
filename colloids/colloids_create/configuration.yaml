@@ -1,4 +1,5 @@
-cluster_specification: "cluster.lmp"
+cluster_specifications: 
+ - "cluster.lmp"
 lattice_repeats: 2
 cluster_padding_factor: 3.0
 padding_factor: 1.5

@@ -157,7 +157,7 @@ class ConfigurationParameters(Parameters):
                                                                      "2": 95.0 * length_unit})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"1": 44.0 * electric_potential_unit, "2": -54.0 * electric_potential_unit})
-    use_explicit_substrate: bool
+    use_explicit_substrate: bool = False
     substrate_particle_type: Optional[Union[str, int]] = None
     
 

@@ -95,7 +95,7 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
                               "pp 10079 - 10106.")
     
     # Explicit substrate is detected by immobile particles with mass 0.0.
-    use_substrate = any([mass == 0.0 for mass in frame.particles.mass,parameters.use_implicit_substrate])
+    use_substrate = any([mass == 0.0 for mass in frame.particles.mass]) or parameters.use_implicit_substrate
     if use_substrate:
         if not all(parameters.wall_directions):
             raise ValueError("A substrate can only be used if all walls are active.")
@@ -115,6 +115,9 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         atoms.append(topology.addAtom(frame.particles.types[type_id], None, residue))
 
     system = openmm.System()
+
+    # Explicit substrate is detected by immobile particles with mass 0.0.
+    use_substrate = any([mass == 0.0 for mass in frame.particles.mass]) or parameters.use_implicit_substrate
 
     cell = get_cell_from_box(frame.configuration.box)
     include_walls = any(parameters.wall_directions)
@@ -235,7 +238,7 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
             force.setForceGroup(system.getNumForces())
             system.addForce(force)
 
-    if add_implicit_substrate:
+    if parameters.use_implicit_substrate:
         substrate_wall = SubstrateWall(colloid_potentials_parameters=potentials_parameters, 
                                         wall_distance=wall_distances[2],
                                         wall_charge=parameters.substrate_wall_charge, 

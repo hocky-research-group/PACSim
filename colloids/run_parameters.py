@@ -300,7 +300,7 @@ class RunParameters(Parameters):
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
     use_implicit_substrate: bool = False
-    substrate_wall_charge: Optional[unit.Quantity]
+    substrate_wall_charge: Optional[unit.Quantity] = None
     use_depletion: bool = False
     depletion_phi: Optional[float] = None
     depletant_radius: Optional[unit.Quantity] = None
@@ -413,9 +413,9 @@ class RunParameters(Parameters):
             if not self.substrate_wall_charge.unit.is_compatible(electric_potential_unit):
                 raise TypeError(
                     "The substrate wall charge must have a unit compatible with millivolts.")
-         else:
+        else:
             if self.substrate_wall_charge is not None:
-                raise Value Error("Substrate wall charge must not be specified if not using implicit substrate.")
+                raise ValueError("Substrate wall charge must not be specified if not using implicit substrate.")
         if self.use_gravity:
             if self.gravitational_acceleration is None:
                 raise ValueError("Gravitational acceleration must be specified if gravity is on.")

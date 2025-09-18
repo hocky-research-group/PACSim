@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Sep 17 10:22:05 2025
+
+@author: steven
+"""
+
+
+import numpy as np
+import gc
+import time
+from contextlib import contextmanager
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+# Pymatgen imports for structures
+from pymatgen.core import Structure
+from pymatgen.io.cif import CifParser
+
+# OpenMM imports
+import openmm
+from openmm import unit
+from colloids.colloid_potentials_algebraic import ColloidPotentialsAlgebraic
+from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
+
+
+from pymatgen.core import Lattice, Structure, Molecule
+from scipy.optimize import minimize_scalar
+
+import gsd.hoomd
+import os
+
+class LatticeBuilder:
+    """
+    Handles structure creation from CIF or coordinates,
+    supercell expansion, ASE/pymatgen structure conversion,
+    and resizing to match colloid radii.
+    """
+
+    def __init__(self, cif_path=None):
+        self.structure = None
+        self.positions = None
+        self.types = None
+        self.scale = None
+        self.box = None
+
+        if cif_path:
+            self.load_from_cif(cif_path)
+
+    def load_from_cif(self, cif_path):
+        """Load structure from CIF file using pymatgen."""
+        parser = CifParser(cif_path)
+        self.structure = parser.get_structures()[0]
+
+    def set_structure(self, lattice, coords, species):
+        """Manually define a structure (instead of CIF)."""
+        self.structure = Structure(lattice, species, coords)
+
+    def make_supercell(self, matrix=(3, 3, 3)):
+        """Return a new supercell structure."""
+        if self.structure is None:
+            raise ValueError("No structure defined")
+        return self.structure.make_supercell(matrix)
+
+    def get_AB_labels(self, atomic_numbers):
+        """Label atoms as 'A' or 'B' based on first atomic number."""
+        first = atomic_numbers[0]
+        return ['1' if x == first else '2' for x in atomic_numbers]
+
+    # -------------------------
+    # NEW resizing functionality
+    # -------------------------
+
+    def _calculate_distances(self, positions):
+        """Pairwise distance matrix."""
+        n = len(positions)
+        dists = np.zeros((n, n))
+        for i in range(n):
+            for j in range(i + 1, n):
+                d = np.linalg.norm(positions[i] - positions[j])
+                dists[i, j] = d
+                dists[j, i] = d
+        return dists
+
+    def _check_overlap(self, distances, radii):
+        """Check if any particles overlap."""
+        n = len(radii)
+        for i in range(n):
+            for j in range(i + 1, n):
+                if distances[i, j] <= (radii[i] + radii[j]):
+                    return True
+        return False
+
+    def give_smallest_connection(self, distances, radii):
+        """
+        Return smallest effective distance (gap between particle surfaces).
+
+        Effective distance = d - (r_i + r_j).
+        """
+        n = len(radii)
+        min_dist = np.inf
+        min_pair = None
+        for i in range(n):
+            for j in range(i + 1, n):
+                eff = distances[i, j] - (radii[i] + radii[j])
+                if eff < min_dist:
+                    min_dist = eff
+                    min_pair = (i, j)
+        return min_dist, min_pair
+
+    # -------------------------
+    # Resizing
+    # -------------------------
+
+    def resize_to_match_radii(
+        self, r_pos, r_neg, brush_length=10.0, matrix=(3, 3, 3),
+        spacing=10.0, factor=1.1, start=0.0,
+    padding = 1000):
+        """
+        Expand supercell until no overlaps remain given target radii.
+
+        Parameters
+        ----------
+        r_pos, r_neg : float
+            Particle radii (in nanometers).
+        brush_length : float
+            Extra radius from polymer brush (nm).
+        spacing : float
+            Extra gap added to effective radii.
+        factor : float
+            Scale-up increment factor.
+        start : float
+            Starting scale factor.
+        """
+        sc = self.make_supercell(matrix)
+        positions = sc.cart_coords
+        types = self.get_AB_labels(sc.atomic_numbers)
+
+        # Effective radii in same units as positions
+        radii = [r_pos if t == 'A' else r_neg for t in types]
+        radii = np.array(radii) + brush_length + spacing
+
+        dists = self._calculate_distances(positions)
+        i = 0
+
+        while self._check_overlap(dists, radii):
+            scale = start + i * factor
+            positions_exp = positions * scale
+            dists = self._calculate_distances(positions_exp)
+            i += 1
+
+        # Check smallest connection after scaling
+        min_gap, pair = self.give_smallest_connection(dists, radii)
+
+        # Store resized system
+        self.positions = positions_exp
+        self.types = types
+        self.scale = scale
+        self.box =  np.max(self.positions, axis=0) + np.max(radii) + padding
+
+
+        return {
+            "positions": self.positions,
+            "types": self.types,
+            "box": self.box,
+            "scale": self.scale,
+            "min_gap": min_gap,
+            "min_pair": pair,
+        }
+    
+    
+    def write_lammps_data(self, filename, positions, types, box, atom_type_map=None, triclinic=True):
+         """
+         Write a LAMMPS .lmp data file in 'full' style (no bonds).
+         
+         Parameters
+         ----------
+         filename : str
+             Path to output file.
+         positions : ndarray (N,3)
+             Atomic positions in Cartesian coordinates.
+         types : list of str
+             Particle type labels (e.g. ['A','B',...]).
+         box : array_like (3,)
+             Simulation box size along x,y,z (for orthogonal).
+         atom_type_map : dict, optional
+             Map from type labels (e.g. {'A':1, 'B':2}).
+             If None, assigned in order of appearance.
+         triclinic : bool
+             If True, writes xy, xz, yz tilt factors (all set to 0).
+         """
+         positions = np.asarray(positions)
+         n_atoms = len(positions)
+         uniq_types = sorted(set(types))
+     
+         if atom_type_map is None:
+             atom_type_map = {t: i+1 for i, t in enumerate(uniq_types)}
+     
+         n_types = len(atom_type_map)
+     
+         with open(filename, "w") as f:
+             # Header counts
+             f.write("(written by ASE)\n\n")
+             f.write(f"{n_atoms} atoms\n")
+             f.write("0 bonds\n")
+             f.write(f"{n_types} atom types\n")
+             f.write("0 bond types\n\n")
+     
+             # Box boundaries
+             f.write(f"0.0 {box[0]:.6f} xlo xhi\n")
+             f.write(f"0.0 {box[1]:.6f} ylo yhi\n")
+             f.write(f"0.0 {box[2]:.6f} zlo zhi\n")
+             if triclinic:
+                 f.write("0.0 0.0 0.0 xy xz yz\n")
+             f.write("\n")
+     
+             # Atom section
+             f.write("Atoms # full\n\n")
+             for i, (pos, t) in enumerate(zip(positions, types), start=1):
+                 type_id = atom_type_map[t]
+                 f.write(f"{i:6d}   0   {type_id:d}   0.0   {pos[0]:.6f}   {pos[1]:.6f}   {pos[2]:.6f}\n")
+                 
+
+
+
+#%%
+# import os
+# dir_path =  os.path.dirname(os.path.abspath(__file__))
+# cif_path = os.path.normpath(dir_path + r"/CsCl.cif")
+# lmp_path = os.path.normpath(dir_path + r"/CIF/LAMMPS/CsCl.lmp")
+# gsd_path = os.path.normpath(dir_path + r"/CIF/OpenMM/CsCl/first_frame.gsd")
+
+
+
+# builder = LatticeBuilder(cif_path)
+# result = builder.resize_to_match_radii(r_pos=102, r_neg=120, brush_length=18 ,factor = 0.5,start=60,matrix=[8,8,8])

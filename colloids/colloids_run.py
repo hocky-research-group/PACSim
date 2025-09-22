@@ -15,10 +15,7 @@ from colloids.run_parameters import RunParameters
 from colloids.status_reporter import StatusReporter
 import colloids.update_reporters as update_reporters
 from colloids.units import electric_potential_unit, length_unit
-try:
-  from openmmplumed import PlumedForce
-except ImportError:
-  pass
+from openmmplumed import PlumedForce
 
 
 class ExampleAction(argparse.Action):

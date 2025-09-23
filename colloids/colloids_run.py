@@ -196,6 +196,14 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     else:
         gravitational_potential = None
 
+    if parameters.use_implicit_substrate:
+        substrate_wall = SubstrateWall(colloid_potentials_parameters=potentials_parameters, 
+                                        wall_distance_z=wall_distances[2],
+                                        substrate_charge=parameters.substrate_wall_charge, 
+                                        use_log=parameters.use_log)
+    else:
+        substrate_wall = None
+
     # --------------------------- Add all particles and constraints to the system. -------------------------------------
     for mass in frame.particles.mass:
         system.addParticle(mass)
@@ -217,6 +225,11 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
             depletion_potential.add_particle(radius=radii[i], substrate_flag=is_substrate)
         if parameters.use_gravity and not is_substrate:
             gravitational_potential.add_particle(index=i, radius=radii[i])
+        if parameters.use_implicit_substrate:
+            if is_substrate:
+                raise ValueError("Cannot use both implicit and explicit substrate.")
+            else:
+                substrate_wall.add_particle(radius=radii[i], surface_potential=surface_potentials[i])
 
     for i in range(frame.constraints.N):
         colloid_potentials.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
@@ -237,12 +250,6 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         for force in depletion_potential.yield_potentials():
             force.setForceGroup(system.getNumForces())
             system.addForce(force)
-
-    if parameters.use_implicit_substrate:
-        substrate_wall = SubstrateWall(colloid_potentials_parameters=potentials_parameters, 
-                                        wall_distance_z=wall_distances[2],
-                                        substrate_charge=parameters.substrate_wall_charge, 
-                                        use_log=parameters.use_log)
     
     if parameters.use_gravity:
         assert all_walls
@@ -250,7 +257,13 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
             force.setForceGroup(system.getNumForces())
             system.addForce(force)
         assert not system.usesPeriodicBoundaryConditions()
-
+    
+    if parameters.use_implicit_substrate:
+        assert all_walls
+        for force in substrate_wall.yield_potentials():
+            force.setForceGroup(system.getNumForces())
+            system.addForce(force)
+            
     # -------------------------------------- Set up the simulation. ----------------------------------------------------
     if parameters.platform_name == "CUDA":
         simulation = app.Simulation(topology, system, integrator, platform,

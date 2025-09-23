@@ -229,7 +229,7 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
             if is_substrate:
                 raise ValueError("Cannot use both implicit and explicit substrate.")
             else:
-                substrate_wall.add_particle(radius=radii[i], surface_potential=surface_potentials[i])
+                substrate_wall.add_particle(index=i, radius=radii[i], surface_potential=surface_potentials[i])
 
     for i in range(frame.constraints.N):
         colloid_potentials.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])

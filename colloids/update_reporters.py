@@ -1,5 +1,6 @@
 from abc import abstractmethod, ABC
 import math
+import random
 from typing import Optional, Sequence, Union
 import warnings
 import freud.cluster
@@ -592,6 +593,107 @@ class SquaredSinusoidalUpdateReporter(GlobalParameterUpdateReporterAbstract):
         step = simulation.currentStep
         current_value = self._amplitude * (math.sin(self._period * step) ** 2) + self._start_value
         self.set_and_print(simulation, current_value)
+
+
+class RandomUpdateReporter(GlobalParameterUpdateReporterAbstract):
+    """
+    This class sets up a reporter to sample the value of a custom-force-related global parameter from a normal
+    distribution over the course of an OpenMM simulation.
+
+    Both the mean and standard deviation of the global parameter are specified on initialization.
+
+    This class creates a csv file that stores the current simulation step and current value of the global parameter
+    being updated.
+
+    :param filename:
+        The name of the file to write to.
+        The filename must end with the .csv extension.
+    :type filename: str
+    :param parameter_name:
+        The name of the global parameter to be updated.
+        This must be one of the global parameters passed into any of the OpenMM CustomForce objects.
+    :type parameter_name: str
+    :param simulation:
+        The OpenMM simulation that this reporter will be added to.
+        The context of this OpenMM simulation must contain the parameter to be updated.
+    :type simulation: openmm.app.Simulation
+    :param mean_value:
+        The mean value of the normally distributed global parameter.
+        OpenMM does not store the units of global parameters, so if using a quantity with a unit, the user must make
+        sure to pass in a sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type mean_value: Union[unit.Quantity, float]
+    :param standard_deviation:
+        The standard deviation value of the normally distributed global parameter.
+        OpenMM does not store the units of global parameters, so if using a quantity with a unit, the user must make
+        sure to pass in a sensible unit here. This quantity will only be converted to the unit system of OpenMM.
+    :type standard_deviation: Union[unit.Quantity, float]
+    :param final_update_step:
+        The final step at which the value of the global parameter will be updated.
+        The value must be greater than or equal to the update_interval.
+    :type final_update_step: int
+    :param update_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is updated.
+        The value must be greater than zero.
+        Defaults to 1.
+    :type update_interval: int
+    :param print_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is printed
+        to the output csv file.
+        The value must be greater than zero.
+        Defaults to 1.
+    :type print_interval: int
+    :param append_file:
+        If True, open an existing csv file to append to. If False, create a new file possibly overwriting an already
+        existing file.
+        Defaults to False.
+    :type append_file: bool
+
+    :raises ValueError:
+        If the filename does not end with the .csv extension (via the base class).
+        If the update_interval is not greater than zero (via the base class).
+        If the print_interval is not greater than zero (via the base class).
+        If the final_update_step is not greater than or equal to the update_interval (via the base class).
+        If the parameter_name is not in the simulation context (via the base class).
+        If the mean and standard deviation values have incompatible units.
+    """
+
+    def __init__(self, filename: str, parameter_name: str, simulation: openmm.app.Simulation,
+                 mean_value: Union[unit.Quantity, float], standard_deviation: Union[unit.Quantity, float],
+                 final_update_step: int, update_interval: int = 1, print_interval: int = 1,
+                 append_file: bool = False) -> None:
+        """Constructor of the RampUpdateReporter class."""
+        super().__init__(filename=filename, parameter_name=parameter_name, simulation=simulation,
+                         start_value=mean_value, update_interval=update_interval, print_interval=print_interval,
+                         final_update_step=final_update_step, append_file=append_file)
+        # Base class allows final_update_step to be None, but here it must be specified.
+        if final_update_step is None:
+            raise ValueError("The final update step must be specified for the RampUpdateReporter.")
+        if isinstance(standard_deviation, unit.Quantity):
+            if not isinstance(mean_value, unit.Quantity):
+                raise ValueError(f"The mean and standard deviation values have incompatible units.")
+            if not mean_value.unit.is_compatible(standard_deviation.unit):
+                raise ValueError(f"The mean and standard deviation values have incompatible units.")
+            self._standard_deviation = standard_deviation.value_in_unit_system(unit.md_unit_system)
+        else:
+            if not isinstance(standard_deviation, type(mean_value)):
+                raise ValueError(f"The start and end values have incompatible units.")
+            self._standard_deviation = standard_deviation
+
+    def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
+        """
+        Linearly change the value of a global parameter during the simulation.
+
+        This function is called by OpenMM when the reporter should generate a report.
+
+        :param simulation:
+            The OpenMM simulation to generate a report for.
+        :type simulation: openmm.app.Simulation
+        :param state:
+            The current state of the OpenMM simulation.
+        :type state: openmm.State
+        """
+        new_value = random.normalvariate(mu=self._start_value, sigma=self._standard_deviation)
+        self.set_and_print(simulation, new_value)
 
 
 class RampTemperatureUpdateReporter(UpdateReporterAbstract):

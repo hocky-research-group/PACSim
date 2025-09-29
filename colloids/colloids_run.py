@@ -160,7 +160,6 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     # Explicit substrate is detected by immobile particles with mass 0.0.
     use_substrate = any(mass == 0.0 for mass in frame.particles.mass) or parameters.use_implicit_substrate
     assert not (any(mass == 0.0 for mass in frame.particles.mass) and parameters.use_implicit_substrate)
-    assert all(parameters.wall_directions)
 
     # TODO: Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)

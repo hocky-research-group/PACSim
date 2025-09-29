@@ -1,9 +1,9 @@
 from openmm import Context, LangevinIntegrator, OpenMMException, Platform, System, unit, Vec3
 import pytest
-from colloids import ColloidPotentialsParameters, SubstrateWall
+from colloids import ColloidPotentialsParameters, ImplicitSubstrateWall
 
 
-class TestSubstrateWallParameters(object):
+class TestImplicitSubstrateWallParameters(object):
 
     @pytest.fixture
     def radius(self):
@@ -64,10 +64,10 @@ class TestSubstrateWallParameters(object):
 
     @pytest.fixture
     def substrate_wall_potential(self, colloid_potentials_parameters, wall_distance, wall_charge):
-        return SubstrateWall(colloid_potentials_parameters, wall_distance, wall_charge, False)
+        return ImplicitSubstrateWall(colloid_potentials_parameters, wall_distance, wall_charge, False)
 
 
-class TestSubstrateWallExceptions(TestSubstrateWallParameters):
+class TestSubstrateWallExceptions(TestImplicitSubstrateWallParameters):
     def test_exception_radius(self, radius, surface_potential, substrate_wall_potential):
         # Test exception on wrong unit.
         with pytest.raises(TypeError):
@@ -95,7 +95,7 @@ class TestSubstrateWallExceptions(TestSubstrateWallParameters):
             substrate_wall_potential.add_particle(index=0, radius=radius, surface_potential=surface_potential)
 
 
-class TestSubstrateWallEnergies(TestSubstrateWallParameters):
+class TestSubstrateWallEnergies(TestImplicitSubstrateWallParameters):
     @pytest.fixture(autouse=True)
     def add_particle(self, openmm_system, substrate_wall_potential, radius, surface_potential):
         openmm_system.addParticle(mass=1.0)
@@ -137,6 +137,7 @@ class TestSubstrateWallEnergies(TestSubstrateWallParameters):
         openmm_state = openmm_context.getState(getEnergy=True)
         assert (openmm_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
                 == pytest.approx(expected.value_in_unit(unit.kilojoule_per_mole), rel=rel, abs=1.0e-13))
+
 
 if __name__ == '__main__':
     pytest.main([__file__])

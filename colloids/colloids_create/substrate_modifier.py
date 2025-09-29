@@ -8,8 +8,8 @@ from colloids.units import length_unit
 
 class SubstrateModifier(ConfigurationModifier):
     """
-    Modifier of an existing configuration in a gsd.hoomd.Frame instance for a colloid simulation that adds explicit substrate
-    particles in a hexagonal pattern at the bottom of the simulation box.
+    Modifier of an existing configuration in a gsd.hoomd.Frame instance for a colloid simulation that adds explicit
+    substrate particles in a hexagonal pattern at the bottom of the simulation box.
 
     This class can only modify configurations that have orthogonal box vectors.
 
@@ -139,4 +139,3 @@ class SubstrateModifier(ConfigurationModifier):
         frame.particles.position = np.concatenate((frame.particles.position, substrate_positions), axis=0)
         frame.particles.typeid = np.concatenate((frame.particles.typeid,
                                                  np.full(len(substrate_positions), substrate_index)))
-                                                 

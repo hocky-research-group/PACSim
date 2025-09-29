@@ -116,15 +116,15 @@ class ConfigurationParameters(Parameters):
         Defaults to {"1": 44.0 * millivolt, "2": -54.0 * millivolt}.
     :type surface_potentials: dict[str, unit.Quantity]
     :param use_explicit_substrate:
-        A boolean indicating whether to explicitly add substrate particles at the bottom of the simulation box.
+        A boolean indicating whether to explicitly place substrate particles at the bottom of the simulation box.
         A substrate can only be used when all walls are active. The bottom wall is then replaced by the substrate.
-        Defaults to False (no explicit substrate).
-    :type use_explicit_substrate: bool Optional[str]
+        Also, a substrate can only be used with the algebraic colloid potentials (use_tabulated=False).
+        Defaults to False.
+    :type use_explicit_substrate: bool
     :param substrate_particle_type:
         The type of the substrate that is used at the bottom of the simulation box.
         For an explicit substrate, this type must appear in the radii, masses, and surface_potentials dictionaries to
-        specify the properties of the explicit substrate particles. An explicit substrate can only be used with the
-        algebraic colloid potentials (use_tabulated=False).
+        specify the properties of the explicit substrate particles.
         Defaults to None.
     :type substrate_particle_type: Optional[Union[str, int]]
 
@@ -159,7 +159,6 @@ class ConfigurationParameters(Parameters):
         default_factory=lambda: {"1": 44.0 * electric_potential_unit, "2": -54.0 * electric_potential_unit})
     use_explicit_substrate: bool = False
     substrate_particle_type: Optional[Union[str, int]] = None
-    
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
@@ -261,22 +260,23 @@ class ConfigurationParameters(Parameters):
             raise ValueError("Padding factor must be greater than zero.")
 
         if self.use_explicit_substrate :
-            if not all(self.wall_directions):
-                raise ValueError("A substrate can only be used if all walls are active.")
             if self.substrate_particle_type is None:
                 raise ValueError("The substrate particle type must be specified if a substrate is used.")
+            if not isinstance(self.substrate_particle_type, (str, int)):
+                raise TypeError("The substrate particle type must be a string or an integer.")
             if self.substrate_particle_type not in self.radii:
-                raise ValueError("The substrate type must be in the radii dictionary for an explicit substrate.")
+                raise ValueError("The substrate particle type must be in the radii dictionary for an explicit "
+                                 "substrate.")
             if self.substrate_particle_type not in self.masses:
-                raise ValueError("The substrate type must be in the masses dictionary for an explicit substrate.")
+                raise ValueError("The substrate particle type must be in the masses dictionary for an explicit "
+                                 "substrate.")
+            if self.substrate_particle_type not in self.surface_potentials:
+                raise ValueError("The substrate particle type must be in the surface potentials dictionary for an "
+                                 "explicit substrate.")
             if self.masses[self.substrate_particle_type] != 0.0 * unit.amu:
                 warnings.warn("The mass of the substrate type is not zero. Explicit substrate particles will move "
-                                "during the simulation.")
-            if self.use_tabulated:
-                raise ValueError("An explicit substrate can only be used with the algebraic colloid potentials.")
-            if self.substrate_particle_type not in self.surface_potentials:
-                raise ValueError("The substrate type must be in the surface potentials dictionary.")
+                              "during the simulation.")
         else:
             if self.substrate_particle_type is not None:
                 raise ValueError("The substrate particle type must not be specified in the configuration input file "
-                                    "if an explicit substrate is not used.")
+                                 "if an explicit substrate is not used.")

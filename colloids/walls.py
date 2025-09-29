@@ -247,6 +247,7 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         self._slj_potential.setName(self._name)
         yield self._slj_potential
 
+
 class SubstrateWall(OpenMMPotentialAbstract):
     """
     This class sets up an implicit substrate at the bottom of the simulation box using the
@@ -426,4 +427,3 @@ class SubstrateWall(OpenMMPotentialAbstract):
         """
         super().yield_potentials()
         yield self._substrate_wall_potential
-

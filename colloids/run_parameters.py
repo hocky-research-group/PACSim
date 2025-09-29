@@ -196,14 +196,14 @@ class RunParameters(Parameters):
     :type alpha: Optional[float]
     :param use_implicit_substrate:
         A boolean indicating whether to implicitly model a substrate implicitly as a charged wall. 
-        An implicit substrate can only be used when all walls are active. The bottom wall is then replaced by the substrate.
-        An implicit substrate can only be used if explicit particles have not been added to the simulation box (specified in the
-        configuration input files).
+        An implicit substrate can only be used when all walls are active. The bottom wall is then replaced by the
+        implicit substrate.
+        An implicit substrate can only be used if no explicit substrate particles have been added to the simulation box.
         Defaults to False.
     :type use_implicit_substrate: bool
     :param substrate_wall_charge:
-        The charge of the substrate wall at the bottom of the simulation box. If using an implicit substrate, substrate wall charge
-        must not be None and the units must be compatible with millivolts.
+        The charge of the substrate wall at the bottom of the simulation box. If using an implicit substrate, substrate
+        wall charge must not be None and the units must be compatible with millivolts.
         Defaults to None.
     :type substrate_wall_charge: Optional[unit.Quantity]
     :param use_depletion:

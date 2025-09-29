@@ -95,8 +95,10 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
                               "pp 10079 - 10106.")
     
     # Explicit substrate is detected by immobile particles with mass 0.0.
-    use_substrate = any([mass == 0.0 for mass in frame.particles.mass]) or parameters.use_implicit_substrate
-    if use_substrate:
+    use_explicit_substrate = any(mass == 0.0 for mass in frame.particles.mass)
+    if use_explicit_substrate and parameters.use_implicit_substrate:
+        raise ValueError("Cannot use both explicit and implicit substrate.")
+    if use_explicit_substrate or parameters.use_implicit_substrate:
         if not all(parameters.wall_directions):
             raise ValueError("A substrate can only be used if all walls are active.")
 
@@ -115,9 +117,6 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         atoms.append(topology.addAtom(frame.particles.types[type_id], None, residue))
 
     system = openmm.System()
-
-    # Explicit substrate is detected by immobile particles with mass 0.0.
-    use_substrate = any([mass == 0.0 for mass in frame.particles.mass]) or parameters.use_implicit_substrate
 
     cell = get_cell_from_box(frame.configuration.box)
     include_walls = any(parameters.wall_directions)
@@ -157,6 +156,11 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         topology.setPeriodicBoxVectors(final_cell)
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
+
+    # Explicit substrate is detected by immobile particles with mass 0.0.
+    use_substrate = any(mass == 0.0 for mass in frame.particles.mass) or parameters.use_implicit_substrate
+    assert not (any(mass == 0.0 for mass in frame.particles.mass) and parameters.use_implicit_substrate)
+    assert all(parameters.wall_directions)
 
     # TODO: Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
@@ -226,10 +230,8 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         if parameters.use_gravity and not is_substrate:
             gravitational_potential.add_particle(index=i, radius=radii[i])
         if parameters.use_implicit_substrate:
-            if is_substrate:
-                raise ValueError("Cannot use both implicit and explicit substrate.")
-            else:
-                substrate_wall.add_particle(index=i, radius=radii[i], surface_potential=surface_potentials[i])
+            assert not is_substrate
+            substrate_wall.add_particle(index=i, radius=radii[i], surface_potential=surface_potentials[i])
 
     for i in range(frame.constraints.N):
         colloid_potentials.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
@@ -250,14 +252,14 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         for force in depletion_potential.yield_potentials():
             force.setForceGroup(system.getNumForces())
             system.addForce(force)
-    
+
     if parameters.use_gravity:
         assert all_walls
         for force in gravitational_potential.yield_potentials():
             force.setForceGroup(system.getNumForces())
             system.addForce(force)
         assert not system.usesPeriodicBoundaryConditions()
-    
+
     if parameters.use_implicit_substrate:
         assert all_walls
         for force in substrate_wall.yield_potentials():

@@ -165,8 +165,8 @@ class ColloidPotentialsAlgebraic(ColloidPotentialsAbstract):
         else:
             electrostatic_potential = CustomNonbondedForce(
                 "select(flag1 * flag2, 0, "
-                "electrostatic_prefactor * radius * psi1 * psi2 * exp(-h / debye_length)); "
-                "radius = 2.0 / (1.0 / radius1 + 1.0 / radius2);"
+                "electrostatic_prefactor * radius_average * psi1 * psi2 * exp(-h / debye_length)); "
+                f"radius_average = {radius_average_str};"
                 "h = r - rs;"
                 "rs = radius1 + radius2"
             )

@@ -1,10 +1,11 @@
+import math
 from typing import Iterator, Optional, Sequence
+import warnings
 from openmm import CustomExternalForce, unit
 from colloids.abstracts import OpenMMPotentialAbstract
 from colloids import ColloidPotentialsParameters
-import warnings
-from colloids.units import energy_unit, length_unit
-import math
+from colloids.units import electric_potential_unit, energy_unit, length_unit
+
 
 class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     """
@@ -26,7 +27,6 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     The shifted Lennard-Jones potential as a function of the distance r to the wall is given by:
     slj(r) = 4 * epsilon * ((radius / (r - delta))^12 - alpha * (radius / (r - delta))^6)
              - 4 * epsilon * ((radius / r_cut)^12 - alpha * (radius / r_cut)^6)
-    
 
     :param wall_distances:
         A list of three distances specifying the dimensions of the simulation box in the x, y, and z directions.
@@ -248,15 +248,14 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         yield self._slj_potential
 
 
-class SubstrateWall(OpenMMPotentialAbstract):
+class ImplicitSubstrateWall(OpenMMPotentialAbstract):
     """
-    This class sets up an implicit substrate at the bottom of the simulation box using the
-    CustomExternalForce class of OpenMM. This is an alternative to explicitly modeling the substrate using a layer of
-    fixed particles, and is designed to reduce computational costs. Either implicit or explicit substrate may be used,
-    but not both.
+    This class sets up an implicit substrate at the bottom of the simulation box using the CustomExternalForce class of
+    OpenMM. This is an alternative to explicitly modeling the substrate using a layer of fixed particles, and is
+    designed to reduce computational costs. Either implicit or explicit substrate may be used but not both.
 
     A substrate can only be used when all SLJ walls are active. The bottom wall in the z direction will be replaced by
-    the substrate wall.
+    the implicit substrate wall.
 
     The implicit substrate is modeled as a single substrate particle with a flat surface (that is, with an infinite
     radius) at the bottom of the simulation box. The substrate particle is charged and interacts with the colloidal
@@ -280,7 +279,6 @@ class SubstrateWall(OpenMMPotentialAbstract):
         Hunter, Foundations of Colloid Science (Oxford University Press, 2001), 2nd edition] instead of the simpler
         equation that only involves an exponential [i.e., eq. (12.5.5) in Hunter, Foundations of Colloid Science
         (Oxford University Press, 2001), 2nd edition].
-        Defaults to True.
     :type use_log: bool
 
     :raises TypeError:
@@ -290,18 +288,20 @@ class SubstrateWall(OpenMMPotentialAbstract):
         If the wall distance for an active substrate wall is not greater than zero.
     """
 
-    _nanometer = unit.nano * unit.meter
+    _steric_prefactor_unit = energy_unit / (length_unit ** 3)
+    _electrostatic_prefactor_unit = energy_unit / (length_unit * electric_potential_unit ** 2)
+    _name = "implicit_substrate_energy"
 
     def __init__(self, colloid_potentials_parameters: ColloidPotentialsParameters, wall_distance_z: unit.Quantity,
-                 substrate_charge: unit.Quantity, use_log: bool = False) -> None:
+                 substrate_charge: unit.Quantity, use_log: bool) -> None:
         """Constructor of the ImplicitSubstrate class."""
         super().__init__()
 
-        if not wall_distance_z.unit.is_compatible(self._nanometer):
+        if not wall_distance_z.unit.is_compatible(length_unit):
             raise TypeError("wall distance must have a unit that is compatible with nanometers")
-        if not wall_distance_z.value_in_unit(self._nanometer) > 0.0:
+        if not wall_distance_z.value_in_unit(length_unit) > 0.0:
             raise ValueError("wall distance must have a value greater than zero")
-        if not substrate_charge.unit.is_compatible(unit.milli * unit.volt):
+        if not substrate_charge.unit.is_compatible(electric_potential_unit):
             raise TypeError("substrate charge must have a unit that is compatible with volts")
 
         self._parameters = colloid_potentials_parameters
@@ -318,7 +318,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
 
         steric_potential = (
             "step(two_l - h) * "
-            "steric_prefactor * 2 * radius * brush_length * brush_length * ("
+            "steric_prefactor * 2.0 * radius * brush_length * brush_length * ("
             "28.0 * ((two_l / h)^0.25 - 1.0) "
             "+ 20.0 / 11.0 * (1.0 - (h / two_l)^2.75)"
             "+ 12.0 * (h / two_l - 1.0)) "
@@ -328,7 +328,7 @@ class SubstrateWall(OpenMMPotentialAbstract):
         if self._use_log:
             # 2 / (1 / radius1 + 1 / radius2) = 2 * radius1 if radius2 = infinity.
             electrostatic_potential = (
-                "electrostatic_prefactor * 2 * radius * psi * substrate_psi * log(1.0 + exp(-h / debye_length);")
+                "electrostatic_prefactor * 2 * radius * psi * substrate_psi * log(1.0 + exp(-h / debye_length));")
 
         else:
             # 2 / (1 / radius1 + 1 / radius2) = 2 * radius1 if radius2 = infinity.
@@ -336,9 +336,11 @@ class SubstrateWall(OpenMMPotentialAbstract):
                 "electrostatic_prefactor * 2 * radius * psi * substrate_psi * exp(-h / debye_length);")
 
         substrate_string = "+".join([steric_potential, electrostatic_potential]) #steric_potential + electrostatic_potential
-        # +z so that close to zero when z~-L/2.
-        # substrate_wall_distance is L / 2 - radius.
-        substrate_string += ("h = substrate_wall_distance + z;"
+        # +z so that close to zero when z~-L/2 + radius.
+        # The surface separation to the implicit substrate is h = L/2 - radius + 1 + z.
+        # The +1 shift is analogous to the shift in the SLJ walls.
+        # This means that the repulsive potential diverges at a distance of radius - 1 to the implicit substrate wall.
+        substrate_string += ("h = substrate_wall_distance + z - radius + 1.0;"
                              "two_l = 2.0 * brush_length")
 
         substrate_wall_potential = CustomExternalForce(substrate_string)
@@ -348,27 +350,27 @@ class SubstrateWall(OpenMMPotentialAbstract):
             "steric_prefactor",
             (unit.BOLTZMANN_CONSTANT_kB * self._parameters.temperature
              * 16.0 * math.pi * (self._parameters.brush_density ** (3 / 2)) / 35.0
-             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(unit.kilojoule_per_mole / (self._nanometer ** 3))
+             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(self._steric_prefactor_unit)
         )
         # Brush length L (see Hocky paper)
         substrate_wall_potential.addGlobalParameter("brush_length",
-                                                    self._parameters.brush_length.value_in_unit(self._nanometer))
+                                                    self._parameters.brush_length.value_in_unit(length_unit))
 
         # Electrostatic prefactor is 2 * pi * epsilon
         substrate_wall_potential.addGlobalParameter(
             "electrostatic_prefactor",
             (2.0 * math.pi * self._parameters.VACUUM_PERMITTIVITY * self._parameters.dielectric_constant
-             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(
-                unit.kilojoule_per_mole / (self._nanometer * (unit.milli * unit.volt) ** 2)))
+             * unit.AVOGADRO_CONSTANT_NA).value_in_unit(self._electrostatic_prefactor_unit))
         substrate_wall_potential.addGlobalParameter("debye_length",
-                                                    self._parameters.debye_length.value_in_unit(self._nanometer))
+                                                    self._parameters.debye_length.value_in_unit(length_unit))
         substrate_wall_potential.addGlobalParameter("substrate_psi",
-                                                    self._substrate_charge.value_in_unit((unit.milli * unit.volt)))
+                                                    self._substrate_charge.value_in_unit(electric_potential_unit))
+        substrate_wall_potential.addGlobalParameter("substrate_wall_distance",
+                                                    (self._wall_distance / 2.0).value_in_unit(length_unit))
 
         substrate_wall_potential.addPerParticleParameter("radius")
         # Psi should be given in millivolts.
         substrate_wall_potential.addPerParticleParameter("psi")
-        substrate_wall_potential.addPerParticleParameter("substrate_wall_distance")
 
         return substrate_wall_potential
 
@@ -398,19 +400,15 @@ class SubstrateWall(OpenMMPotentialAbstract):
             If this method is called after the yield_potentials method (via the abstract base class).
         """
         super().add_particle()
-        if not radius.unit.is_compatible(self._nanometer):
+        if not radius.unit.is_compatible(length_unit):
             raise TypeError("argument radius must have a unit that is compatible with nanometers")
-        if not radius.value_in_unit(self._nanometer) > 0.0:
+        if not radius.value_in_unit(length_unit) > 0.0:
             raise ValueError("argument radius must have a value greater than zero")
-        if not surface_potential.unit.is_compatible(unit.milli * unit.volt):
+        if not surface_potential.unit.is_compatible(electric_potential_unit):
             raise TypeError("argument surface_potential must have a unit that is compatible with volts")
 
-        substrate_wall_distance = (self._wall_distance / 2.0 - radius + 1.0 * self._nanometer).value_in_unit(
-            self._nanometer)  # TODO: Why shift 1 nm?
-
-        self._substrate_wall_potential.addParticle(index, [radius.value_in_unit(self._nanometer),
-                                                           surface_potential.value_in_unit(unit.milli * unit.volt),
-                                                           substrate_wall_distance])
+        self._substrate_wall_potential.addParticle(index, [radius.value_in_unit(length_unit),
+                                                           surface_potential.value_in_unit(electric_potential_unit)])
 
     def yield_potentials(self) -> Iterator[CustomExternalForce]:
         """
@@ -426,4 +424,5 @@ class SubstrateWall(OpenMMPotentialAbstract):
             If the method add_particle was not called before this method (via the abstract base class).
         """
         super().yield_potentials()
+        self._substrate_wall_potential.setName(self._name)
         yield self._substrate_wall_potential

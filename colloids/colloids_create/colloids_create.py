@@ -7,7 +7,7 @@ from colloids.colloids_create.configuration_parameters import ConfigurationParam
 from colloids.colloids_create.cluster_generator import ClusterGenerator
 from colloids.colloids_create.substrate_modifier import SubstrateModifier
 from colloids.colloids_create.trajectory_wrapper import TrajectoryWrapper
-from colloids.units import electric_potential_unit, length_unit, mass_unit
+from colloids.units import electric_potential_unit, length_unit, mass_unit, energy_unit
 
 
 class ExampleAction(argparse.Action):
@@ -37,6 +37,7 @@ def _check_frame_changes(frame: gsd.hoomd.Frame, accountable_name: str) -> None:
         If the accountable class populated the frame.particles.diameter attribute.
         If the accountable class populated the frame.particles.charge attribute.
         If the accountable class populated the frame.particles.mass attribute.
+        If the accountable class populated the frame.particles.orientation attribute.
     """
     if frame.particles.type_shapes is not None:
         raise ValueError(f"Class {accountable_name} must not populate the frame.particles.type_shapes attribute.")
@@ -46,10 +47,12 @@ def _check_frame_changes(frame: gsd.hoomd.Frame, accountable_name: str) -> None:
         raise ValueError(f"Class {accountable_name} must not populate the frame.particles.charge attribute.")
     if frame.particles.mass is not None:
         raise ValueError(f"Class {accountable_name} must not populate the frame.particles.mass attribute.")
+    if frame.particles.orientation is not None:
+        raise ValueError(f"Class {accountable_name} must not populate the frame.particles.orientation attribute.")
 
 
 def check_frame_types(frame: gsd.hoomd.Frame, masses: dict[str, unit.Quantity], radii: dict[str, unit.Quantity],
-                      surface_potentials: dict[str, unit.Quantity]) -> None:
+                      surface_potentials: dict[str, unit.Quantity], magnetic_moments: dict[str, unit.Quantity]) -> None:
     """
     Check if the frame contains all types of particles that are in the masses, radii, and surface potentials
     dictionaries and vice versa.
@@ -82,6 +85,8 @@ def check_frame_types(frame: gsd.hoomd.Frame, masses: dict[str, unit.Quantity], 
             raise ValueError(f"Type {t} of the frame is not in the radii dictionary.")
         if t not in surface_potentials:
             raise ValueError(f"Type {t} of the frame is not in the surface potentials dictionary.")
+        if t not in magnetic_moments:
+            raise ValueError(f"Type {t} of the frame is not in the magnetic moments dictionary.")
     for t in masses:
         if t not in frame.particles.types:
             raise ValueError(f"Type {t} of the masses dictionary is not in the frame.")
@@ -91,6 +96,9 @@ def check_frame_types(frame: gsd.hoomd.Frame, masses: dict[str, unit.Quantity], 
     for t in surface_potentials:
         if t not in frame.particles.types:
             raise ValueError(f"Type {t} of the surface potentials dictionary is not in the frame.")
+    for t in magnetic_moments:
+        if t not in frame.particles.types:
+            raise ValueError(f"Type {t} of the magnetic moments dictionary is not in the frame.")
 
 
 def main():
@@ -131,7 +139,7 @@ def main():
 
     # Check if the frame has the necessary attributes.
     check_frame_types(frame, configuration_parameters.masses, configuration_parameters.radii,
-                      configuration_parameters.surface_potentials)
+                      configuration_parameters.surface_potentials, configuration_parameters.magnetic_moments)
 
     frame.particles.mass = np.array([configuration_parameters.masses[frame.particles.types[i]].value_in_unit(mass_unit)
                                      for i in frame.particles.typeid], dtype=np.float32)
@@ -140,6 +148,9 @@ def main():
          for i in frame.particles.typeid], dtype=np.float32)
     frame.particles.diameter = np.array(
         [2.0 * configuration_parameters.radii[frame.particles.types[i]].value_in_unit(length_unit)
+         for i in frame.particles.typeid], dtype=np.float32)
+    frame.particles.orientation = np.array(
+        [[0, 0, 0, configuration_parameters.magnetic_moments[frame.particles.types[i]]]
          for i in frame.particles.typeid], dtype=np.float32)
 
     if configuration_parameters.seed_files is not None:

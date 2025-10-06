@@ -87,6 +87,12 @@ class ConfigurationParameters(Parameters):
         The unit of the surface potentials must be compatible with millivolts.
         Defaults to {"1": 44.0 * millivolt, "2": -54.0 * millivolt}.
     :type surface_potentials: dict[str, unit.Quantity]
+    :param magnetic_moment:
+        The magnetic moments of the different types of colloidal particles that appear in the initial configuration
+        file.
+        The keys of the dictionary are the types of the colloidal particles and the values are the magnetic moments.
+        Defaults to {"1": 0.0, "2": 0.0}.
+    :type magnetic_moment: dict[str, float]
     :param seed_file:
         The gsd file with the crystal seed to be used for the colloids.
         If a seed file is specified, the colloids are placed in the crystal lattice and then the seed is placed in the
@@ -135,6 +141,8 @@ class ConfigurationParameters(Parameters):
                                                                      "2": 95.0 * length_unit})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"1": 44.0 * electric_potential_unit, "2": -54.0 * electric_potential_unit})
+    magnetic_moments: dict[str, float] = field(
+        default_factory=lambda: {"1": 0.0, "2": 0.0})
     seed_files: Optional[list[str]] = None
     seed_fractional_coordinates: Optional[list[list[float]]] = None
     seed_overlap_distance: unit.Quantity = field(default_factory=lambda: 20.0 * length_unit)
@@ -174,6 +182,17 @@ class ConfigurationParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
             if t not in self.radii:
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
+        for t in self.magnetic_moments:
+            if not isinstance(t, str):
+                raise TypeError("The types of the magnetic moments dictionary must be strings.")
+            if not isinstance(self.magnetic_moments[t], float):
+                raise TypeError(f"Magnetic moment of type {t} must be of type float.")
+            if t not in self.masses:
+                raise ValueError(f"Type {t} of the magnetic moments dictionary is not in masses dictionary.")
+            if t not in self.radii:
+                raise ValueError(f"Type {t} of the magnetic moments dictionary is not in radii dictionary.")
+            if t not in self.surface_potentials:
+                raise ValueError(f"Type {t} of the magnetic moments dictionary is not in surface potentials dictionary.")
 
         # We assume that the lammps-data file uses "nano" units where distances are measured in nanometers.
         # However, ase would transform the distances in the lammps-data file to Angstroms by multiplying them by 10 if
@@ -189,6 +208,9 @@ class ConfigurationParameters(Parameters):
             if t not in self.surface_potentials:
                 raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in surface potentials "
                                  f"dictionary.")
+            if t not in self.magnetic_moments:
+                raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in magnetic_moments dictionary.")
+
         for t in self.masses:
             if t not in types and t != self.substrate_type:
                 raise ValueError(f"Non-substrate type {t} of the masses dictionary is not in the lammps-data file.")
@@ -199,6 +221,10 @@ class ConfigurationParameters(Parameters):
             if t not in types and t != self.substrate_type:
                 raise ValueError(f"Non-substrate type {t} of the surface potentials dictionary is not in the "
                                  f"lammps-data file.")
+        for t in self.magnetic_moments:
+            if t not in types and t != self.substrate_type:
+                raise ValueError(f"Non-substrate type {t} of the magnetic_moments dictionary is not in the lammps-data "
+                                 f"file.")
 
         # If no cell is set in the lammps-data file, the lattice vectors are set to the identity matrix.
         if np.equal(atoms.get_cell(), [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]).all():
@@ -257,6 +283,8 @@ class ConfigurationParameters(Parameters):
                 raise ValueError("The substrate type must be in the masses dictionary.")
             if self.substrate_type not in self.surface_potentials:
                 raise ValueError("The substrate type must be in the surface potentials dictionary.")
+            if self.substrate_type not in self.magnetic_moments:
+                raise ValueError("The substrate type must be in the magnetic moment dictionary.")
             if self.masses[self.substrate_type] != 0.0 * mass_unit:
                 warnings.warn("The mass of the substrate type is not zero. Substrate will move during the simulation.")
         else:

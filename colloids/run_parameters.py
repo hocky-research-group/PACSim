@@ -241,6 +241,15 @@ class RunParameters(Parameters):
         cubed, and the value must be greater than zero.
         Defaults to None.
     :type particle_density: Optional[unit.Quantity]
+    :param use_magnetic_field: bool
+        A boolean indicating whether a uniform magnetic field is turned on for the simulation.
+        If true, the magnetic field strength and magnetic moments parameters must be specified.
+        Defaults to False.
+    :param magnetic_potential_force:
+        The strength of the uniform magnetic field.
+        If the magnetic field is on, the value must be specified and its unit must be compatible with force.
+        Defaults to None.
+    :type magnetic_potential_force: Optional[unit.Quantity]
     :param update_reporter:
         The name of the update reporter used to vary the value of a force-related global parameter over time
         in a simulation.
@@ -305,6 +314,8 @@ class RunParameters(Parameters):
     gravitational_acceleration: Optional[unit.Quantity] = None
     water_density: Optional[unit.Quantity] = None
     particle_density: Optional[unit.Quantity] = None
+    use_magnetic_field: bool = False
+    magnetic_potential_force: Optional[unit.Quantity] = None
     update_reporter: Optional[str] = None
     update_reporter_parameters: Optional[dict[str, Any]] = None
 
@@ -441,6 +452,11 @@ class RunParameters(Parameters):
                 raise TypeError("The particle density must have a unit compatible with grams per centimeter cubed.")
             if self.particle_density <= 0.0 * (unit.gram / length_unit ** 3):
                 raise ValueError("The particle density must be greater than zero.")
+        if self.use_magnetic_field:
+            if self.magnetic_potential_force is None:
+                raise ValueError("Magnetic potential force must be specified if magnetic field is on.")
+            if not self.magnetic_potential_force.unit.is_compatible(energy_unit / length_unit):
+                raise TypeError("The magnetic potential force must have a unit compatible with tesla.")
         else:
             if self.gravitational_acceleration is not None:
                 raise ValueError("Gravitational acceleration must not be specified if gravity is not on.")

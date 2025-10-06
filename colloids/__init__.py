@@ -2,6 +2,7 @@ from .abstracts import ColloidPotentialsAbstract, OpenMMPotentialAbstract
 from .colloid_potentials_algebraic import ColloidPotentialsAlgebraic
 from .colloid_potentials_parameters import ColloidPotentialsParameters
 from .colloid_potentials_tabulated import ColloidPotentialsTabulated
+from .uniform_magnetic_field import UniformMagneticField
 from .lennard_jones_potential import LennardJonesPotential
 from .depletion_potential import DepletionPotential
 from .gravity import Gravity

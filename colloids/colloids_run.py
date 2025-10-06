@@ -8,7 +8,7 @@ import openmm
 import numpy as np
 from openmm import app
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
-                      DepletionPotential, Gravity, LennardJonesPotential)
+                      DepletionPotential, Gravity, LennardJonesPotential, UniformMagneticField)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import get_cell_from_box, read_gsd_file, write_gsd_file
 import colloids.integrators as integrators
@@ -69,6 +69,7 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
 def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.Simulation:
     radii = frame.particles.diameter / 2.0 * length_unit
     surface_potentials = frame.particles.charge * electric_potential_unit
+    magnetic_moments = [float(magnetic_moment[-1]) for magnetic_moment in frame.particles.orientation]
     radii_dict = {frame.particles.types[type_id]: radius for type_id, radius in zip(frame.particles.typeid, radii)}
 
     # ----------------------------------- Set up system and parameters. ------------------------------------------------
@@ -169,6 +170,11 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     else:
         lennard_jones_potential = None
 
+    if parameters.use_magnetic_field:
+        magnetic_field_potential = UniformMagneticField(parameters.magnetic_potential_force,
+                                                        periodic_boundary_conditions=not all_walls)
+        
+
     # --------------------------- Add all particles and constraints to the system. -------------------------------------
     for mass in frame.particles.mass:
         system.addParticle(mass)
@@ -193,6 +199,8 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
             gravitational_potential.add_particle(index=i, radius=radii[i])
         if parameters.use_lennard_jones:
             lennard_jones_potential.add_particle(type=frame.particles.types[frame.particles.typeid[i]], substrate_flag=is_substrate)
+        if parameters.use_magnetic_field:
+            magnetic_field_potential.add_particle(index=i, magnetic_moment=magnetic_moments[i])
 
     for i in range(frame.constraints.N):
         if parameters.use_colloid_potentials:
@@ -221,6 +229,10 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
 
     if parameters.use_lennard_jones:
         for force in lennard_jones_potential.yield_potentials():
+            system.addForce(force)
+
+    if parameters.use_magnetic_field:
+        for force in magnetic_field_potential.yield_potentials():
             system.addForce(force)
 
     # -------------------------------------- Set up the simulation. ----------------------------------------------------

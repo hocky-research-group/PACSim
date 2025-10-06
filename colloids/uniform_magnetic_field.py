@@ -54,7 +54,6 @@ class UniformMagneticField(OpenMMPotentialAbstract):
             "magnetic_field_strength",
             self._magnetic_field_strength.value_in_unit(self._force_unit))
         magnetic_field_potential.addPerParticleParameter("particle_magnetic_moment")
-        print(f"Setting magnetic field strength to {self._magnetic_field_strength.value_in_unit(self._force_unit)}")
 
         return magnetic_field_potential
 

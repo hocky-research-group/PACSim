@@ -452,7 +452,7 @@ class RunParameters(Parameters):
                 raise TypeError("The particle density must have a unit compatible with grams per centimeter cubed.")
             if self.particle_density <= 0.0 * (unit.gram / length_unit ** 3):
                 raise ValueError("The particle density must be greater than zero.")
-        if self.use_magnetic_field:
+        elif self.use_magnetic_field:
             if self.magnetic_potential_force is None:
                 raise ValueError("Magnetic potential force must be specified if magnetic field is on.")
             if not self.magnetic_potential_force.unit.is_compatible(energy_unit / length_unit):

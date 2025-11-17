@@ -358,8 +358,8 @@ class ScaleRampUpdateReporter(RampUpdateReporter):
     def __init__(self, filename: str, parameter_name: str, simulation: openmm.app.Simulation,
                  start_scale: float, end_scale: float, final_update_step: int, update_interval: int = 1,
                  print_interval: int = 1, append_file: bool = False) -> None:
-        start_value = simulation.context.getParameters()[self._parameter_name] * start_scale
-        end_value = simulation.context.getParameters()[self._parameter_name] * end_scale
+        start_value = simulation.context.getParameters()[parameter_name] * start_scale
+        end_value = simulation.context.getParameters()[parameter_name] * end_scale
         super().__init__(filename=filename, parameter_name=parameter_name, simulation=simulation,
                          start_value=start_value, end_value=end_value, final_update_step=final_update_step,
                          update_interval=update_interval, print_interval=print_interval, append_file=append_file)

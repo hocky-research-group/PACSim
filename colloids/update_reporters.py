@@ -805,6 +805,44 @@ class RampTemperatureUpdateReporter(UpdateReporterAbstract):
             print(f"{step},{new_value}", file=self._file, flush=True)
 
 
+class TemperatureSequenceUpdateReporter(UpdateReporterAbstract):
+    def __init__(self, filename: str, simulation: openmm.app.Simulation, temperature_values: Sequence[unit.Quantity],
+                 final_update_step: int, update_interval: int = 1, print_interval: int = 1,
+                 append_file: bool = False) -> None:
+        """Constructor of the TemperatureSequenceUpdateReporter class."""
+        super().__init__(filename=filename, parameter_name="temperature", simulation=simulation,
+                         update_interval=update_interval, print_interval=print_interval,
+                         final_update_step=final_update_step, append_file=append_file)
+        # Base class allows final_update_step to be None, but here it must be specified.
+        if final_update_step is None:
+            raise ValueError("The final update step must be specified for the TemperatureSequenceUpdateReporter.")
+        for value in temperature_values:
+            if not value.unit.is_compatible(temperature_unit):
+                raise TypeError("Every temperature value must have a unit that is compatible with Kelvin.")
+            if not value.unit.is_compatible(temperature_unit):
+                raise TypeError("The end value must have a unit that is compatible with Kelvin.")
+        self._temperature_values = [value.value_in_unit(temperature_unit) for value in temperature_values]
+        self._current_index = 0
+        # Check if the start value of the temperature matches the value in the OpenMM simulation.
+        # If the file is being appended to, this check is not necessary since the simulation was resumed in which case
+        # the start value is not necessarily the same as the value in the OpenMM simulation.
+        if (not append_file
+                and abs(self._temperature_values[self._current_index]
+                        - simulation.integrator.getTemperature().value_in_unit(temperature_unit)) > 1.0e-12):
+            warnings.warn("The first temperature value does not match the value in the OpenMM integrator.")
+            simulation.integrator.setTemperature(self._temperature_values[self._current_index])
+        if not append_file:
+            print(f"0,{self._temperature_values[self._current_index]}", file=self._file)
+
+    def report(self, simulation: openmm.app.Simulation, state: openmm.State) -> None:
+        self._current_index = (self._current_index + 1) % len(self._temperature_values)
+        new_value = self._temperature_values[self._current_index]
+        step = simulation.currentStep
+        simulation.integrator.setTemperature(new_value)
+        if step % self._print_interval == 0:
+            print(f"{step},{new_value}", file=self._file, flush=True)
+
+
 class RampUpdateReporterUntilCluster(GlobalParameterUpdateReporterAbstract):
     """
     This class sets up a reporter to linearly change the value of a custom-force-related global parameter in a ramp over

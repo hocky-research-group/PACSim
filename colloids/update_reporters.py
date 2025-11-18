@@ -355,6 +355,54 @@ class RampUpdateReporter(GlobalParameterUpdateReporterAbstract):
 
 
 class ScaleRampUpdateReporter(RampUpdateReporter):
+    """
+    This class sets up a reporter to linearly change the value of a custom-force-related global parameter in a ramp over
+    the course of an OpenMM simulation, defined by scaling factors relative to the initial value.
+
+    This works exactly like RampUpdateReporter, but instead of providing absolute start and end values,
+    you provide scales (multipliers) relative to the parameter's value at the moment of initialization.
+
+    :param filename:
+        The name of the file to write to.
+        The filename must end with the .csv extension.
+    :type filename: str
+    :param parameter_name:
+        The name of the global parameter to be updated.
+        This must be one of the global parameters passed into any of the OpenMM CustomForce objects.
+    :type parameter_name: str
+    :param simulation:
+        The OpenMM simulation that this reporter will be added to.
+        The context of this OpenMM simulation must contain the parameter to be updated.
+    :type simulation: openmm.app.Simulation
+    :param start_scale:
+        The scaling factor for the start value.
+        start_value = initial_parameter_value * start_scale
+    :type start_scale: float
+    :param end_scale:
+        The scaling factor for the end value.
+        end_value = initial_parameter_value * end_scale
+    :type end_scale: float
+    :param final_update_step:
+        The final step at which the value of the global parameter will be updated.
+        The value must be greater than or equal to the update_interval.
+    :type final_update_step: int
+    :param update_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is updated.
+        The value must be greater than zero.
+        Defaults to 1.
+    :type update_interval: int
+    :param print_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is printed
+        to the output csv file.
+        The value must be greater than zero.
+        Defaults to 1.
+    :type print_interval: int
+    :param append_file:
+        If True, open an existing csv file to append to. If False, create a new file possibly overwriting an already
+        existing file.
+        Defaults to False.
+    :type append_file: bool
+    """
     def __init__(self, filename: str, parameter_name: str, simulation: openmm.app.Simulation,
                  start_scale: float, end_scale: float, final_update_step: int, update_interval: int = 1,
                  print_interval: int = 1, append_file: bool = False) -> None:
@@ -604,6 +652,76 @@ class SquaredSinusoidalUpdateReporter(GlobalParameterUpdateReporterAbstract):
         step = simulation.currentStep
         current_value = self._amplitude * (math.sin(self._period * step) ** 2) + self._start_value
         self.set_and_print(simulation, current_value)
+
+
+class ScaleSquaredSinusoidalUpdateReporter(SquaredSinusoidalUpdateReporter):
+    """
+    This class sets up a reporter to change the value of a custom-force-related global parameter following a squared
+    sinusoidal wave over the course of an OpenMM simulation, defined by scaling factors relative to the initial value.
+
+    This works exactly like SquaredSinusoidalUpdateReporter, but instead of providing absolute start and end values,
+    you provide scales (multipliers) relative to the parameter's value at the moment of initialization.
+
+    :param filename:
+        The name of the file to write to.
+        The filename must end with the .csv extension.
+    :type filename: str
+    :param parameter_name:
+        The name of the global parameter to be updated.
+        This must be one of the global parameters passed into any of the OpenMM CustomForce objects.
+    :type parameter_name: str
+    :param simulation:
+        The OpenMM simulation that this reporter will be added to.
+        The context of this OpenMM simulation must contain the parameter to be updated.
+    :type simulation: openmm.app.Simulation
+    :param start_scale:
+        The scaling factor for the start value.
+        start_value = initial_parameter_value * start_scale
+    :type start_scale: float
+    :param end_scale:
+        The scaling factor for the end value (amplitude peak).
+        end_value = initial_parameter_value * end_scale
+    :type end_scale: float
+    :param switch_step:
+        The number of steps after which this reporter switches from increasing to decreasing (or decreasing to
+        increasing) the value of the global parameter.
+        The value must be a multiple of the update_interval, and less than or equal to the final_update_step.
+    :type switch_step: int
+    :param update_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is updated.
+        The value must be greater than zero.
+        Defaults to 1.
+    :type update_interval: int
+    :param print_interval:
+        The interval (in time steps) at which the value of the global parameter in the OpenMM simulation is printed
+        to the output csv file.
+        The value must be greater than zero.
+        Defaults to 1.
+    :type print_interval: int
+    :param final_update_step:
+        The final step at which the value of the global parameter will be updated.
+        If None, the parameter will be updated until the end of the simulation.
+        If not None, the value must be greater than or equal to the update_interval.
+        Defaults to None.
+    :type final_update_step: Optional[int]
+    :param append_file:
+        If True, open an existing csv file to append to. If False, create a new file possibly overwriting an already
+        existing file.
+        Defaults to False.
+    :type append_file: bool
+    """
+
+    def __init__(self, filename: str, parameter_name: str, simulation: openmm.app.Simulation,
+                 start_scale: float, end_scale: float, switch_step: int,
+                 update_interval: int = 1, print_interval: int = 1, final_update_step: Optional[int] = None,
+                 append_file: bool = False) -> None:
+        initial_value = simulation.context.getParameters()[parameter_name]
+        start_value = initial_value * start_scale
+        end_value = initial_value * end_scale
+        super().__init__(filename=filename, parameter_name=parameter_name, simulation=simulation,
+                         start_value=start_value, end_value=end_value, switch_step=switch_step,
+                         update_interval=update_interval, print_interval=print_interval,
+                         final_update_step=final_update_step, append_file=append_file)
 
 
 class RandomUpdateReporter(GlobalParameterUpdateReporterAbstract):

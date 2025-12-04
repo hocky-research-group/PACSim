@@ -1,4 +1,5 @@
 import argparse
+import warnings
 from ase.io.lammpsdata import read_lammps_data
 import gsd.hoomd
 import numpy as np
@@ -83,13 +84,13 @@ def check_frame_types(frame: gsd.hoomd.Frame, masses: dict[str, unit.Quantity], 
             raise ValueError(f"Type {t} of the frame is not in the surface potentials dictionary.")
     for t in masses:
         if t not in frame.particles.types:
-            raise ValueError(f"Type {t} of the masses dictionary is not in the frame.")
+            warnings.warn(f"Type {t} of the masses dictionary is not in the frame.")
     for t in radii:
         if t not in frame.particles.types:
-            raise ValueError(f"Type {t} of the radii dictionary is not in the frame.")
+            warnings.warn(f"Type {t} of the radii dictionary is not in the frame.")
     for t in surface_potentials:
         if t not in frame.particles.types:
-            raise ValueError(f"Type {t} of the surface potentials dictionary is not in the frame.")
+            warnings.warn(f"Type {t} of the surface potentials dictionary is not in the frame.")
 
 
 def main():
@@ -113,8 +114,9 @@ def main():
     # However, ase would transform the distances in the lammps-data file to Angstroms by multiplying them by 10 if
     # we specify units="nano". For units="metal", the ase distances are equal to the distances in the lammps-data
     # file. We then just pretend that the distances are in nanometers.
-    cluster = read_lammps_data(configuration_parameters.cluster_specification, units="metal")
-    generator = ClusterGenerator(cluster, configuration_parameters.lattice_repeats,
+    clusters = [read_lammps_data(spec, units="metal") for spec in configuration_parameters.cluster_specifications]
+    generator = ClusterGenerator(clusters, configuration_parameters.cluster_relative_weights,
+                                 configuration_parameters.lattice_repeats,
                                  configuration_parameters.cluster_padding_factor,
                                  configuration_parameters.padding_factor,
                                  configuration_parameters.random_rotation)
@@ -122,9 +124,10 @@ def main():
     frame = generator.generate_configuration()
     _check_frame_changes(frame, generator.__class__.__name__)
 
-    if configuration_parameters.use_substrate:
-        substrate_modifier = SubstrateModifier(configuration_parameters.radii[configuration_parameters.substrate_type],
-                                               configuration_parameters.substrate_type)
+    if configuration_parameters.use_explicit_substrate:
+        substrate_modifier = SubstrateModifier(
+            configuration_parameters.radii[configuration_parameters.substrate_particle_type],
+            configuration_parameters.substrate_particle_type)
         substrate_modifier.modify_configuration(frame)
         _check_frame_changes(frame, substrate_modifier.__class__.__name__)
 

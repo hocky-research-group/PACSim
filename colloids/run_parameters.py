@@ -6,7 +6,7 @@ from openmm import unit
 from colloids.abstracts import Parameters
 import colloids.integrators as integrators
 import colloids.update_reporters as update_reporters
-from colloids.units import energy_unit, length_unit, temperature_unit, time_unit
+from colloids.units import energy_unit, length_unit, temperature_unit, time_unit, electric_potential_unit
 
 
 @dataclass(order=True, frozen=True)
@@ -28,11 +28,13 @@ class RunParameters(Parameters):
 
     - frame.particles.N -> Total number of particles in the frame (including colloids, substrate, snowman heads, etc.).
     - frame.particles.position -> Positions of all particles in the frame.
+    - frame.particles.velocity -> Velocities of all particles in the frame. Can be overridden by sampling from a
+                                  Maxwell-Boltzmann distribution if velocity_seed is not None.
     - frame.particles.types -> Possible types of all particles in the frame.
     - frame.particles.typeid -> Type index within the frame.particles.types tuple of each particle in the frame.
     - frame.particles.diameter -> Diameter in nanometer of each particle in the frame that is used to infer the radius.
     - frame.particles.charge -> Surface potential in millivolt of each particle in the frame.
-    - frame.particles.mass -> Mass in atomic mass units of each particle in the frame. A zero mass signals non-mobile
+    - frame.particles.mass -> Mass in atomic mass units of each particle in the frame. A zero mass signals immobile
                               particles and are interpreted as the substrate.
     - frame.configuration.box -> Box dimensions of the frame. The first three entries are the box lengths in x, y, and z
                                  directions in nanometers. The next three entries are the tilt factors xy, xz, and yz.
@@ -43,8 +45,6 @@ class RunParameters(Parameters):
     Note that gsd files can store constraints directly in the frame.constraints attribute. One has to be careful,
     however, that Ovito ignores the frame.constraints attribute. This means that one has to manually store the
     constraint distances into the GSD file once a gsd file is exported from Ovito
-
-    TODO: Also store velocities in gsd file.
 
     :param initial_configuration:
         The path to the initial configuration of the system in a gsd file.
@@ -75,7 +75,7 @@ class RunParameters(Parameters):
         The parameters that are forwarded to initialize the OpenMM integrator.
         Each integrator has specific parameters, and the parameters passed in here must be compatible with the chosen
         integrator. See the corresponding integrator in the OpenMM documentation
-        http://docs.openmm.org/latest/api-python/library.html#integrators for the possible arguments (or, alternatively,
+        https://docs.openmm.org/latest/api-python/library.html#integrators for the possible arguments (or, alternatively,
         the colloids.integrators module).
         Defaults to sensible values for the LangevinIntegrator (temperature of 298 K, frictionCoeff of
         0.001574074286750681 / ps, stepSize of 0.00317647015905543 ps, and no specified random number seed).
@@ -118,10 +118,18 @@ class RunParameters(Parameters):
         Defaults to "harmonic".
     :type electrostatic_radius_average: str
     :param velocity_seed:
-        The seed for the random number generator that is used to sample the initial velocities.
-        If None, a random seed is used.
+        The seed for the random number generator that is used to sample the initial velocities replacing the velocities
+        in the gsd file.
+        If None, the velocities in the gsd file are used.
+        If negative, a random seed is used for the random number generator.
         Defaults to None.
     :type velocity_seed: Optional[int]
+    :param equilibration_steps:
+        The number of time steps to equilibrate the system before the production run.
+        During the equilibration run, no data is written.
+        The number of time steps must be greater than or equal to zero.
+        Defaults to 0.
+    :type equilibration_steps: int
     :param run_steps:
         The number of time steps to run the simulation.
         The number of time steps must be greater than zero.
@@ -186,6 +194,18 @@ class RunParameters(Parameters):
         If any wall direction is True, alpha must be not None and 0 <= alpha <= 1.
         Note that the force of this potential is only continuous if alpha = 1.
     :type alpha: Optional[float]
+    :param use_implicit_substrate:
+        A boolean indicating whether to implicitly model a substrate implicitly as a charged wall. 
+        An implicit substrate can only be used when all walls are active. The bottom wall is then replaced by the
+        implicit substrate.
+        An implicit substrate can only be used if no explicit substrate particles have been added to the simulation box.
+        Defaults to False.
+    :type use_implicit_substrate: bool
+    :param substrate_wall_charge:
+        The charge of the substrate wall at the bottom of the simulation box. If using an implicit substrate, substrate
+        wall charge must not be None and the units must be compatible with millivolts.
+        Defaults to None.
+    :type substrate_wall_charge: Optional[unit.Quantity]
     :param use_depletion:
         A boolean indicating whether to turn on the depletion attraction for the simulation.
         If depletion attraction is on, depletion_phi and depletant_radius must be specified.
@@ -275,6 +295,7 @@ class RunParameters(Parameters):
     steric_radius_average: str = "harmonic"
     electrostatic_radius_average: str = "harmonic"
     velocity_seed: Optional[int] = None
+    equilibration_steps: int = 0
     run_steps: int = 100
     state_data_interval: int = 100
     state_data_filename: str = "state_data.csv"
@@ -287,6 +308,8 @@ class RunParameters(Parameters):
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
+    use_implicit_substrate: bool = False
+    substrate_wall_charge: Optional[unit.Quantity] = None
     use_depletion: bool = False
     depletion_phi: Optional[float] = None
     depletant_radius: Optional[unit.Quantity] = None
@@ -334,6 +357,8 @@ class RunParameters(Parameters):
             raise ValueError("The Debye length must be greater than zero.")
         if self.dielectric_constant <= 0.0:
             raise ValueError("The dielectric constant must be greater than zero.")
+        if self.equilibration_steps < 0:
+            raise ValueError("The number of equilibration steps must be greater than or equal to zero.")
         if self.run_steps == 0:
             warnings.warn("The number of time steps is zero.")
         if self.run_steps < 0:
@@ -391,6 +416,17 @@ class RunParameters(Parameters):
                 raise ValueError("Depletion phi must not be specified if depletion potential is not on.")
             if self.depletant_radius is not None:
                 raise ValueError("Depletant radius must not be specified if depletion potential is not on.")
+        if self.use_implicit_substrate:
+            if not all(self.wall_directions):
+                raise ValueError("A substrate can only be used if all walls are active.")
+            if self.substrate_wall_charge is None:
+                raise ValueError("Substrate wall charge must be specified if using implicit substrate.")
+            if not self.substrate_wall_charge.unit.is_compatible(electric_potential_unit):
+                raise TypeError(
+                    "The substrate wall charge must have a unit compatible with millivolts.")
+        else:
+            if self.substrate_wall_charge is not None:
+                raise ValueError("Substrate wall charge must not be specified if not using implicit substrate.")
         if self.use_gravity:
             if self.gravitational_acceleration is None:
                 raise ValueError("Gravitational acceleration must be specified if gravity is on.")

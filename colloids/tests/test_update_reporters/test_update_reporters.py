@@ -32,7 +32,9 @@ class TestUpdateReporters(object):
                                                        + [5.0 + i * (1.0 / 3.0) for i in range(1, 4)]
                                                        + [6.0 - (1.0 / 3.0)])),
                               ("debye_squared_sinusoidal.yaml", [5.0 + (sin(pi / (2.0 * 10) * i) ** 2)
-                                                                 for i in range(101)])])
+                                                                 for i in range(101)]),
+                              ("temperature_ramp.yaml", [298.0 + i * 5.0 for i in range(11)]),
+                              ("debye_ramp_until_cluster.yaml", [5.0 + i * 0.1 for i in range(11)])])
     def test_parameter_values(self, yaml_file, expected_parameter_values):
         colloids_run([yaml_file])
         f= np.loadtxt('update_reporter.csv', delimiter=",", dtype=float, skiprows=1)

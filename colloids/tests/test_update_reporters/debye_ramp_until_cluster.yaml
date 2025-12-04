@@ -5,26 +5,22 @@ brush_density: !Quantity
 brush_length: !Quantity
   unit: nanometer
   value: 10.6
-checkpoint_filename: test_run_and_resume/checkpoint.chk
-checkpoint_interval: 50
+checkpoint_filename: checkpoint.chk
+checkpoint_interval: 500
 cutoff_factor: 21.0
 debye_length: !Quantity
   unit: nanometer
-  value: 5.726968
-depletant_radius: !Quantity
-    unit: nanometer
-    value: 5.0
-depletion_phi: 0.5
+  value: 5.0
+depletant_radius: null
+depletion_phi: null
 dielectric_constant: 80.0
 electrostatic_radius_average: harmonic
 epsilon: !Quantity
     unit: kilojoule/mole
     value: 2.477709860209665  # 1 k_B T
-final_configuration_gsd_filename: test_run_and_resume/final_frame_resume.gsd
-gravitational_acceleration: !Quantity
-    unit: meter/(second**2)
-    value: 9.8
-initial_configuration: full_first_frame.gsd
+final_configuration_gsd_filename: final_frame.gsd
+gravitational_acceleration: null
+initial_configuration: first_frame.gsd
 integrator: LangevinIntegrator
 integrator_parameters:
   frictionCoeff: !Quantity
@@ -37,44 +33,46 @@ integrator_parameters:
   temperature: !Copy
     key: potential_temperature
 minimize_energy_initially: false
-particle_density: !Quantity
-  unit: gram/(centimeter**3)
-  value: 1.05
+particle_density: null
 platform_name: Reference
+run_steps: 100
+state_data_filename: state_data.csv
+state_data_interval: 10
+steric_radius_average: arithmetic
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0
-run_steps: 50
-state_data_filename: test_run_and_resume/state_data_resume.csv
-state_data_interval: 10
-steric_radius_average: harmonic
-trajectory_filename: test_run_and_resume/trajectory_resume.gsd
+trajectory_filename: trajectory.gsd
 trajectory_interval: 10
-update_reporter: RampUpdateReporter
+update_reporter: RampUpdateReporterUntilCluster
 update_reporter_parameters:
-  filename: test_run_and_resume/update_reporter_resume.csv
+  filename: update_reporter.csv
   update_interval: !Copy
     key: state_data_interval
   print_interval: !Copy
     key: state_data_interval
-  final_update_step: 100
+  final_update_step: !Copy
+    key: run_steps
   parameter_name: debye_length
   start_value: !Copy
     key: debye_length
   end_value: !Quantity
     unit: nanometer
     value: 6.0
-use_depletion: true
+  cluster_size: 2000
+  cutoff_distance: !Quantity  # Choose small enough so that it does not matter.
+    unit: nanometer
+    value: 0.1
+  ignore_types:
+    - "N"
+use_depletion: false
 use_implicit_substrate: false
 substrate_wall_charge: null
-use_gravity: true
+use_gravity: false
 use_log: false
-use_plumed: false
 velocity_seed: 2
 wall_directions:
   - true
   - true
   - true
-water_density: !Quantity
-  unit: gram/(centimeter**3)
-  value: 0.998
+water_density: null

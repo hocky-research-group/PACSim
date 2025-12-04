@@ -26,8 +26,8 @@ class ColloidPotentialsTabulatedHoomd(object):
         self._tabulated_potential = self._set_up_tabulated_potential()
 
     def _steric_potential(
-            self, prefactor: float, h_values: npt.NDArray[np.floating]) -> (npt.NDArray[np.floating],
-                                                                            npt.NDArray[np.floating]):
+            self, prefactor: float, h_values: npt.NDArray[np.floating]) -> tuple[npt.NDArray[np.floating],
+                                                                                 npt.NDArray[np.floating]]:
         """
         Return the steric potential from the Alexander-de Gennes polymer brush model for the given surface-to-surface
         separations.
@@ -45,9 +45,8 @@ class ColloidPotentialsTabulatedHoomd(object):
                                                             - 5.0 * np.power(h_over_double_brush_length, 1.75)
                                                             + 12.0, 0.0))
 
-    def _electrostatic_potential(
-            self, prefactor: float, h_values: npt.NDArray[np.floating], h_cut: float) -> (npt.NDArray[np.floating],
-                                                                                          npt.NDArray[np.floating]):
+    def _electrostatic_potential(self, prefactor: float, h_values: npt.NDArray[np.floating],
+                                 h_cut: float) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
         """Return the electrostatic potential from DLVO theory for the given surface-to-surface separations."""
         debye_length = self._parameters.debye_length.value_in_unit(length_unit)
         if self._shift:

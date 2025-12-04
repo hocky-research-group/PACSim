@@ -11,7 +11,7 @@ def BrownianIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity,
     Function to return the OpenMM Brownian integrator that defines the keyword arguments (in contrast to OpenMM).
 
     The following is the OpenMM documentation for the Brownian integrator (see
-    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.BrownianIntegrator.html).
+    https://docs.openmm.org/latest/api-python/generated/openmm.openmm.BrownianIntegrator.html).
 
     This is an Integrator which simulates a System using Brownian dynamics.
 
@@ -57,7 +57,7 @@ def LangevinIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Quantity,
     Function to return the OpenMM Langevin integrator that defines the keyword arguments (in contrast to OpenMM).
 
     The following is the OpenMM documentation for the Langevin integrator (see
-    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.LangevinIntegrator.html).
+    https://docs.openmm.org/latest/api-python/generated/openmm.openmm.LangevinIntegrator.html).
 
     This is an Integrator which simulates a System using Langevin dynamics.
 
@@ -103,7 +103,7 @@ def LangevinMiddleIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Qua
     Function to return the OpenMM Langevin middle integrator that defines the keyword arguments (in contrast to OpenMM).
 
     The following is the OpenMM documentation for the Langevin middle integrator (see
-    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.LangevinMiddleIntegrator.html).
+    https://docs.openmm.org/latest/api-python/generated/openmm.openmm.LangevinMiddleIntegrator.html).
 
     This is an Integrator which simulates a System using Langevin dynamics, with the LFMiddle discretization
     (J. Phys. Chem. A 2019, 123, 28, 6056-6079). This method tend to produce more accurate configurational sampling
@@ -156,7 +156,7 @@ def NoseHooverIntegrator(temperature: unit.Quantity, collisionFrequency: unit.Qu
     Function to return the OpenMM Nose-Hoover integrator that defines the keyword arguments (in contrast to OpenMM).
 
     The following is the OpenMM documentation for the Nose-Hoover integrator (see
-    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.NoseHooverIntegrator.html).
+    https://docs.openmm.org/latest/api-python/generated/openmm.openmm.NoseHooverIntegrator.html).
 
     This is an Integrator which simulates a System using one or more Nose Hoover chain thermostats, using the "middle"
     leapfrog propagation algorithm described in J. Phys. Chem. A 2019, 123, 6056-6079.
@@ -202,7 +202,7 @@ def VariableLangevinIntegrator(temperature: unit.Quantity, frictionCoeff: unit.Q
     OpenMM).
 
     The following is the OpenMM documentation for the variable Langevin integrator (see
-    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.VariableLangevinIntegrator.html).
+    https://docs.openmm.org/latest/api-python/generated/openmm.openmm.VariableLangevinIntegrator.html).
 
     This is an error controlled, variable time step Integrator that simulates a System using Langevin dynamics. It
     compares the result of the Langevin integrator to that of an explicit Euler integrator, takes the difference between
@@ -266,7 +266,7 @@ def VariableVerletIntegrator(errorTol: float, maximumStepSize: Optional[unit.Qua
     Function to return the OpenMM variable Verlet integrator that defines the keyword arguments (in contrast to OpenMM).
 
     The following is the OpenMM documentation for the variable Verlet integrator (see
-    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.VariableVerletIntegrator.html).
+    https://docs.openmm.org/latest/api-python/generated/openmm.openmm.VariableVerletIntegrator.html).
 
     This is an error controlled, variable time step Integrator that simulates a System using the leap-frog Verlet
     algorithm. It compares the result of the Verlet integrator to that of an explicit Euler integrator, takes the
@@ -313,7 +313,7 @@ def VerletIntegrator(stepSize: unit.Quantity) -> openmm.Integrator:
     Function to return the OpenMM Verlet integrator that defines the keyword arguments (in contrast to OpenMM).
 
     The following is the OpenMM documentation for the Verlet integrator (see
-    http://docs.openmm.org/latest/api-python/generated/openmm.openmm.VerletIntegrator.html).
+    https://docs.openmm.org/latest/api-python/generated/openmm.openmm.VerletIntegrator.html).
 
     This is an Integrator which simulates a System using the leap-frog Verlet algorithm.
 

@@ -1,5 +1,5 @@
 from math import acos, pi
-from random import uniform
+from random import choices, uniform
 import re
 from typing import Sequence, Union
 from ase import Atoms
@@ -10,25 +10,36 @@ from colloids.colloids_create import ConfigurationGenerator
 
 class ClusterGenerator(ConfigurationGenerator):
     """
-    Generator for an initial configuration in a gsd.hoomd.Frame instance for a colloid simulation based on a cluster
-    of colloids.
+    Generator for an initial configuration in a gsd.hoomd.Frame instance for a colloid simulation based on several
+    clusters of colloids.
 
-    To generate the initial configuration, the given single cluster of colloids is centered and repeated in all three
-    directions of its lattice vectors. Every replica of the cluster can optionally be randomly rotated.
+    Every cluster of colloids is assumed to have the same cell vectors. To generate the initial configuration,
+    the clusters are first centered. Then, the shared cell vectors of the clusters are repeated in all three directions.
+    Every replica of the cell is then filled with a randomly selected cluster from the list of clusters. The clusters
+    are selected based on their relative weights. Every cluster can optionally be randomly rotated.
 
-    To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors. Additionally,
-    one can increase a padding factor that scales the overall box size and thus increases the distance between the
-    outwards facing colloids and the walls.
+    The clusters are specified by Atoms objects generated from a lammps-data file.
+    See https://docs.lammps.org/2001/data_format.html for information about this file format.
+
+    To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors before
+    replication. This will also scale the box size. Additionally, one can increase a padding factor that scales just the
+    overall box size and thus increases the distance between the outwards facing colloids and the walls. To make the
+    simulation box smaller, use a padding factor less than 1.
 
     This dataclass assumes that the distances in the cluster are in units of nanometers.
 
     Any bonds in the cluster are added as constraints, with the constraint distance equal to the current bond length in
     the cluster definition. The bond lengths are not modified during the simulation.
 
-    :param cluster:
-        The cluster of colloids that is repeated in all three directions of its lattice vectors.
-        All colloid positions in the centered cluster should lie in the unit cell defined by the lattice vectors.
-    :type cluster: Atoms
+    :param clusters:
+        A sequence of clusters of colloids with equal cell vectors that are used to generate the initial configuration.
+        All collooids in the centered clusters should lie in the unit cell defined by the lattice vectors.
+    :type clusters: Sequence[Atoms]
+    :param cluster_relative_weights:
+        The relative weights of the clusters. The weights are used to randomly select a cluster from the list of
+        clusters when generating the initial configuration.
+        The weights should be positive.
+    :type cluster_relative_weights: Sequence[float]
     :param lattice_repeats:
         The number of repeats of the lattice in the three directions of the lattice vectors of the cluster.
         If only a single integer is given, the same number of repeats is used in all directions.
@@ -40,21 +51,33 @@ class ClusterGenerator(ConfigurationGenerator):
     :type cluster_padding_factor: float
     :param padding_factor:
         The factor by which the overall lattice vectors are scaled to increase the distance between the outwards facing
-        colloids and the walls.
+        colloids and the walls. This will scale the box dimensions specified in the cluster specification file without
+        changing the spacing in between clusters.
         The padding factor should be greater than zero.
     :type padding_factor: float
+    :param random_rotation:
+        Specifies whether replicas of the original clusters should be rotated in the initial configuration.
+        If False, the orientation of the original cluster is preserved for all replicas when generating the initial
+        configuration.
+    :type random_rotation: bool
 
     :raises ValueError:
         If the cluster padding factor is not greater than zero.
         If the padding factor is not greater than zero.
+        If no clusters are provided.
+        If the number of clusters does not match the number of cluster probabilities.
+        If any cluster probability is not greater than zero.
+        If the clusters do not have the same cell vectors.
     """
 
-    def __init__(self, cluster: Atoms, lattice_repeats: Union[int, Sequence[int]], cluster_padding_factor: float,
+    def __init__(self, clusters: Sequence[Atoms], cluster_relative_weights: Sequence[float],
+                 lattice_repeats: Union[int, Sequence[int]], cluster_padding_factor: float,
                  padding_factor: float, random_rotation: bool) -> None:
         """Constructor of the ClusterGenerator class."""
         super().__init__()
         # The format of these arguments is already checked in configuration_parameters.py.
-        self._cluster = cluster
+        self._clusters = clusters
+        self._cluster_relative_weights = cluster_relative_weights
         self._lattice_repeats = lattice_repeats
         self._cluster_padding_factor = cluster_padding_factor
         self._padding_factor = padding_factor
@@ -63,6 +86,14 @@ class ClusterGenerator(ConfigurationGenerator):
             raise ValueError("The cluster padding factor must be greater than zero.")
         if self._padding_factor <= 0.0:
             raise ValueError("The padding factor must be greater than zero.")
+        if not len(clusters) > 0:
+            raise ValueError("At least one cluster must be provided.")
+        if len(clusters) != len(cluster_relative_weights):
+            raise ValueError("The number of clusters must match the number of cluster probabilities.")
+        if not all(prob >= 0.0 for prob in cluster_relative_weights):
+            raise ValueError("All cluster probabilities must be non-negative.")
+        if not all(np.allclose(c.cell, clusters[0].cell) for c in clusters):
+            raise ValueError("All clusters must have the same cell vectors.")
 
     @staticmethod
     def _extract_bonded_indices(bond_string: str) -> list[int]:
@@ -113,52 +144,77 @@ class ClusterGenerator(ConfigurationGenerator):
         :raises ValueError:
             If some positions in the centered and padded cluster are outside the unit cell.
         """
-        centered_padded_cluster = self._cluster.copy()
-        centered_padded_cluster.set_cell(np.array([self._cluster_padding_factor * self._cluster.cell[c]
-                                                   for c in range(3)]))
-        # Do not use the vacuum argument of the center method, as it does not simply add vacuum but can also decrease
-        # the size of the cell to get the desired vaccum.
-        centered_padded_cluster.center()
-        unwrapped_positions = centered_padded_cluster.get_positions(wrap=False)
-        wrapped_positions = centered_padded_cluster.get_positions(wrap=True)
-        if not np.allclose(unwrapped_positions, wrapped_positions):
-            raise ValueError("Some positions in the centered and padded cluster are outside of the unit cell.")
-        if not self._random_rotation:
-            repeated_cluster = centered_padded_cluster.repeat(self._lattice_repeats)
+        centered_padded_clusters = [c.copy() for c in self._clusters]
+        for c in centered_padded_clusters:
+            # Do not use the vacuum argument of the center method, as it does not simply add vacuum
+            # but can also decrease the size of the cell to get the desired vaccum.
+            c.set_cell(np.array([self._cluster_padding_factor * c.cell[i] for i in range(3)]))
+            c.center()
+        unwrapped_positions = [c.get_positions(wrap=False) for c in centered_padded_clusters]
+        wrapped_positions = [c.get_positions(wrap=True) for c in centered_padded_clusters]
+        for i, (unwrapped, wrapped) in enumerate(zip(unwrapped_positions, wrapped_positions)):
+            if not np.allclose(unwrapped, wrapped):
+                raise ValueError(f"Some positions in the cluster {i} are outside of the unit cell. "
+                                 f"Increase the cluster padding factor to allow for rotations.")
+
+        if isinstance(self._lattice_repeats, int):
+            r = (self._lattice_repeats, self._lattice_repeats, self._lattice_repeats)
         else:
-            # Adapted from ase's repeat function.
-            if isinstance(self._lattice_repeats, int):
-                r = (self._lattice_repeats, self._lattice_repeats, self._lattice_repeats)
-            else:
-                r = self._lattice_repeats
-            repeated_cluster = centered_padded_cluster.copy()
-            for name, a in repeated_cluster.arrays.items():
-                repeated_cluster.arrays[name] = np.tile(a, (np.prod(r),) + (1,) * (len(a.shape) - 1))
-            i0 = 0
-            for r0 in range(r[0]):
-                for r1 in range(r[1]):
-                    for r2 in range(r[2]):
-                        copied_cluster = centered_padded_cluster.copy()
+            r = self._lattice_repeats
+
+        repeated_cluster = None
+        bond_pairs = []
+        # All cells are assumed to be the same so we can use the first one.
+        cell = centered_padded_clusters[0].get_cell()
+        # Adapted from ase's repeat function.
+        i0 = 0
+        for r0 in range(r[0]):
+            for r1 in range(r[1]):
+                for r2 in range(r[2]):
+                    new_cluster = choices(centered_padded_clusters, weights=self._cluster_relative_weights,
+                                          k=1)[0].copy()
+                    if self._random_rotation:
                         # Generate uniformly randomized rotations.
                         # See Properties section here: https://en.wikipedia.org/wiki/Euler_angles
                         random_phi_deg = uniform(0.0, 2.0 * pi) * 180.0 / pi  # alpha on Wikipedia.
                         random_theta_deg = acos(uniform(-1.0, 1.0)) * 180.0 / pi  # beta on Wikipedia.
                         random_psi_deg = uniform(0.0, 2.0 * pi) * 180.0 / pi  # gamma on Wikipedia.
-                        copied_cluster.euler_rotate(phi=random_phi_deg, theta=random_theta_deg, psi=random_psi_deg,
+                        new_cluster.euler_rotate(phi=random_phi_deg, theta=random_theta_deg, psi=random_psi_deg,
                                                     center="COP")
-                        unwrapped_positions = copied_cluster.get_positions(wrap=False)
-                        wrapped_positions = copied_cluster.get_positions(wrap=True)
+                    unwrapped_positions = new_cluster.get_positions(wrap=False)
+                    if self._random_rotation:
+                        wrapped_positions = new_cluster.get_positions(wrap=True)
                         if not np.allclose(wrapped_positions, unwrapped_positions):
                             raise ValueError("Parts of the rotated cluster lie outside the original box, increase the "
                                              "rotation padding distance to allow for rotations.")
-                        repeated_cluster.arrays["positions"][i0:i0 + len(centered_padded_cluster)] = unwrapped_positions
-                        repeated_cluster.arrays["positions"][i0:i0 + len(centered_padded_cluster)] += np.dot(
-                            (r0, r1, r2), centered_padded_cluster.get_cell())
-                        i0 += len(centered_padded_cluster)
-            repeated_cluster.set_cell(np.array([r[c] * centered_padded_cluster.cell[c] for c in range(3)]))
+                    # Translate the unwrapped positions of the new cluster to the correct repeat.
+                    unwrapped_positions += np.dot((r0, r1, r2), cell)
+                    if repeated_cluster is None:
+                        # If this is the first cluster, we create the repeated cluster.
+                        assert r0 == r1 == r2 == i0 == 0
+                        repeated_cluster = new_cluster.copy()
+                        if "bonds" in repeated_cluster.arrays:
+                            # Extract the bonds and adjust the indices to account for the repetitions.
+                            bond_pairs += [(first_index, second_index)
+                                           for first_index, bonds in enumerate(new_cluster.arrays["bonds"])
+                                           for second_index in self._extract_bonded_indices(bonds)]
+                    else:
+                        # Concatenate the arrays of the new cluster to the repeated cluster.
+                        for name, a in new_cluster.arrays.items():
+                            if name != "bonds":
+                                repeated_cluster.arrays[name] = np.concatenate((repeated_cluster.arrays[name], a),
+                                                                               axis=0)
+                            else:
+                                # For the bonds, we need to adjust the indices to account for the repetitions.
+                                bond_pairs += [(first_index + i0, second_index + i0)
+                                               for first_index, bonds in enumerate(new_cluster.arrays["bonds"])
+                                               for second_index in self._extract_bonded_indices(bonds)]
+                        # Set the positions of the repeated cluster to the unwrapped positions.
+                        repeated_cluster.arrays["positions"][i0:i0 + len(new_cluster)] = unwrapped_positions
+                    i0 += len(new_cluster)
 
-        old_cell = repeated_cluster.get_cell()
-        repeated_cluster.set_cell(np.array([self._padding_factor * old_cell[c] for c in range(3)]))
+        # Enlarge the cell of the repeated cluster.
+        repeated_cluster.set_cell(np.array([self._padding_factor * r[c] * cell[c] for c in range(3)]) )
         repeated_cluster.center(about=(0.0, 0.0, 0.0))
 
         frame = Frame()
@@ -175,36 +231,17 @@ class ClusterGenerator(ConfigurationGenerator):
              repeated_cluster.cell[2][0] / repeated_cluster.cell[2][2],
              repeated_cluster.cell[2][1] / repeated_cluster.cell[2][2]], dtype=np.float32)
 
-        if "bonds" in centered_padded_cluster.arrays:
-            # Note that the replication of the bonds does not work correctly so we have to use only the original ones.
-            original_bonds = centered_padded_cluster.arrays["bonds"]
-            # By sorting and converting to a set we remove duplicates.
-            bond_pairs = set(tuple(sorted((first_index, second_index)))
-                             for first_index, bonds in enumerate(original_bonds)
-                             for second_index in self._extract_bonded_indices(bonds))
-            assert len(repeated_cluster) % len(centered_padded_cluster) == 0
-            number_repetitions = len(repeated_cluster) // len(centered_padded_cluster)
-
-            all_constraints = np.array(
-                [[first_index + i * len(centered_padded_cluster),
-                  second_index + i * len(centered_padded_cluster)]
-                 for i in range(number_repetitions) for first_index, second_index in bond_pairs], dtype=np.uint32)
+        if len(bond_pairs) > 0:
             all_distances = repeated_cluster.get_all_distances()
-            # Distances within all replicas should be the same.
-            assert all(np.allclose(all_distances[i * len(centered_padded_cluster):(i + 1) * len(centered_padded_cluster),
-                                                 i * len(centered_padded_cluster):(i + 1) * len(centered_padded_cluster)],
-                                   centered_padded_cluster.get_all_distances()) for i in range(number_repetitions))
-            all_values = np.array(
-                [all_distances[first_index + i * len(centered_padded_cluster),
-                               second_index + i * len(centered_padded_cluster)]
-                for i in range(number_repetitions) for first_index, second_index in bond_pairs], dtype=np.float32)
-
-            frame.constraints.N = len(bond_pairs) * number_repetitions
+            all_constraints = np.array(bond_pairs, dtype=np.uint32)
+            all_values = np.array([all_distances[first_index, second_index]
+                                   for first_index, second_index in bond_pairs], dtype=np.float32)
+            frame.constraints.N = len(bond_pairs)
             frame.constraints.group = all_constraints
             frame.constraints.value = all_values
 
             # Useful for visualization although not necessary for the simulation.
-            frame.bonds.N = len(bond_pairs) * number_repetitions
+            frame.bonds.N = len(bond_pairs)
             frame.bonds.types = ["b"]
             frame.bonds.typeid = np.zeros(frame.bonds.N, dtype=np.uint32)
             frame.bonds.group = all_constraints

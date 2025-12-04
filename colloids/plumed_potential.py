@@ -52,7 +52,7 @@ class PlumedPotential(OpenMMPotentialAbstract):
         super().add_particle()
 
 
-    def yield_potentials(self) -> Iterator[openmmplumed.PlumedForce]:
+    def yield_potentials(self) -> "Iterator[openmmplumed.PlumedForce]":
         """
         Generate the PLUMED force for an OpenMM system.
 

@@ -36,7 +36,12 @@ We recommend enabling the crystallization, multicolvar, and adjmat modules when 
 PLUMED 2.9.0 is available for download [here](https://github.com/plumed/plumed2/releases/tag/v2.9.0). Instructions for configuring and compiling can be found [here](https://www.plumed.org/doc-v2.9/user-doc/html/_installation.html). 
 
 After installing and configuring PLUMED, openmm-plumed can be installed by following [these instructions](https://github.com/openmm/openmm-plumed). To ensure that openmm-plumed points to the right version of PLUMED, we strongly recommend building the openmm-plumed plugin from scratch using CMake rather than doing a conda install.
- 
+
+If you are using PLUMED, it is not necessary to install the MPI version. However, one should carefully check that OpenMP
+is enabled during the configuration step of PLUMED. Then, increasing `PLUMED_NUM_THREADS` should speed up the 
+calculations and increase CPU usage.
+
+For the CPU platform of OpenMM, it might make sense for small systems to set `OPENMM_CPU_THREADS=1`.
 
 ## Installation
 

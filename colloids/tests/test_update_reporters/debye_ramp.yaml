@@ -35,6 +35,7 @@ integrator_parameters:
 minimize_energy_initially: false
 particle_density: null
 platform_name: Reference
+plumed_script: null
 run_steps: 100
 state_data_filename: state_data.csv
 state_data_interval: 10

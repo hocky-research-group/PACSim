@@ -33,6 +33,7 @@ integrator_parameters:
 minimize_energy_initially: false
 particle_density: null
 platform_name: Reference
+plumed_script: null
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0

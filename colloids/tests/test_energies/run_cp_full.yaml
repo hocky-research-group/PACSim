@@ -41,6 +41,7 @@ particle_density: !Quantity
   unit: gram/(centimeter**3)
   value: 1.05
 platform_name: Reference
+plumed_script: null
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0

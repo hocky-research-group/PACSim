@@ -8,7 +8,7 @@ import numpy as np
 import openmm
 from openmm import app
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
-                      ImplicitSubstrateWall, DepletionPotential, Gravity)
+                      ImplicitSubstrateWall, DepletionPotential, Gravity, PlumedPotential)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import get_cell_from_box, read_gsd_file, write_gsd_file
 import colloids.integrators as integrators
@@ -16,7 +16,6 @@ from colloids.run_parameters import RunParameters
 from colloids.status_reporter import StatusReporter
 import colloids.update_reporters as update_reporters
 from colloids.units import electric_potential_unit, length_unit
-from openmmplumed import PlumedForce
 
 
 def simple_formatwarning(msg: str, category: Warning, filename: str, lineno: int, line: Optional[str] = None) -> str:
@@ -209,12 +208,9 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         substrate_wall = None
 
     if parameters.use_plumed:
-        f = open(parameters.plumed_script, "r")
-        script=''
-        for line in f.readlines()[1:]:
-            script+=line
-
-        system.addForce(PlumedForce(script))
+        plumed = PlumedPotential(parameters.plumed_script)
+    else:
+        plumed = None
 
     # --------------------------- Add all particles and constraints to the system. -------------------------------------
     for mass in frame.particles.mass:
@@ -240,6 +236,8 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         if parameters.use_implicit_substrate:
             assert not is_substrate
             substrate_wall.add_particle(index=i, radius=radii[i], surface_potential=surface_potentials[i])
+        if parameters.use_plumed:
+            plumed.add_particle()
 
     for i in range(frame.constraints.N):
         colloid_potentials.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
@@ -271,6 +269,11 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     if parameters.use_implicit_substrate:
         assert all_walls
         for force in substrate_wall.yield_potentials():
+            force.setForceGroup(system.getNumForces())
+            system.addForce(force)
+
+    if parameters.use_plumed:
+        for force in plumed.yield_potentials():
             force.setForceGroup(system.getNumForces())
             system.addForce(force)
 

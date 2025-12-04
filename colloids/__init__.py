@@ -5,3 +5,4 @@ from .colloid_potentials_tabulated import ColloidPotentialsTabulated
 from .depletion_potential import DepletionPotential
 from .gravity import Gravity
 from .walls import ShiftedLennardJonesWalls, ImplicitSubstrateWall
+from .plumed_potential import PlumedPotential

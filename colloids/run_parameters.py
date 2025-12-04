@@ -267,7 +267,6 @@ class RunParameters(Parameters):
         A plumed input file to be used for interfacing with a simulation.
     :type plumed_script: Optional[str]
 
-
     :raises TypeError:
         If any of the quantities has an incompatible unit.
     :raises ValueError:

@@ -5,22 +5,22 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "colloids"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 version = "0.0.1"
 dependencies = [
-    "jupyterlab >= 4.1",
-    "matplotlib >= 3.8",
-    "numpy >= 1.26, < 2.0",
-    "openmm >= 8.0",
-    "pytest >= 7.4",
-    "gsd >= 3.2",
+    "jupyterlab >= 4.5",
+    "matplotlib >= 3.10",
+    "numpy >= 2.3",
+    "openmm >= 8.4",
+    "pytest >= 9.0",
+    "gsd >= 4.2",
     "pyyaml >= 6.0",
-    "tqdm >= 4.65",
-    "pandas >= 2.2",
-    "ase >= 3.22",
-    "scipy >= 1.12",
-    "MDAnalysis >= 2.7",
-    "freud-analysis >= 3.3"
+    "tqdm >= 4.67",
+    "pandas >= 2.3",
+    "ase >= 3.26",
+    "scipy >= 1.16",
+    "MDAnalysis >= 2.10",
+    "freud-analysis >= 3.5"
 ]
 
 [project.scripts]

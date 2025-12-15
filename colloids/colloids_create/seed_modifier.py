@@ -36,10 +36,6 @@ class SeedModifier(ConfigurationModifier):
         surface-to-surface distance is less than this value.
         Must have units compatible with nanometers and be non-negative.
     :type overlap_distance: unit.Quantity
-    :param zero_velocities:
-        If True, set the velocities of all particles to zero after seeding.
-        Defaults to True.
-    :type zero_velocities: bool
 
     :raises TypeError:
         If overlap_distance does not have units compatible with nanometers.
@@ -47,8 +43,7 @@ class SeedModifier(ConfigurationModifier):
         If overlap_distance is negative.
     """
 
-    def __init__(self, seed_filename: str, seed_frame_index: int, overlap_distance: unit.Quantity,
-                 zero_velocities: bool = True) -> None:
+    def __init__(self, seed_filename: str, seed_frame_index: int, overlap_distance: unit.Quantity) -> None:
         """Constructor of the SeedModifier class."""
         super().__init__()
         if not overlap_distance.unit.is_compatible(length_unit):
@@ -58,7 +53,6 @@ class SeedModifier(ConfigurationModifier):
         self._overlap_distance = overlap_distance.value_in_unit(length_unit)
         self._seed_filename = seed_filename
         self._seed_frame_index = seed_frame_index
-        self._zero_velocities = zero_velocities
 
     @staticmethod
     def _validate_frame_compatibility(frame: Frame, seed_frame: Frame) -> None:
@@ -127,7 +121,7 @@ class SeedModifier(ConfigurationModifier):
                 assert len(masses_seed) > 0
                 if not np.allclose(masses, masses[0]):
                     raise ValueError(f"The base frame contains particles with the same type {t} but different masses.")
-                if not np.isclose(masses_seed, masses_seed[0]):
+                if not np.allclose(masses_seed, masses_seed[0]):
                     raise ValueError(f"The seed frame contains particles with the same type {t} but different masses.")
                 if not np.isclose(masses[0], masses_seed[0]):
                     raise ValueError(f"The mass of type {t} is {masses[0]} in the base frame but "
@@ -139,7 +133,7 @@ class SeedModifier(ConfigurationModifier):
                 assert len(charges_seed) > 0
                 if not np.allclose(charges, charges[0]):
                     raise ValueError(f"The base frame contains particles with the same type {t} but different charges.")
-                if not np.isclose(charges_seed, charges_seed[0]):
+                if not np.allclose(charges_seed, charges_seed[0]):
                     raise ValueError(f"The seed frame contains particles with the same type {t} but different charges.")
                 if not np.isclose(charges[0], charges_seed[0]):
                     raise ValueError(f"The charge of type {t} is {charges[0]} in the base frame but "
@@ -236,7 +230,6 @@ class SeedModifier(ConfigurationModifier):
         frame.particles.charge = frame.particles.charge[mask]
         frame.particles.diameter = frame.particles.diameter[mask]
         frame.particles.position = frame.particles.position[mask]
-        frame.particles.velocity = frame.particles.velocity[mask]
 
         if frame.constraints.N == 0:
             return
@@ -285,7 +278,6 @@ class SeedModifier(ConfigurationModifier):
         frame.particles.charge = np.concatenate((frame.particles.charge, seed_frame.particles.charge))
         frame.particles.diameter = np.concatenate((frame.particles.diameter, seed_frame.particles.diameter))
         frame.particles.position = np.vstack((frame.particles.position, seed_frame.particles.position))
-        frame.particles.velocity = np.vstack((frame.particles.velocity, seed_frame.particles.velocity))
 
         if frame.constraints.N == 0 and seed_frame.constraints.N == 0:
             return
@@ -321,7 +313,6 @@ class SeedModifier(ConfigurationModifier):
         - frame.particles.position
         - frame.particles.types
         - frame.particles.typeid
-        - frame.particles.velocity
         - frame.particles.mass
         - frame.particles.charge
         - frame.particles.diameter
@@ -343,8 +334,6 @@ class SeedModifier(ConfigurationModifier):
             If the base frame's box is smaller than the seed frame's box in any dimension.
             If either box is triclinic (has non-zero tilt factors).
         """
-        if frame.particles.type_shapes is None:
-            raise ValueError(f"The SeedModifier class requires already populated type shapes.")
         if frame.particles.diameter is None:
             raise ValueError(f"The SeedModifier class requires already populated diameter.")
         if frame.particles.charge is None:
@@ -366,9 +355,6 @@ class SeedModifier(ConfigurationModifier):
 
         # Add seed particles
         self.combine_frames(frame, seed_frame)
-
-        if self._zero_velocities:
-            frame.particles.velocity = np.zeros((frame.particles.N, 3), dtype=np.float32)
 
 
 if __name__ == '__main__':

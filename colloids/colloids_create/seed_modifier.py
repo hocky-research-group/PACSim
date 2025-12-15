@@ -199,7 +199,7 @@ class SeedModifier(ConfigurationModifier):
             if i != j:
                 parents[i] = j
 
-        for pair in overlapping_indices:
+        for pair in frame.constraints.group:
             union(pair[0], pair[1])
 
         groups_to_remove = set(find(i) for i in overlapping_indices)

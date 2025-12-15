@@ -151,6 +151,7 @@ class ConfigurationParameters(Parameters):
         If the lattice repeats are not an integer or a list of three integers.
         If the masses, radii, or surface potentials do not have the correct units.
         If the masses, radii, or surface potentials dictionaries do not have strings as keys.
+        If the seed overlap distance does not have the correct units.
         If the substrate particle type is not a string.
     :raises ValueError:
         If the cluster specification file does not end in ".lmp."
@@ -161,6 +162,9 @@ class ConfigurationParameters(Parameters):
         If the substrate particle type is not specified when an explicit substrate is used or vice versa.
         If a non-substrate type of the masses, radii, or surface potentials dictionaries is not in the lammps-data file.
         If a type of the lammps-data file is not in the masses, radii, or surface potentials dictionaries.
+        If the seed file does not end in ".gsd."
+        If the seed frame index or overlap distance is not specified when a seed file is set or vice versa.
+        If the overlap distance is negative.
         If the substrate particle type is not in the radii, masses, or surface potentials dictionaries.
         If the mass of the substrate type is not zero.
     """

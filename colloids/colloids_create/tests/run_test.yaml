@@ -30,6 +30,7 @@ integrator_parameters:
     key: potential_temperature
 minimize_energy_initially: false
 platform_name: Reference
+plumed_script: null
 potential_temperature: !Quantity
   unit: kelvin
   value: 298.0
@@ -42,6 +43,7 @@ update_reporter: null
 update_reporter_parameters: null
 use_depletion: false
 use_log: false
+use_plumed: false
 velocity_seed: 2
 wall_directions:
   - false

@@ -1,4 +1,7 @@
-cluster_specification: "cluster.lmp"
+cluster_specifications: 
+ - "cluster.lmp"
+cluster_relative_weights:
+  - 1.0
 lattice_repeats: 2
 cluster_padding_factor: 3.0
 padding_factor: 1.5
@@ -32,6 +35,6 @@ surface_potentials:
   "3": !Quantity
     unit: millivolt
     value: 40.0
-use_substrate: false
-substrate_type: null
+use_explicit_substrate: false
+substrate_particle_type: null
 random_rotation: true

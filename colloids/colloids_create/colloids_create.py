@@ -125,9 +125,10 @@ def main():
     frame = generator.generate_configuration()
     _check_frame_changes(frame, generator.__class__.__name__)
 
-    if configuration_parameters.use_substrate:
-        substrate_modifier = SubstrateModifier(configuration_parameters.radii[configuration_parameters.substrate_type],
-                                               configuration_parameters.substrate_type)
+    if configuration_parameters.use_explicit_substrate:
+        substrate_modifier = SubstrateModifier(
+            configuration_parameters.radii[configuration_parameters.substrate_particle_type],
+            configuration_parameters.substrate_particle_type)
         substrate_modifier.modify_configuration(frame)
         _check_frame_changes(frame, substrate_modifier.__class__.__name__)
 

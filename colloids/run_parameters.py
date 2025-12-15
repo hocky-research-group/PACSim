@@ -6,7 +6,7 @@ from openmm import unit
 from colloids.abstracts import Parameters
 import colloids.integrators as integrators
 import colloids.update_reporters as update_reporters
-from colloids.units import energy_unit, length_unit, temperature_unit, time_unit
+from colloids.units import energy_unit, length_unit, temperature_unit, time_unit, electric_potential_unit
 
 
 @dataclass(order=True, frozen=True)
@@ -34,7 +34,7 @@ class RunParameters(Parameters):
     - frame.particles.typeid -> Type index within the frame.particles.types tuple of each particle in the frame.
     - frame.particles.diameter -> Diameter in nanometer of each particle in the frame that is used to infer the radius.
     - frame.particles.charge -> Surface potential in millivolt of each particle in the frame.
-    - frame.particles.mass -> Mass in atomic mass units of each particle in the frame. A zero mass signals non-mobile
+    - frame.particles.mass -> Mass in atomic mass units of each particle in the frame. A zero mass signals immobile
                               particles and are interpreted as the substrate.
     - frame.configuration.box -> Box dimensions of the frame. The first three entries are the box lengths in x, y, and z
                                  directions in nanometers. The next three entries are the tilt factors xy, xz, and yz.
@@ -194,6 +194,18 @@ class RunParameters(Parameters):
         If any wall direction is True, alpha must be not None and 0 <= alpha <= 1.
         Note that the force of this potential is only continuous if alpha = 1.
     :type alpha: Optional[float]
+    :param use_implicit_substrate:
+        A boolean indicating whether to implicitly model a substrate implicitly as a charged wall. 
+        An implicit substrate can only be used when all walls are active. The bottom wall is then replaced by the
+        implicit substrate.
+        An implicit substrate can only be used if no explicit substrate particles have been added to the simulation box.
+        Defaults to False.
+    :type use_implicit_substrate: bool
+    :param substrate_wall_charge:
+        The charge of the substrate wall at the bottom of the simulation box. If using an implicit substrate, substrate
+        wall charge must not be None and the units must be compatible with millivolts.
+        Defaults to None.
+    :type substrate_wall_charge: Optional[unit.Quantity]
     :param use_depletion:
         A boolean indicating whether to turn on the depletion attraction for the simulation.
         If depletion attraction is on, depletion_phi and depletant_radius must be specified.
@@ -246,6 +258,14 @@ class RunParameters(Parameters):
         and an append_file boolean that should not appear in this dictionary.
         Defaults to None.
     :type update_reporter_parameters: Optional[dict[str, Any]]
+    :param use_plumed: 
+        A boolean indicating whether to interface a simulation with the PLUMED plugin.
+        If true, plumed_script must be specified and must point to a plumed input file.
+        Defaults to False.
+    :type use_plumed: bool
+    :param plumed_script:
+        A plumed input file to be used for interfacing with a simulation.
+    :type plumed_script: Optional[str]
 
     :raises TypeError:
         If any of the quantities has an incompatible unit.
@@ -287,6 +307,8 @@ class RunParameters(Parameters):
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
+    use_implicit_substrate: bool = False
+    substrate_wall_charge: Optional[unit.Quantity] = None
     use_depletion: bool = False
     depletion_phi: Optional[float] = None
     depletant_radius: Optional[unit.Quantity] = None
@@ -296,6 +318,8 @@ class RunParameters(Parameters):
     particle_density: Optional[unit.Quantity] = None
     update_reporter: Optional[str] = None
     update_reporter_parameters: Optional[dict[str, Any]] = None
+    use_plumed: bool = False
+    plumed_script: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
@@ -391,6 +415,17 @@ class RunParameters(Parameters):
                 raise ValueError("Depletion phi must not be specified if depletion potential is not on.")
             if self.depletant_radius is not None:
                 raise ValueError("Depletant radius must not be specified if depletion potential is not on.")
+        if self.use_implicit_substrate:
+            if not all(self.wall_directions):
+                raise ValueError("A substrate can only be used if all walls are active.")
+            if self.substrate_wall_charge is None:
+                raise ValueError("Substrate wall charge must be specified if using implicit substrate.")
+            if not self.substrate_wall_charge.unit.is_compatible(electric_potential_unit):
+                raise TypeError(
+                    "The substrate wall charge must have a unit compatible with millivolts.")
+        else:
+            if self.substrate_wall_charge is not None:
+                raise ValueError("Substrate wall charge must not be specified if not using implicit substrate.")
         if self.use_gravity:
             if self.gravitational_acceleration is None:
                 raise ValueError("Gravitational acceleration must be specified if gravity is on.")
@@ -434,7 +469,12 @@ class RunParameters(Parameters):
         else:
             if self.update_reporter_parameters is not None:
                 raise ValueError("Update-reporter parameters must not be specified if the update reporter is not on.")
-
+        if self.use_plumed:
+            if self.plumed_script is None:
+                raise ValueError("PLUMED input file must be specified if using PLUMED.")
+        else:
+            if self.plumed_script is not None:
+                raise ValueError("PLUMED input file must not be specified if PLUMED is not being used.")
 
 if __name__ == '__main__':
     RunParameters(initial_configuration="tests/first_frame.xyz").to_yaml("example.yaml")

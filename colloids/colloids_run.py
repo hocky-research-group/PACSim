@@ -8,7 +8,7 @@ import numpy as np
 import openmm
 from openmm import app
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
-                      DepletionPotential, Gravity)
+                      ImplicitSubstrateWall, DepletionPotential, Gravity, PlumedPotential)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import get_cell_from_box, read_gsd_file, write_gsd_file
 import colloids.integrators as integrators
@@ -93,8 +93,12 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
                               "Analytical computation of depletion potential may be invalid."
                               "See Dijkstra et. al., Journal of Physics: Condensed Matter, 1999, Volume 11, "
                               "pp 10079 - 10106.")
-    use_substrate = any(mass == 0.0 for mass in frame.particles.mass)
-    if use_substrate:
+
+    # Explicit substrate is detected by immobile particles with mass 0.0.
+    use_explicit_substrate = any(mass == 0.0 for mass in frame.particles.mass)
+    if use_explicit_substrate and parameters.use_implicit_substrate:
+        raise ValueError("Cannot use both explicit and implicit substrate.")
+    if use_explicit_substrate or parameters.use_implicit_substrate:
         if not all(parameters.wall_directions):
             raise ValueError("A substrate can only be used if all walls are active.")
 
@@ -153,8 +157,9 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
 
-    # Substrate is detected by immobile particles with mass 0.0.
-    use_substrate = any(mass == 0.0 for mass in frame.particles.mass)
+    # Explicit substrate is detected by immobile particles with mass 0.0.
+    use_substrate = any(mass == 0.0 for mass in frame.particles.mass) or parameters.use_implicit_substrate
+    assert not (any(mass == 0.0 for mass in frame.particles.mass) and parameters.use_implicit_substrate)
 
     # TODO: Prevent printing the traceback when the platform is not existing.
     platform = openmm.Platform.getPlatformByName(parameters.platform_name)
@@ -194,6 +199,19 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     else:
         gravitational_potential = None
 
+    if parameters.use_implicit_substrate:
+        substrate_wall = ImplicitSubstrateWall(colloid_potentials_parameters=potentials_parameters,
+                                               wall_distance_z=wall_distances[2],
+                                               substrate_charge=parameters.substrate_wall_charge,
+                                               use_log=parameters.use_log)
+    else:
+        substrate_wall = None
+
+    if parameters.use_plumed:
+        plumed = PlumedPotential(parameters.plumed_script)
+    else:
+        plumed = None
+
     # --------------------------- Add all particles and constraints to the system. -------------------------------------
     for mass in frame.particles.mass:
         system.addParticle(mass)
@@ -215,6 +233,11 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
             depletion_potential.add_particle(radius=radii[i], substrate_flag=is_substrate)
         if parameters.use_gravity and not is_substrate:
             gravitational_potential.add_particle(index=i, radius=radii[i])
+        if parameters.use_implicit_substrate:
+            assert not is_substrate
+            substrate_wall.add_particle(index=i, radius=radii[i], surface_potential=surface_potentials[i])
+        if parameters.use_plumed:
+            plumed.add_particle()
 
     for i in range(frame.constraints.N):
         colloid_potentials.add_exclusion(frame.constraints.group[i][0], frame.constraints.group[i][1])
@@ -242,6 +265,17 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
             force.setForceGroup(system.getNumForces())
             system.addForce(force)
         assert not system.usesPeriodicBoundaryConditions()
+
+    if parameters.use_implicit_substrate:
+        assert all_walls
+        for force in substrate_wall.yield_potentials():
+            force.setForceGroup(system.getNumForces())
+            system.addForce(force)
+
+    if parameters.use_plumed:
+        for force in plumed.yield_potentials():
+            force.setForceGroup(system.getNumForces())
+            system.addForce(force)
 
     # -------------------------------------- Set up the simulation. ----------------------------------------------------
     if parameters.platform_name == "CUDA":

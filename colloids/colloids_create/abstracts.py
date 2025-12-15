@@ -55,7 +55,7 @@ class ConfigurationModifier(ABC):
         """
         Modify the given configuration and constraints in-place (for instance, by adding a substrate).
 
-        The overloading method should only modify the following attributes of the given frame:
+        In most cases, the overloading method should only modify the following attributes of the given frame:
         - frame.particles.N
         - frame.particles.position
         - frame.particles.types
@@ -65,7 +65,7 @@ class ConfigurationModifier(ABC):
         - frame.constraints.value (optionally if constraints are present)
         - frame.constraints.group (optionally if constraints are present)
 
-        The overloading method should not modify the following attributes of the given frame:
+        The overloading method should only modify the following attributes of the given frame if necessary:
         - frame.particles.type_shapes
         - frame.particles.diameter
         - frame.particles.charge

@@ -64,6 +64,11 @@ class ConfigurationParameters(Parameters):
     After the base configuration has been created, it can be modified by adding a substrate at the bottom of the
     simulation box.
 
+    Furthermore, it is possible to include a seed of colloids from a gsd file. If a seed file is specified, the seed is
+    placed in the simulation box without transformation, overwriting any colloids that overlap with the seed. Overlaps
+    are determined based on a specified overlap distance. Particles with a surface-to-surface distance smaller than the
+    overlap distance are considered overlapping.
+
     :param cluster_specifications:
         The filenames of the cluster definitions in lammps-data format.
         Defaults to [cluster.lmp].
@@ -115,14 +120,20 @@ class ConfigurationParameters(Parameters):
         The unit of the surface potentials must be compatible with millivolts.
         Defaults to {"1": 44.0 * millivolt, "2": -54.0 * millivolt}.
     :type surface_potentials: dict[str, unit.Quantity]
-    :param seed_file:
-        The gsd file with the crystal seed to be used for the colloids.
-        If a seed file is specified, the colloids are placed in the crystal lattice and then the seed is placed in the
-        center of the simulation box, overwriting the colloids in the center.
-        If no seed file is specified, the initial configuration is created from the cluster definition.
-        Must be a .gsd file.
+    :param seed_filename:
+        The gsd file with a seed of colloids.
         Defaults to None.
-    :type seed_file: Optional[str]
+    :type seed_filename: Optional[str]
+    :param seed_frame_index:
+        The frame index in the seed file to use. Negative indices are supported (e.g., -1 for the last frame).
+        Only used if seed_file is specified.
+        Defaults to -1.
+    :type seed_frame_index: int
+    :param seed_overlap_distance:
+        The overlap distance for seeding. Particles in the base frame that overlap with the seed are removed.
+        Must have units compatible with nanometers and be non-negative.
+        Defaults to 0.0 * length_unit.
+    :type seed_overlap_distance: unit.Quantity
     :param use_substrate:
         A boolean indicating whether to place a substrate at the bottom of the simulation box.
         In a simulation with colloids_run, a substrate can only be used when all walls are active. The bottom wall is
@@ -165,9 +176,9 @@ class ConfigurationParameters(Parameters):
                                                                      "2": 95.0 * length_unit})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"1": 44.0 * electric_potential_unit, "2": -54.0 * electric_potential_unit})
-    seed_files: Optional[list[str]] = None
-    seed_fractional_coordinates: Optional[list[list[float]]] = None
-    seed_overlap_distance: unit.Quantity = field(default_factory=lambda: 20.0 * length_unit)
+    seed_filename: Optional[str] = None
+    seed_frame_index: Optional[int] = None
+    seed_overlap_distance: Optional[unit.Quantity] = None
     use_substrate: bool = False
     substrate_type: Optional[str] = None
 
@@ -270,30 +281,22 @@ class ConfigurationParameters(Parameters):
         if self.padding_factor <= 0.0:
             raise ValueError("Padding factor must be greater than zero.")
 
-        if self.seed_files is not None:
-            if not isinstance(self.seed_files, list):
-                raise TypeError("The seed files must be a list of strings.")
-            if not all(isinstance(seed_file, str) for seed_file in self.seed_files):
-                raise TypeError("All seed files must be strings.")
-            if not all(seed_file.endswith(".gsd") for seed_file in self.seed_files):
-                raise ValueError("All seed files must have the .gsd extension.")
-            if self.seed_fractional_coordinates is None:
-                raise ValueError("The seed fractional coordinates must be specified if seed files are used.")
-            if len(self.seed_files) != len(self.seed_fractional_coordinates):
-                raise ValueError("The number of seed files and the number of seed fractional coordinates must match.")
-            if not all(isinstance(coord, list) for coord in self.seed_fractional_coordinates):
-                raise TypeError("All seed fractional coordinates must be a list of floats.")
-            if not all(len(coord) == 3 for coord in self.seed_fractional_coordinates):
-                raise ValueError("All seed fractional coordinates must have three components.")
-            if not all(isinstance(coord, float) for coord in np.concatenate(self.seed_fractional_coordinates)):
-                raise TypeError("All seed fractional coordinates must be floats.")
-            if not all(0.0 <= coord <= 1.0 for coord in np.concatenate(self.seed_fractional_coordinates)):
-                raise ValueError("All seed fractional coordinates must be between 0 and 1.")
-
+        if self.seed_filename is not None:
+            if not self.seed_filename.endswith(".gsd"):
+                raise ValueError("The seed file must have the .gsd extension.")
+            if self.seed_frame_index is None:
+                raise ValueError("The seed frame index must be specified if a seed file is set.")
+            if self.seed_overlap_distance is None:
+                raise ValueError("The seed overlap distance must be specified if a seed file is set.")
             if not self.seed_overlap_distance.unit.is_compatible(length_unit):
                 raise TypeError("The seed overlap distance must have a unit compatible with nanometers.")
-            if self.seed_overlap_distance <= 0.0 * length_unit:
-                raise ValueError("The seed overlap distance must be greater than zero.")
+            if self.seed_overlap_distance < 0.0 * length_unit:
+                raise ValueError("The seed overlap distance must be non-negative.")
+        else:
+            if self.seed_frame_index is not None:
+                raise ValueError("The seed frame index must not be specified if no seed file is set.")
+            if self.seed_overlap_distance is not None:
+                raise ValueError("The seed overlap distance must not be specified if no seed file is set.")
 
         if self.use_substrate:
             if self.substrate_type is None:

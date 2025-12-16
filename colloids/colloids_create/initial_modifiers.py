@@ -1,37 +1,55 @@
+import warnings
 from gsd.hoomd import Frame
 import numpy as np
 import numpy.typing as npt
 from openmm import unit
-from colloids.colloids_create import ConfigurationModifier
+from colloids.colloids_create import InitialModifier
 from colloids.units import length_unit
 
 
-class SubstrateModifier(ConfigurationModifier):
+class SubstrateModifier(InitialModifier):
     """
     Modifier of an existing configuration in a gsd.hoomd.Frame instance for a colloid simulation that adds explicit
     substrate particles in a hexagonal pattern at the bottom of the simulation box.
 
     This class can only modify configurations that have orthogonal box vectors.
 
-    :param substrate_radius:
-        The radius of the substrate particles.
-        The unit must be compatible with nanometers and the value must be greater than zero.
-    :type substrate_radius: unit.Quantity
+    :param masses:
+        The masses dictionary with the particle types as keys and the masses as values.
+    :type masses: dict[str, unit.Quantity]
+    :param radii:
+        The radii dictionary with the particle types as keys and the radii as values.
+    :type radii: dict[str, unit.Quantity]
+    :param surface_potentials:
+        The surface potentials dictionary with the particle types as keys and the surface potentials as values.
+    :type surface_potentials: dict[str, unit.Quantity]
+    :param substrate_type
+        The type of the substrate particles.
+    :type substrate_type: str
 
     :raises TypeError:
-        If the substrate_radius is not a Quantity with a proper unit.
+        If the substrate_type is not a string.
     :raises ValueError:
-        If the substrate_radius is not greater than zero.
+        If the substrate_type is not in the provided radii, masses, or surface_potentials dictionary.
     """
 
-    def __init__(self, substrate_radius: unit.Quantity, substrate_type: str) -> None:
+    def __init__(self, masses: dict[str, unit.Quantity], radii: dict[str, unit.Quantity],
+                 surface_potentials: dict[str, unit.Quantity], substrate_type: str) -> None:
         """Constructor of the SubstrateModifier class."""
-        super().__init__()
-        if not substrate_radius.unit.is_compatible(length_unit):
-            raise TypeError("The substrate radius must have a unit that is compatible with nanometers.")
-        if not substrate_radius > 0.0 * length_unit:
-            raise ValueError("The substrate radius must have a value greater than zero.")
-        self._substrate_radius = substrate_radius
+        super().__init__(masses=masses, radii=radii, surface_potentials=surface_potentials)
+        if not isinstance(substrate_type, str):
+            raise TypeError("The substrate type must be a string.")
+        if substrate_type not in radii:
+            raise ValueError(f"The substrate type '{substrate_type}' is not in the provided radii dictionary.")
+        if substrate_type not in masses:
+            raise ValueError(f"The substrate type '{substrate_type}' is not in the provided masses dictionary.")
+        if substrate_type not in surface_potentials:
+            raise ValueError(f"The substrate type '{substrate_type}' is not in the provided surface potentials "
+                             "dictionary.")
+        if masses[substrate_type] != 0.0 * unit.amu:
+            warnings.warn("The mass of the substrate type is not zero. Explicit substrate particles will move "
+                          "during the simulation.")
+        self._substrate_radius = radii[substrate_type]
         self._substrate_type = substrate_type
 
     @staticmethod

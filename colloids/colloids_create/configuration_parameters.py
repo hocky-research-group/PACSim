@@ -1,11 +1,14 @@
 from dataclasses import dataclass, field
-from typing import Optional, Union
+from typing import Any, Optional, Union
+import inspect
 import warnings
 from ase.io.lammpsdata import read_lammps_data
 import numpy as np
 from openmm import unit
 from colloids.abstracts import Parameters
 from colloids.units import electric_potential_unit, length_unit, mass_unit
+import colloids.colloids_create.initial_modifiers as initial_modifiers
+import colloids.colloids_create.final_modifiers as final_modifiers
 
 
 @dataclass(order=True, frozen=True)
@@ -61,13 +64,12 @@ class ConfigurationParameters(Parameters):
         Index of first atom involved in the bond.
         Index of second atom involved in the bond.
 
-    After the base configuration has been created, it can be modified by adding a substrate at the bottom of the
-    simulation box.
-
-    Furthermore, it is possible to include a seed of colloids from a gsd file. If a seed file is specified, the seed is
-    placed in the simulation box without transformation, overwriting any colloids that overlap with the seed. Overlaps
-    are determined based on a specified overlap distance. Particles with a surface-to-surface distance smaller than the
-    overlap distance are considered overlapping.
+    After the base configuration has been created, it can be modified by applying a series of configuration modifiers.
+    These modifiers can modify the positions of the colloids, add or remove colloids, or modify other properties of the
+    colloids. The modifiers are applied in two stages: initial modifiers (such as adding a substrate at the bottom of
+    the simulation box) are applied before setting the particle properties (diameter, charge, mass), and final modifiers
+    (such as including a seed of colloids from a gsd file while removing overlapping particles from the base
+    configuration) are applied after setting the particle properties.
 
     :param cluster_specifications:
         The filenames of the cluster definitions in lammps-data format.
@@ -120,53 +122,49 @@ class ConfigurationParameters(Parameters):
         The unit of the surface potentials must be compatible with millivolts.
         Defaults to {"1": 44.0 * millivolt, "2": -54.0 * millivolt}.
     :type surface_potentials: dict[str, unit.Quantity]
-    :param seed_filename:
-        The gsd file with a seed of colloids.
+    :param initial_modifiers:
+        List of modifier class names to apply before setting particle properties (diameter, charge, mass).
+        These modifiers run early in the configuration generation process.
+        Possible choices can be found in the colloids_create.initial_modifiers module.
+        If initial modifiers are specified, their parameters must be specified as well in the
+        initial_modifiers_parameters list.
         Defaults to None.
-    :type seed_filename: Optional[str]
-    :param seed_frame_index:
-        The frame index in the seed file to use. Negative indices are supported (e.g., -1 for the last frame).
-        Only used if seed_file is specified.
-        Defaults to -1.
-    :type seed_frame_index: int
-    :param seed_overlap_distance:
-        The overlap distance for seeding. Particles in the base frame that overlap with the seed are removed.
-        Must have units compatible with nanometers and be non-negative.
-        Defaults to 0.0 * length_unit.
-    :type seed_overlap_distance: unit.Quantity
-    :param use_explicit_substrate:
-        A boolean indicating whether to explicitly place substrate particles at the bottom of the simulation box.
-        A substrate can only be used when all walls are active. The bottom wall is then replaced by the substrate.
-        Also, a substrate can only be used with the algebraic colloid potentials (use_tabulated=False).
-        Defaults to False.
-    :type use_explicit_substrate: bool
-    :param substrate_particle_type:
-        The type of the substrate that is used at the bottom of the simulation box.
-        For an explicit substrate, this type must appear in the radii, masses, and surface_potentials dictionaries to
-        specify the properties of the explicit substrate particles.
+    :type initial_modifiers: Optional[list[str]]
+    :param initial_modifiers_parameters:
+        List of dictionaries containing parameters for each initial modifier.
+        Each dictionary is passed to the corresponding modifier's __init__ method.
+        The list must have the same length as initial_modifiers.
         Defaults to None.
-    :type substrate_particle_type: Optional[Union[str, int]]
+    :type initial_modifiers_parameters: Optional[list[dict[str, Any]]]
+    :param final_modifiers:
+        List of modifier class names to apply after setting particle properties (diameter, charge, mass).
+        These modifiers run at the end of the configuration generation process.
+        Possible choices can be found in the colloids_create.final_modifiers module.
+        If final modifiers are specified, their parameters must be specified as well.
+        Defaults to None.
+    :type final_modifiers: Optional[list[str]]
+    :param final_modifiers_parameters:
+        List of dictionaries containing parameters for each final modifier.
+        Each dictionary is passed to the corresponding modifier's __init__ method.
+        The list must have the same length as final_modifiers.
+        Defaults to None.
+    :type final_modifiers_parameters: Optional[list[dict[str, Any]]]
 
     :raises TypeError:
         If the lattice repeats are not an integer or a list of three integers.
         If the masses, radii, or surface potentials do not have the correct units.
         If the masses, radii, or surface potentials dictionaries do not have strings as keys.
-        If the seed overlap distance does not have the correct units.
-        If the substrate particle type is not a string.
     :raises ValueError:
         If the cluster specification file does not end in ".lmp."
         If the number of lattice repeats is not positive.
         If the (cluster) padding factor is not greater than zero.
         If the masses are not greater than or equal to zero.
         If the radii are not greater than zero.
-        If the substrate particle type is not specified when an explicit substrate is used or vice versa.
-        If a non-substrate type of the masses, radii, or surface potentials dictionaries is not in the lammps-data file.
         If a type of the lammps-data file is not in the masses, radii, or surface potentials dictionaries.
-        If the seed file does not end in ".gsd."
-        If the seed frame index or overlap distance is not specified when a seed file is set or vice versa.
-        If the overlap distance is negative.
-        If the substrate particle type is not in the radii, masses, or surface potentials dictionaries.
-        If the mass of the substrate type is not zero.
+        If an initial or final modifier is not found in the available modifiers.
+        If initial_modifiers is specified but initial_modifiers_parameters is not, or vice versa.
+        If final_modifiers is specified but final_modifiers_parameters is not, or vice versa.
+        If the number of (initial or final) modifiers does not match the number of parameter dictionaries.
     """
     cluster_specifications: list[str] = field(default_factory=lambda: ["cluster.lmp"])
     cluster_relative_weights: list[float] = field(default_factory=lambda: [1.0])
@@ -180,11 +178,10 @@ class ConfigurationParameters(Parameters):
                                                                      "2": 95.0 * length_unit})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"1": 44.0 * electric_potential_unit, "2": -54.0 * electric_potential_unit})
-    seed_filename: Optional[str] = None
-    seed_frame_index: Optional[int] = None
-    seed_overlap_distance: Optional[unit.Quantity] = None
-    use_explicit_substrate: bool = False
-    substrate_particle_type: Optional[Union[str, int]] = None
+    initial_modifiers: Optional[list[str]] = None
+    initial_modifiers_parameters: Optional[list[dict[str, Any]]] = None
+    final_modifiers: Optional[list[str]] = None
+    final_modifiers_parameters: Optional[list[dict[str, Any]]] = None
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
@@ -258,16 +255,6 @@ class ConfigurationParameters(Parameters):
                 if t not in self.surface_potentials:
                     raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in surface potentials "
                                      f"dictionary.")
-        for t in self.masses:
-            if t not in found_types and t != self.substrate_particle_type:
-                warnings.warn(f"Non-substrate type {t} of the masses dictionary is not in the lammps-data file.")
-        for t in self.radii:
-            if t not in found_types and t != self.substrate_particle_type:
-                warnings.warn(f"Non-substrate type {t} of the radii dictionary is not in the lammps-data file.")
-        for t in self.surface_potentials:
-            if t not in found_types and t != self.substrate_particle_type:
-                warnings.warn(f"Non-substrate type {t} of the surface potentials dictionary is not in the lammps-data "
-                              f"file.")
 
         if isinstance(self.lattice_repeats, int):
             if self.lattice_repeats <= 0:
@@ -285,42 +272,38 @@ class ConfigurationParameters(Parameters):
         if self.padding_factor <= 0.0:
             raise ValueError("Padding factor must be greater than zero.")
 
-        if self.seed_filename is not None:
-            if not self.seed_filename.endswith(".gsd"):
-                raise ValueError("The seed file must have the .gsd extension.")
-            if self.seed_frame_index is None:
-                raise ValueError("The seed frame index must be specified if a seed file is set.")
-            if self.seed_overlap_distance is None:
-                raise ValueError("The seed overlap distance must be specified if a seed file is set.")
-            if not self.seed_overlap_distance.unit.is_compatible(length_unit):
-                raise TypeError("The seed overlap distance must have a unit compatible with nanometers.")
-            if self.seed_overlap_distance < 0.0 * length_unit:
-                raise ValueError("The seed overlap distance must be non-negative.")
+        if self.initial_modifiers is not None:
+            if self.initial_modifiers_parameters is None:
+                raise ValueError("The initial_modifiers_parameters must be specified if initial_modifiers is specified.")
+            if len(self.initial_modifiers) != len(self.initial_modifiers_parameters):
+                raise ValueError("The number of initial modifiers must match the number of initial modifier "
+                                 "parameter dictionaries.")
+            possible_modifiers = [name for name, obj in inspect.getmembers(initial_modifiers, inspect.isclass)
+                                  if issubclass(obj, initial_modifiers.InitialModifier)
+                                  and obj is not initial_modifiers.InitialModifier]
+            for initial_modifier in self.initial_modifiers:
+                if initial_modifier not in possible_modifiers:
+                    raise ValueError(f"Initial modifier {initial_modifier} not found. Possible choices are: "
+                                     f"{', '.join(possible_modifiers)}.")
         else:
-            if self.seed_frame_index is not None:
-                raise ValueError("The seed frame index must not be specified if no seed file is set.")
-            if self.seed_overlap_distance is not None:
-                raise ValueError("The seed overlap distance must not be specified if no seed file is set.")
+            if self.initial_modifiers_parameters is not None:
+                raise ValueError("The initial_modifiers_parameters must not be specified if initial_modifiers is not "
+                                 "specified.")
 
-
-        if self.use_explicit_substrate :
-            if self.substrate_particle_type is None:
-                raise ValueError("The substrate particle type must be specified if a substrate is used.")
-            if not isinstance(self.substrate_particle_type, (str, int)):
-                raise TypeError("The substrate particle type must be a string or an integer.")
-            if self.substrate_particle_type not in self.radii:
-                raise ValueError("The substrate particle type must be in the radii dictionary for an explicit "
-                                 "substrate.")
-            if self.substrate_particle_type not in self.masses:
-                raise ValueError("The substrate particle type must be in the masses dictionary for an explicit "
-                                 "substrate.")
-            if self.substrate_particle_type not in self.surface_potentials:
-                raise ValueError("The substrate particle type must be in the surface potentials dictionary for an "
-                                 "explicit substrate.")
-            if self.masses[self.substrate_particle_type] != 0.0 * unit.amu:
-                warnings.warn("The mass of the substrate type is not zero. Explicit substrate particles will move "
-                              "during the simulation.")
+        if self.final_modifiers is not None:
+            if self.final_modifiers_parameters is None:
+                raise ValueError("The final_modifiers_parameters must be specified if final_modifiers is specified.")
+            if len(self.final_modifiers) != len(self.final_modifiers_parameters):
+                raise ValueError("The number of final modifiers must match the number of final modifier "
+                                 "parameter dictionaries.")
+            possible_modifiers = [name for name, obj in inspect.getmembers(final_modifiers, inspect.isclass)
+                                  if issubclass(obj, final_modifiers.FinalModifier)
+                                  and obj is not final_modifiers.FinalModifier]
+            for final_modifier in self.final_modifiers:
+                if final_modifier not in possible_modifiers:
+                    raise ValueError(f"Final modifier {final_modifier} not found. Possible choices are: "
+                                     f"{', '.join(possible_modifiers)}.")
         else:
-            if self.substrate_particle_type is not None:
-                raise ValueError("The substrate particle type must not be specified in the configuration input file "
-                                 "if an explicit substrate is not used.")
+            if self.final_modifiers_parameters is not None:
+                raise ValueError("The final_modifiers_parameters must not be specified if final_modifiers is not "
+                                 "specified.")

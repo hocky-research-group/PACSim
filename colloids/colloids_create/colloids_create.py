@@ -1,4 +1,5 @@
 import argparse
+import inspect
 import warnings
 from ase.io.lammpsdata import read_lammps_data
 import gsd.hoomd
@@ -6,8 +7,8 @@ import numpy as np
 from openmm import unit
 from colloids.colloids_create.configuration_parameters import ConfigurationParameters
 from colloids.colloids_create.cluster_generator import ClusterGenerator
-from colloids.colloids_create.seed_modifier import SeedModifier
-from colloids.colloids_create.substrate_modifier import SubstrateModifier
+import colloids.colloids_create.final_modifiers as final_modifiers
+import colloids.colloids_create.initial_modifiers as initial_modifiers
 from colloids.units import electric_potential_unit, length_unit, mass_unit
 
 
@@ -125,12 +126,23 @@ def main():
     frame = generator.generate_configuration()
     _check_frame_changes(frame, generator.__class__.__name__)
 
-    if configuration_parameters.use_explicit_substrate:
-        substrate_modifier = SubstrateModifier(
-            configuration_parameters.radii[configuration_parameters.substrate_particle_type],
-            configuration_parameters.substrate_particle_type)
-        substrate_modifier.modify_configuration(frame)
-        _check_frame_changes(frame, substrate_modifier.__class__.__name__)
+    # Apply initial modifiers before setting particle properties.
+    if configuration_parameters.initial_modifiers is not None:
+        assert (len(configuration_parameters.initial_modifiers)
+                == len(configuration_parameters.initial_modifiers_parameters))
+        for modifier_name, modifier_params in zip(configuration_parameters.initial_modifiers,
+                                                  configuration_parameters.initial_modifiers_parameters):
+            modifier_class = getattr(initial_modifiers, modifier_name)
+            try:
+                modifier = modifier_class(configuration_parameters.masses, configuration_parameters.radii,
+                                          configuration_parameters.surface_potentials, **modifier_params)
+                modifier.modify_configuration(frame)
+                _check_frame_changes(frame, modifier.__class__.__name__)
+            except TypeError:
+                raise TypeError(
+                    f"Modifier {modifier_name} does not accept the given arguments {modifier_params}. "
+                    f"The expected signature is {inspect.signature(modifier_class)} (the masses, radii, and "
+                    f"surface_potentials arguments should not be specified).")
 
     # Check if the frame has the necessary attributes.
     check_frame_types(frame, configuration_parameters.masses, configuration_parameters.radii,
@@ -145,12 +157,20 @@ def main():
         [2.0 * configuration_parameters.radii[frame.particles.types[i]].value_in_unit(length_unit)
          for i in frame.particles.typeid], dtype=np.float32)
 
-    # Seed modifier needs diameters to be set and modifies all attributes.
-    if configuration_parameters.seed_filename is not None:
-        seed_modifier = SeedModifier(configuration_parameters.seed_filename,
-                                     configuration_parameters.seed_frame_index,
-                                     configuration_parameters.seed_overlap_distance)
-        seed_modifier.modify_configuration(frame)
+    # Apply final modifiers after setting particle properties.
+    if configuration_parameters.final_modifiers is not None:
+        assert (len(configuration_parameters.final_modifiers)
+                == len(configuration_parameters.final_modifiers_parameters))
+        for modifier_name, modifier_params in zip(configuration_parameters.final_modifiers,
+                                                  configuration_parameters.final_modifiers_parameters):
+            modifier_class = getattr(final_modifiers, modifier_name)
+            try:
+                modifier = modifier_class(**modifier_params)
+                modifier.modify_configuration(frame)
+            except TypeError:
+                raise TypeError(
+                    f"Modifier {modifier_name} does not accept the given arguments {modifier_params}. "
+                    f"The expected signature is {inspect.signature(modifier_class)}.")
 
     with gsd.hoomd.open(name=args.save_file, mode="w") as f:
         f.append(frame)

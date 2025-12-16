@@ -4,11 +4,11 @@ import numpy as np
 import gsd.hoomd
 from gsd.hoomd import Frame
 from openmm import unit
-from colloids.colloids_create import ConfigurationModifier
+from colloids.colloids_create import FinalModifier
 from colloids.units import length_unit
 
 
-class SeedModifier(ConfigurationModifier):
+class SeedModifier(FinalModifier):
     """
     Modifier of an existing configuration in a Frame instance that seeds the configuration with particles from another
     frame.
@@ -37,11 +37,13 @@ class SeedModifier(ConfigurationModifier):
     :type seed_filename: str
     :param seed_frame_index:
         The frame index in the seed file to use. Negative indices are supported (e.g., -1 for last frame).
+        Defaults to -1.
     :type seed_frame_index: int
     :param overlap_distance:
         The overlap tolerance for determining which particles to remove. Particles are considered overlapping if their
         surface-to-surface distance is less than this value.
         Must have units compatible with nanometers and be non-negative.
+        Defaults to 0.0 nm.
     :type overlap_distance: unit.Quantity
     :param cluster_cutoff_distance:
         Optional maximum neighbor distance for clustering in the seed frame. If provided, only the largest cluster
@@ -56,10 +58,13 @@ class SeedModifier(ConfigurationModifier):
         If overlap_distance is negative.
     """
 
-    def __init__(self, seed_filename: str, seed_frame_index: int, overlap_distance: unit.Quantity,
+    def __init__(self, seed_filename: str, seed_frame_index: int = -1,
+                 overlap_distance: unit.Quantity = 0.0 * length_unit,
                  cluster_cutoff_distance: Optional[unit.Quantity] = None) -> None:
         """Constructor of the SeedModifier class."""
         super().__init__()
+        if not seed_filename.endswith(".gsd"):
+            raise ValueError("The seed filename must end with .gsd")
         if not overlap_distance.unit.is_compatible(length_unit):
             raise TypeError("The overlap distance must have a unit compatible with nanometers.")
         if overlap_distance < 0.0 * length_unit:

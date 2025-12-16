@@ -1,3 +1,5 @@
+from typing import Optional
+import freud
 import numpy as np
 import gsd.hoomd
 from gsd.hoomd import Frame
@@ -22,6 +24,11 @@ class SeedModifier(ConfigurationModifier):
     The seed positions are taken directly from the seed frame without any transformation. The base frame's box must be
     at least as large as the seed frame's box in all dimensions. Additionally, both boxes must be orthorhombic.
 
+    Optionally, one can filter the seed frame to keep only the largest cluster of particles before seeding. For this,
+    a cutoff distance must be provided. Two particles are considered neighbors if their distance is less than this
+    cutoff distance. The largest cluster is determined based on these neighbor relationships. If any particle in a bond
+    belongs to the largest cluster, all particles in that bond are included in the largest cluster.
+
     This modifier requires that the frame already has diameter, charge, and mass attributes set. The diameters are
     needed for overlap detection.
 
@@ -36,23 +43,37 @@ class SeedModifier(ConfigurationModifier):
         surface-to-surface distance is less than this value.
         Must have units compatible with nanometers and be non-negative.
     :type overlap_distance: unit.Quantity
-
+    :param cluster_cutoff_distance:
+        Optional maximum neighbor distance for clustering in the seed frame. If provided, only the largest cluster
+        of particles in the seed frame will be used for seeding.
+        Must have units compatible with nanometers.
+        Must be positive if provided.
+        Default is None, meaning no filtering of the seed frame.
+    :type cluster_cutoff_distance: Optional[unit.Quantity]
     :raises TypeError:
         If overlap_distance does not have units compatible with nanometers.
     :raises ValueError:
         If overlap_distance is negative.
     """
 
-    def __init__(self, seed_filename: str, seed_frame_index: int, overlap_distance: unit.Quantity) -> None:
+    def __init__(self, seed_filename: str, seed_frame_index: int, overlap_distance: unit.Quantity,
+                 cluster_cutoff_distance: Optional[unit.Quantity] = None) -> None:
         """Constructor of the SeedModifier class."""
         super().__init__()
         if not overlap_distance.unit.is_compatible(length_unit):
             raise TypeError("The overlap distance must have a unit compatible with nanometers.")
         if overlap_distance < 0.0 * length_unit:
             raise ValueError("The overlap distance must be non-negative.")
+        if cluster_cutoff_distance is not None:
+            if not cluster_cutoff_distance.unit.is_compatible(length_unit):
+                raise TypeError("The filter_cluster_r_max distance must have a unit compatible with nanometers.")
+            if cluster_cutoff_distance <= 0.0 * length_unit:
+                raise ValueError("The filter_cluster_r_max distance must be positive.")
         self._overlap_distance = overlap_distance.value_in_unit(length_unit)
         self._seed_filename = seed_filename
         self._seed_frame_index = seed_frame_index
+        self._cluster_cutoff_distance = (cluster_cutoff_distance.value_in_unit(length_unit)
+                                         if cluster_cutoff_distance is not None else None)
 
     @staticmethod
     def _validate_frame_compatibility(frame: Frame, seed_frame: Frame) -> None:
@@ -138,6 +159,71 @@ class SeedModifier(ConfigurationModifier):
                 if not np.isclose(charges[0], charges_seed[0]):
                     raise ValueError(f"The charge of type {t} is {charges[0]} in the base frame but "
                                      f"{charges_seed[0]} in the seed frame.")
+
+    @staticmethod
+    def _filter_largest_cluster(frame: Frame, cutoff_distance: float) -> None:
+        """
+        Modify the given frame in-place to keep only the largest cluster of particles based on the given cutoff
+        distance.
+
+        If any particle in a bond belongs to the largest cluster, all particles in that bond are included in the largest
+        cluster.
+
+        :param frame:
+            The frame to modify.
+        :type frame: Frame
+        :param cutoff_distance:
+            The maximum neighbor distance for clustering.
+        :type cutoff_distance: float
+        """
+        positions = frame.particles.position
+        # Freud box does not matter without periodic boundaries.
+        freud_box = freud.box.Box(Lx=1.0, Ly=1.0, Lz=1.0)
+        freud_box.periodic = False
+        cluster = freud.cluster.Cluster()
+        cluster.compute((freud_box, positions), neighbors={"r_max": cutoff_distance, "exclude_ii": True})
+        cluster_ids = cluster.cluster_idx.copy()
+        largest_cluster_id = np.bincount(cluster_ids).argmax()
+
+        # Make sure that both particles in bonds are in the largest cluster.
+        if frame.constraints.N > 0:
+            for i, j in frame.constraints.group:
+                if cluster_ids[i] == largest_cluster_id or cluster_ids[j] == largest_cluster_id:
+                    cluster_ids[i] = largest_cluster_id
+                    cluster_ids[j] = largest_cluster_id
+
+        largest_cluster_mask = (cluster_ids == largest_cluster_id)
+        filtered_indices = np.nonzero(largest_cluster_mask)[0]
+
+        frame.particles.N = len(filtered_indices)
+        frame.particles.typeid = frame.particles.typeid[filtered_indices]
+        frame.particles.mass = frame.particles.mass[filtered_indices]
+        frame.particles.charge = frame.particles.charge[filtered_indices]
+        frame.particles.diameter = frame.particles.diameter[filtered_indices]
+        frame.particles.position = frame.particles.position[filtered_indices]
+
+        if frame.constraints.N == 0:
+            return
+
+        index_map = {old_index: new_index for new_index, old_index in enumerate(filtered_indices)}
+        new_values = []
+        new_groups = []
+        for value, group in zip(frame.constraints.value, frame.constraints.group):
+            i, j = group
+            if largest_cluster_mask[i]:
+                assert largest_cluster_mask[j]
+                new_values.append(value)
+                new_groups.append([index_map[i], index_map[j]])
+            else:
+                assert not largest_cluster_mask[j]
+        frame.constraints.N = len(new_values)
+        frame.constraints.value = np.array(new_values, dtype=np.float32)
+        frame.constraints.group = np.array(new_groups, dtype=np.uint32)
+
+        frame.bonds.N = len(new_values)
+        frame.bonds.types = ["b"]
+        frame.bonds.typeid = np.zeros(frame.bonds.N, dtype=np.uint32)
+        frame.bonds.group = frame.constraints.group.copy()
 
     @staticmethod
     def _find_overlapping_particles(frame: Frame, seed_frame: Frame, overlap_distance: float) -> set[int]:
@@ -355,6 +441,9 @@ class SeedModifier(ConfigurationModifier):
             raise ValueError("The seed frame does not contain any particles.")
 
         self._validate_frame_compatibility(frame, seed_frame)
+
+        if self._cluster_cutoff_distance is not None:
+            self._filter_largest_cluster(seed_frame, self._cluster_cutoff_distance)
 
         overlapping_indices = self._find_overlapping_particles(frame, seed_frame, self._overlap_distance)
         if len(overlapping_indices) > 0:

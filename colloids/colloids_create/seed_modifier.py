@@ -271,6 +271,7 @@ class SeedModifier(ConfigurationModifier):
             The seed frame.
         :type seed_frame: Frame
         """
+        original_n = frame.particles.N
         frame.particles.N  += seed_frame.particles.N
         for t in seed_frame.particles.types:
             if t not in frame.particles.types:
@@ -292,7 +293,7 @@ class SeedModifier(ConfigurationModifier):
         frame_groups = frame.constraints.group if frame.constraints.N > 0 else np.array([], dtype=np.uint32)
         seed_values = seed_frame.constraints.value if seed_frame.constraints.N > 0 else np.array([], dtype=np.float32)
         seed_groups = (
-            np.array([[i + frame.particles.N, j + frame.particles.N] for i, j in seed_frame.constraints.group],
+            np.array([[i + original_n, j + original_n] for i, j in seed_frame.constraints.group],
                      dtype=np.uint32) if seed_frame.constraints.N > 0 else np.empty((0, 2), dtype=np.uint32)
         )
 

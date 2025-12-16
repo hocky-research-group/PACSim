@@ -187,10 +187,14 @@ class SeedModifier(ConfigurationModifier):
 
         def find(i):
             """Find the root node of particle i by following each parent pointer in succession."""
-            if parents[i] != i:
-                # Update parents of i to directly point to the root for future calls.
-                parents[i] = find(parents[i])
-            return parents[i]
+            root = i
+            while parents[root] != root:
+                root = parents[root]
+            # Update all nodes along the path to point directly to the root (path compression).
+            j = i
+            while j != root:
+                parents[j], j = root, parents[j]
+            return root
 
         def union(i, j):
             """Take the union of particles i and j by making their parents equal."""

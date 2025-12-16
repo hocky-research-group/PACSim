@@ -26,6 +26,8 @@ surface_potentials:
   "2": !Quantity
     unit: millivolt
     value: 0.0
-use_explicit_substrate: false
-substrate_particle_type: null
 random_rotation: false
+initial_modifiers: null
+initial_modifiers_parameters: null
+final_modifiers: null
+final_modifiers_parameters: null

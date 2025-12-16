@@ -238,6 +238,8 @@ class SeedModifier(ConfigurationModifier):
         if frame.constraints.N == 0:
             return
 
+        filtered_indices = np.nonzero(mask)[0]
+        index_map = {old_index: new_index for new_index, old_index in enumerate(filtered_indices)}
         new_values = []
         new_groups = []
         for value, group in zip(frame.constraints.value, frame.constraints.group):
@@ -245,7 +247,7 @@ class SeedModifier(ConfigurationModifier):
             if i not in remove_indices:
                 assert j not in remove_indices
                 new_values.append(value)
-                new_groups.append(group)
+                new_groups.append([index_map[i], index_map[j]])
             else:
                 assert j in remove_indices
         frame.constraints.N = len(new_values)

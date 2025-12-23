@@ -73,10 +73,14 @@ class LatticeBuilder:
 
     def _calculate_distances(self, positions):
         """Pairwise distance matrix."""
-        n = len(positions)
-        dists = np.zeros((n, n))
-        for i in range(n):
-            dists[i,:] = np.linalg.norm(positions-positions[i],axis=1)
+        try:
+            from scipy.spatial import distance_matrix
+            dists = distance_matrix(positions,positions)
+        except ImportError:
+            n = len(positions)
+            dists = np.zeros((n, n))
+            for i in range(n):
+                dists[i,:] = np.linalg.norm(positions-positions[i],axis=1)
         return dists
 
     def _check_overlap(self, distances, radii):

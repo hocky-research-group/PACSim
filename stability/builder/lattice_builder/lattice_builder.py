@@ -62,10 +62,10 @@ class LatticeBuilder:
             raise ValueError("No structure defined")
         return self.structure.make_supercell(matrix)
 
-    def get_AB_labels(self, atomic_numbers):
-        """Label atoms as 'A' or 'B' based on first atomic number."""
-        first = atomic_numbers[0]
-        return ['1' if x == first else '2' for x in atomic_numbers]
+    def get_colloid_labels(self, atomic_numbers):
+        """Label atoms as '1' ... 'N' based on atomic number."""
+        element_list = np.unique(atomic_numbers)
+        return [str(np.where(element_list==atomic_number)[0]+1) for atomic_number in atomic_numbers]
 
     # -------------------------
     # NEW resizing functionality
@@ -115,7 +115,7 @@ class LatticeBuilder:
 
     def resize_to_match_radii(
         self, r_pos, r_neg, brush_length=10.0, matrix=(3, 3, 3),
-        spacing=10.0, factor=1.1, start=0.0,padding = 1000, center_origin=True):
+        spacing=10.0, factor=1.1, start=0.0, padding = 1000, center_origin=True):
         """
         Expand supercell until no overlaps remain given target radii.
 
@@ -136,7 +136,7 @@ class LatticeBuilder:
         """
         sc = self.make_supercell(matrix)
         positions = sc.cart_coords
-        types = self.get_AB_labels(sc.atomic_numbers)
+        types = self.get_colloid_labels(sc.atomic_numbers)
 
         # Effective radii in same units as positions
         radii = [r_pos if t == 'A' else r_neg for t in types]

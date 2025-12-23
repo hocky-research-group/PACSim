@@ -76,10 +76,7 @@ class LatticeBuilder:
         n = len(positions)
         dists = np.zeros((n, n))
         for i in range(n):
-            for j in range(i + 1, n):
-                d = np.linalg.norm(positions[i] - positions[j])
-                dists[i, j] = d
-                dists[j, i] = d
+            dists[i,:] = np.linalg.norm(positions-positions[i],axis=1)
         return dists
 
     def _check_overlap(self, distances, radii):

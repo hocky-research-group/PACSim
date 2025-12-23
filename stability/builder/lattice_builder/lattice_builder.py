@@ -10,6 +10,7 @@ Created on Wed Sep 17 10:22:05 2025
 import numpy as np
 import gc
 import time
+import sys
 from contextlib import contextmanager
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -43,6 +44,7 @@ class LatticeBuilder:
         self.types = None
         self.scale = None
         self.box = None
+        self.type_map = None
 
         if cif_path:
             self.load_from_cif(cif_path)
@@ -62,10 +64,24 @@ class LatticeBuilder:
             raise ValueError("No structure defined")
         return self.structure.make_supercell(matrix)
 
-    def get_colloid_labels(self, atomic_numbers):
+    def set_colloid_labels_atomicnum(self, atomic_numbers):
         """Label atoms as '1' ... 'N' based on atomic number."""
-        element_list = np.unique(atomic_numbers)
-        return [str(np.where(element_list==atomic_number)[0]+1) for atomic_number in atomic_numbers]
+        element_list = np.unique(atomic_numbers).tolist()
+        type_map = {atomic_number: element_list.index(atomic_number)+1 for atomic_number in atomic_numbers}
+        print("\tElement map:",type_map)
+        type_list = [ type_map[atomic_number] for atomic_number in atomic_numbers ]
+        return type_list
+
+    def set_colloid_labels_typemap(self, atomic_species):
+        """Label atoms as '1' ... 'N' based on species using pymatgen atom names."""
+        element_list = np.unique([str(x.name) for x in atomic_species]).tolist()
+        print("\tElement map:",self.type_map)
+        try:
+            type_list = [ self.type_map[species.name] for species in atomic_species ]
+            return type_list
+        except KeyError:
+            print("Error: You must specify a type index for all elements in the element list:",element_list)
+            sys.exit(1)
 
     # -------------------------
     # NEW resizing functionality
@@ -136,7 +152,13 @@ class LatticeBuilder:
         """
         sc = self.make_supercell(matrix)
         positions = sc.cart_coords
-        types = self.get_colloid_labels(sc.atomic_numbers)
+
+        if self.type_map is None:
+            print("Setting atom types based on elements in structure file")
+            types = self.set_colloid_labels_atomicnum(sc.atomic_numbers)
+        else:
+            print("Setting atom types based on elements in type_map")
+            types = self.set_colloid_labels_typemap(sc.species)
 
         # Effective radii in same units as positions
         radii = [r_pos if t == 'A' else r_neg for t in types]

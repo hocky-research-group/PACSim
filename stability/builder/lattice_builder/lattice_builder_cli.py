@@ -12,7 +12,7 @@ import numpy as np
 from openmm import unit
 
 
-from . import LatticeBuilder
+from lattice_builder import LatticeBuilder
 # --- Custom YAML constructor for !Quantity ---
 def quantity_constructor(loader, node):
     mapping = loader.construct_mapping(node)
@@ -40,6 +40,10 @@ def load_yaml(path):
 
 def build_structure(builder, run_cfg):
     """Load from CIF or lattice+positions+numbers"""
+
+    if "type_map" in run_cfg:
+        builder.type_map = run_cfg["type_map"]
+
     if "cif" in run_cfg:
         builder.load_from_cif(run_cfg["cif"])
     elif all(k in run_cfg for k in ("lattice", "positions", "numbers")):

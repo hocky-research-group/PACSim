@@ -115,8 +115,7 @@ class LatticeBuilder:
 
     def resize_to_match_radii(
         self, r_pos, r_neg, brush_length=10.0, matrix=(3, 3, 3),
-        spacing=10.0, factor=1.1, start=0.0,
-    padding = 1000):
+        spacing=10.0, factor=1.1, start=0.0,padding = 1000, center_origin=True):
         """
         Expand supercell until no overlaps remain given target radii.
 
@@ -132,6 +131,8 @@ class LatticeBuilder:
             Scale-up increment factor.
         start : float
             Starting scale factor.
+        center_origin : bool
+            Put center-of-gravity at 0,0,0
         """
         sc = self.make_supercell(matrix)
         positions = sc.cart_coords
@@ -150,9 +151,15 @@ class LatticeBuilder:
             dists = self._calculate_distances(positions_exp)
             i += 1
 
+        print("Optimal scale factor is",scale)
+
         # Check smallest connection after scaling
         min_gap, pair = self.give_smallest_connection(dists, radii)
-
+        
+        if center_origin is True:
+            print("Centering the crystal origin at 0,0,0")
+            positions_exp -= positions_exp.mean(axis=0)
+        
         # Store resized system
         self.positions = positions_exp
         self.types = types

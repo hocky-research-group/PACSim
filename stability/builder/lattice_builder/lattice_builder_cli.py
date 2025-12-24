@@ -67,14 +67,9 @@ def main():
     builder = LatticeBuilder()
     build_structure(builder, run_cfg)
 
-    # Extract radii by label ("1" and "2")
-    r_pos = part_cfg["radii"]["1"].value_in_unit(unit.nanometer)
-    r_neg = part_cfg["radii"]["2"].value_in_unit(unit.nanometer)
-
     # Resize
     result = builder.resize_to_match_radii(
-        r_pos=r_pos,
-        r_neg=r_neg,
+        radii_dict = part_cfg["radii"],
         brush_length=run_cfg["resize"].get("brush_length", 10.0),
         matrix=tuple(run_cfg["resize"].get("supercell", (3, 3, 3))),
         spacing=run_cfg["resize"].get("spacing", 10.0),

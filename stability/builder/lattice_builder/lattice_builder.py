@@ -62,7 +62,7 @@ class LatticeBuilder:
         """Return a new supercell structure."""
         if self.structure is None:
             raise ValueError("No structure defined")
-        return self.structure.make_supercell(matrix)
+        return self.structure.make_supercell(matrix, in_place=False)
 
     def set_colloid_labels_atomicnum(self, atomic_numbers):
         """Label atoms as '1' ... 'N' based on atomic number."""
@@ -117,12 +117,17 @@ class LatticeBuilder:
         n = len(radii)
         min_dist = np.inf
         min_pair = None
+
+        eff_matrix = np.zeros((n,n))
+
         for i in range(n):
             for j in range(i + 1, n):
                 eff = distances[i, j] - (radii[i] + radii[j])
+                eff_matrix[i,j] = eff
                 if eff < min_dist:
                     min_dist = eff
                     min_pair = (i, j)
+
         return min_dist, min_pair
 
     # -------------------------
@@ -130,14 +135,14 @@ class LatticeBuilder:
     # -------------------------
 
     def resize_to_match_radii(
-        self, r_pos, r_neg, brush_length=10.0, matrix=(3, 3, 3),
-        spacing=10.0, factor=1.1, start=0.0, padding = 1000, center_origin=True):
+        self, radii_dict, brush_length=10.0, matrix=(3, 3, 3),
+        spacing=10.0, factor=1.1, start=0.0, padding = 1000, center_origin=True, test_matrix=(3,3,3)):
         """
         Expand supercell until no overlaps remain given target radii.
 
         Parameters
         ----------
-        r_pos, r_neg : float
+        radii_dict : dict
             Particle radii (in nanometers).
         brush_length : float
             Extra radius from polymer brush (nm).
@@ -150,8 +155,9 @@ class LatticeBuilder:
         center_origin : bool
             Put center-of-gravity at 0,0,0
         """
-        sc = self.make_supercell(matrix)
+        sc = self.make_supercell(test_matrix)
         positions = sc.cart_coords
+        print("Test system size:",positions.shape)
 
         if self.type_map is None:
             print("Setting atom types based on elements in structure file")
@@ -161,7 +167,7 @@ class LatticeBuilder:
             types = self.set_colloid_labels_typemap(sc.species)
 
         # Effective radii in same units as positions
-        radii = [r_pos if t == 'A' else r_neg for t in types]
+        radii = [radii_dict[str(t)].value_in_unit(unit.nanometer) for t in types]
         radii = np.array(radii) + brush_length + spacing
 
         dists = self._calculate_distances(positions)
@@ -176,18 +182,33 @@ class LatticeBuilder:
         print("Optimal scale factor is",scale)
 
         # Check smallest connection after scaling
+        print("Computing closest pairs...")
         min_gap, pair = self.give_smallest_connection(dists, radii)
-        
+        print("...closest distance is",min_gap)
+
+        self.structure = self.make_supercell(matrix)
+        positions2 = self.structure.cart_coords
+        positions_exp = positions2*scale
+
+        print("Final system size:",positions2.shape)
+
         if center_origin is True:
             print("Centering the crystal origin at 0,0,0")
             positions_exp -= positions_exp.mean(axis=0)
+
+        if self.type_map is None:
+            types = self.set_colloid_labels_atomicnum(self.structure.atomic_numbers)
+        else:
+            types = self.set_colloid_labels_typemap(self.structure.species)
+
+#        radii = [radii_dict[str(t)].value_in_unit(unit.nanometer) for t in types]
+#        radii = np.array(radii) + brush_length + spacing
         
         # Store resized system
         self.positions = positions_exp
         self.types = types
         self.scale = scale
         self.box =  np.max(self.positions, axis=0) + np.max(radii) + padding
-
 
         return {
             "positions": self.positions,

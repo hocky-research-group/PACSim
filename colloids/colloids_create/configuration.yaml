@@ -1,10 +1,16 @@
+cif: structure.cif
 cluster_specifications: 
  - "cluster.lmp"
 cluster_relative_weights:
   - 1.0
 lattice_repeats: 2
-cluster_padding_factor: 3.0
-padding_factor: 1.5
+cluster_padding_factor: null #3.0
+padding_factor: null #1.5
+lattice_spacing: 15.0
+lattice_scale_factor: 0.5
+lattice_scale_start: 50.0
+optimize_lattice: false
+lattice_scale_rate: 0.005
 masses:
   "1": !Quantity
     unit: dalton
@@ -35,7 +41,10 @@ surface_potentials:
   "3": !Quantity
     unit: millivolt
     value: 40.0
-random_rotation: true
+brush_length: !Quantity
+    unit: nanometer
+    value: 10.0
+random_rotation: null #true
 initial_modifiers: null
 initial_modifiers_parameters: null
 final_modifiers: null

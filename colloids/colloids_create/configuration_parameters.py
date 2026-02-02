@@ -71,6 +71,8 @@ class ConfigurationParameters(Parameters):
     (such as including a seed of colloids from a gsd file while removing overlapping particles from the base
     configuration) are applied after setting the particle properties.
 
+    :param cif:
+    :type cif: 
     :param cluster_specifications:
         The filenames of the cluster definitions in lammps-data format.
         Defaults to [cluster.lmp].
@@ -166,18 +168,26 @@ class ConfigurationParameters(Parameters):
         If final_modifiers is specified but final_modifiers_parameters is not, or vice versa.
         If the number of (initial or final) modifiers does not match the number of parameter dictionaries.
     """
+    
     cluster_specifications: list[str] = field(default_factory=lambda: ["cluster.lmp"])
-    cluster_relative_weights: list[float] = field(default_factory=lambda: [1.0])
     lattice_repeats: Union[int, list[int]] = 8
-    cluster_padding_factor: float = 1.0
-    padding_factor: float = 1.0
-    random_rotation: bool = False
+    cluster_relative_weights: list[float] = field(default_factory=lambda: [1.0])
+    cif: Optional[str] = None
+    lattice_spacing: Optional[float] = None
+    lattice_scale_factor: Optional[float] = None
+    lattice_scale_start: Optional[float] = None
+    optimize_lattice: Optional[bool] = None
+    lattice_scale_rate: Optional[float] = None
+    cluster_padding_factor: Optional[float] = None #float = 1.0
+    padding_factor: Optional[float] = None #float = 1.0
+    random_rotation: Optional[bool] = None #bool = False
     masses: dict[str, unit.Quantity] = field(default_factory=lambda: {"1": 1.0 * mass_unit,
                                                                       "2": (95.0 / 105.0) ** 3 * mass_unit})
     radii: dict[str, unit.Quantity] = field(default_factory=lambda: {"1": 105.0 * length_unit,
                                                                      "2": 95.0 * length_unit})
     surface_potentials: dict[str, unit.Quantity] = field(
         default_factory=lambda: {"1": 44.0 * electric_potential_unit, "2": -54.0 * electric_potential_unit})
+    brush_length: Optional[unit.Quantity] = None
     initial_modifiers: Optional[list[str]] = None
     initial_modifiers_parameters: Optional[list[dict[str, Any]]] = None
     final_modifiers: Optional[list[str]] = None
@@ -227,7 +237,33 @@ class ConfigurationParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
             if t not in self.radii:
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
+        if self.brush_length:
+            if not self.brush_length.unit.is_compatible(length_unit):
+                raise TypeError(f"Brush length must have a unit compatible with nanometers.")
+            if self.brush_length <= 0.0 * length_unit:
+                raise ValueError(f"Brush length must be greater than zero.")
 
+        if self.cif:
+            if not self.cif.endswith(".cif"):
+                raise ValueError("The cif file must have the correct .cif extension.")
+            if not self.lattice_spacing:
+                raise ValueError("Lattice spacing must be specified if using lattice builder method.")
+            if not self.lattice_scale_start:
+                raise ValueError("Lattice scale start must be specified if using lattice builder method.")
+            if not self.lattice_scale_factor:
+                raise ValueError("Lattice scale factor must be specified if using lattice builder method.")
+            if not self.lattice_scale_rate:
+                raise ValueError("Lattice scale rate must be specified if using lattice builder method.")
+        else:
+            if self.cluster_padding_factor <= 0.0:
+                raise ValueError("Cluster padding factor must be greater than zero.")
+            if self.padding_factor <= 0.0:
+                raise ValueError("Padding factor must be greater than zero.")
+            if not self.cluster_padding_factor:
+                raise ValueError("Cluster padding factor must be specified if using cluster generator method.")
+            if not self.padding_factor:
+                raise ValueError("Padding factor must be specified if using cluster generator method.")
+        
         # We assume that the lammps-data file uses "nano" units where distances are measured in nanometers.
         # However, ase would transform the distances in the lammps-data file to Angstroms by multiplying them by 10 if
         # we specify units="nano". For units="metal", the ase distances are equal to the distances in the lammps-data
@@ -266,11 +302,6 @@ class ConfigurationParameters(Parameters):
                 raise TypeError("The lattice repeats must be an integer or a list of three integers.")
             if not all(repeat > 0 for repeat in self.lattice_repeats):
                 raise ValueError("All lattice repeats must be positive.")
-
-        if self.cluster_padding_factor <= 0.0:
-            raise ValueError("Cluster padding factor must be greater than zero.")
-        if self.padding_factor <= 0.0:
-            raise ValueError("Padding factor must be greater than zero.")
 
         if self.initial_modifiers is not None:
             if self.initial_modifiers_parameters is None:

@@ -7,6 +7,7 @@ import numpy as np
 from openmm import unit
 from colloids.colloids_create.configuration_parameters import ConfigurationParameters
 from colloids.colloids_create.cluster_generator import ClusterGenerator
+from colloids.colloids_create.lattice_builder import LatticeBuilder
 import colloids.colloids_create.final_modifiers as final_modifiers
 import colloids.colloids_create.initial_modifiers as initial_modifiers
 from colloids.units import electric_potential_unit, length_unit, mass_unit
@@ -116,14 +117,28 @@ def main():
     # However, ase would transform the distances in the lammps-data file to Angstroms by multiplying them by 10 if
     # we specify units="nano". For units="metal", the ase distances are equal to the distances in the lammps-data
     # file. We then just pretend that the distances are in nanometers.
-    clusters = [read_lammps_data(spec, units="metal") for spec in configuration_parameters.cluster_specifications]
-    generator = ClusterGenerator(clusters, configuration_parameters.cluster_relative_weights,
-                                 configuration_parameters.lattice_repeats,
-                                 configuration_parameters.cluster_padding_factor,
-                                 configuration_parameters.padding_factor,
-                                 configuration_parameters.random_rotation)
+    
+    # Generate an initial configuration from LatticeBuilder
+    if configuration_parameters.cif:
+        builder = LatticeBuilder(configuration_parameters.cif, configuration_parameters.lattice_repeats, 
+                                 configuration_parameters.radii, configuration_parameters.brush_length, 
+                                 configuration_parameters.lattice_scale_factor, configuration_parameters.lattice_scale_start, 
+                                 configuration_parameters.optimize_lattice, configuration_parameters.lattice_scale_rate)
+    
+        frame = builder.write_gsd()
+    
+    # Generate an initial configuration from ClusterGenerator
+    else:
+        clusters = [read_lammps_data(spec, units="metal") for spec in configuration_parameters.cluster_specifications]
+        
+        generator = ClusterGenerator(clusters, configuration_parameters.cluster_relative_weights,
+                                    configuration_parameters.lattice_repeats,
+                                    configuration_parameters.cluster_padding_factor,
+                                    configuration_parameters.padding_factor,
+                                    configuration_parameters.random_rotation)
 
-    frame = generator.generate_configuration()
+        frame = generator.generate_configuration()
+    
     _check_frame_changes(frame, generator.__class__.__name__)
 
     # Apply initial modifiers before setting particle properties.

@@ -23,7 +23,7 @@ class LatticeBuilder(ConfigurationGenerator):
 
     def __init__(self, cif: str, lattice_repeats: Union[int, Sequence[int]], radii: dict[str, unit.Quantity],
                 brush_length: unit.Quantity, lattice_scale_factor: float, lattice_scale_start: float, 
-                optimize_lattice: bool, lattice_scale_rate: float, padding_factor: float):
+                lattice_spacing: float, padding_factor: float):
         """Constructor of the LatticeBuilder class.
 
         lattice_spacing : float
@@ -35,65 +35,66 @@ class LatticeBuilder(ConfigurationGenerator):
         """
 
         self._cif = cif
-        #self._lattice_repeats = lattice_repeats
         self._radii = radii
         self._brush_length = brush_length
         self._lattice_scale_factor = lattice_scale_factor
         self._lattice_scale_start = lattice_scale_start
-        #self._optimize_lattice = optimize_lattice
-        #self._lattice_scale_rate = lattice_scale_rate
+        self._padding_factor = padding_factor
+        self._lattice_spacing = lattice_spacing
+
         
-        self.structure = None
+        '''self.structure = None
         self.positions = None
         self.types = None
         self.scale = None
         self.box = None
-        self.type_map = None
+        self.type_map = None'''
 
         #if cif_path:
            # self.load_from_cif(cif_path)
 
     @staticmethod
-    def load_lattice_from_cif(self):
+    def _load_lattice_from_cif(cif_file):
         """Load structure from CIF file using pymatgen."""
-        parser = CifParser(self._cif)
-        self.structure = parser.get_structures()[0]
-        #print(self.structure)
+        parser = CifParser(cif_file)
+        structure = parser.get_structures()[0]
+        return structure
+
+    #@staticmethod
+    #def _set_manual_lattice(self, lattice, coords, species):
+       # """Manually define a structure (instead of CIF)."""
+       # self.structure = Structure(lattice, species, coords)
 
     @staticmethod
-    def set_manual_lattice(self, lattice, coords, species):
-        """Manually define a structure (instead of CIF)."""
-        self.structure = Structure(lattice, species, coords)
-
-    @staticmethod
-    def make_supercell(self, matrix=(3, 3, 3)):
+    def _make_supercell(structure, matrix=(3, 3, 3)):
         """Return a new supercell structure."""
-        if self.structure is None:
-            raise ValueError("Failed to define structure from cif file.")
-        return self.structure.make_supercell(matrix, in_place=False)
+    #    if structure is None:
+    #        raise ValueError("Failed to define structure from cif file.")
+        return structure.make_supercell(matrix, in_place=False)
 
     @staticmethod
-    def set_colloid_labels_atomicnum(self, atomic_numbers):
+    def _set_colloid_labels_atomicnum(atomic_numbers):
         """Label atoms as '1' ... 'N' based on atomic number."""
         element_list = np.unique(atomic_numbers).tolist()
         type_map = {atomic_number: element_list.index(atomic_number)+1 for atomic_number in atomic_numbers}
-        print("\tElement map:",type_map)
-        type_list = [ type_map[atomic_number] for atomic_number in atomic_numbers ]
+        #print("\tElement map:",type_map)
+        type_list = [ str(type_map[atomic_number]) for atomic_number in atomic_numbers ]
         return type_list
 
     @staticmethod
-    def set_colloid_labels_typemap(self, atomic_species):
+    def _set_colloid_labels_typemap(atomic_species):
         """Label atoms as '1' ... 'N' based on species using pymatgen atom names."""
         element_list = np.unique([str(x.name) for x in atomic_species]).tolist()
-        print("\tElement map:",self.type_map)
+        #print("\tElement map:",self.type_map)
         try:
             type_list = [ self.type_map[species.name] for species in atomic_species ]
             return type_list
         except KeyError:
             print("Error: You must specify a type index for all elements in the element list:",element_list)
-            sys.exit(1)
+            #sys.exit(1)
 
-    def _calculate_distances(self, positions):
+    @staticmethod
+    def _calculate_distances(positions):
         """Pairwise distance matrix."""
         try:
             from scipy.spatial import distance_matrix
@@ -105,7 +106,8 @@ class LatticeBuilder(ConfigurationGenerator):
                 dists[i,:] = np.linalg.norm(positions-positions[i],axis=1)
         return dists
 
-    def _check_overlap(self, distances, radii):
+    @staticmethod
+    def _check_overlap(distances, radii):
         """Check if any particles overlap."""
         n = len(radii)
         for i in range(n):
@@ -114,7 +116,8 @@ class LatticeBuilder(ConfigurationGenerator):
                     return True
         return False
 
-    def _give_smallest_connection(self, distances, radii):
+    @staticmethod
+    def _give_smallest_connection(distances, radii):
         """
         Return smallest effective distance (gap between particle surfaces).
 
@@ -136,91 +139,91 @@ class LatticeBuilder(ConfigurationGenerator):
 
         return min_dist, min_pair
 
-    def _resize_to_match_radii(
-        self, self.radii, self.brush_length, matrix=(3, 3, 3),
-        self.lattice_spacing, self.lattice_scale_factor, self.lattice_scale_start, padding = 1000, test_matrix=(3,3,3)):
+    def generate_configuration(self, matrix=(3, 3, 3), test_matrix=(3,3,3)):
         """
         Expand supercell until no overlaps remain given target radii.
-
-        Parameters
-        ----------
-        center_origin : bool
-            Put center-of-gravity at 0,0,0
         """
-        sc = self.make_supercell(test_matrix)
+        structure = self._load_lattice_from_cif(self._cif)
+        print(structure)
+        
+        sc = structure.make_supercell(test_matrix)
         positions = sc.cart_coords
-        print("Test system size:",positions.shape)
 
-        if self.type_map is None:
-            print("Setting atom types based on elements in structure file")
-            types = self.set_colloid_labels_atomicnum(sc.atomic_numbers)
-        else:
-            print("Setting atom types based on elements in type_map")
-            types = self.set_colloid_labels_typemap(sc.species)
+        #if self.type_map is None:
+            #print("Setting atom types based on elements in structure file")
+        types = self._set_colloid_labels_atomicnum(sc.atomic_numbers)
+        print("types", types)
+        #else:
+           # print("Setting atom types based on elements in type_map")
+          #  types = self._set_colloid_labels_typemap(sc.species)
 
         # Effective radii in same units as positions
-        radii = [radii_dict[str(t)].value_in_unit(unit.nanometer) for t in types]
-        radii = np.array(radii) + brush_length + spacing
+        radii = [self._radii[str(t)].value_in_unit(unit.nanometer) for t in types]
+        radii = np.array(radii) + self._brush_length.value_in_unit(unit.nanometer) + self._lattice_spacing
 
         dists = self._calculate_distances(positions)
         i = 0
 
         while self._check_overlap(dists, radii):
-            scale = start + i * factor
+            scale = self._lattice_scale_start + i * self._lattice_scale_factor
             positions_exp = positions * scale
             dists = self._calculate_distances(positions_exp)
             i += 1
 
-        print("Optimal scale factor is",scale)
+        #print("Optimal scale factor is",scale)
 
         # Check smallest connection after scaling
-        print("Computing closest pairs...")
-        min_gap, pair = self.give_smallest_connection(dists, radii)
-        print("...closest distance is",min_gap)
+        #print("Computing closest pairs...")
+        min_gap, pair = self._give_smallest_connection(dists, radii)
+        #print("...closest distance is",min_gap)
 
-        self.structure = self.make_supercell(matrix)
+        self.structure = self._make_supercell(structure, matrix)
         positions2 = self.structure.cart_coords
         positions_exp = positions2*scale
 
-        print("Final system size:",positions2.shape)
-
-        #if center_origin is True:
-            #print("Centering the crystal origin at 0,0,0")
+        #print("Final system size:",positions2.shape)
         
         #Put center-of-gravity at 0,0,0
         positions_exp -= positions_exp.mean(axis=0)
 
-        if self.type_map is None:
-            types = self.set_colloid_labels_atomicnum(self.structure.atomic_numbers)
-        else:
-            types = self.set_colloid_labels_typemap(self.structure.species)
+        #if self.type_map is None:
+        types = self._set_colloid_labels_atomicnum(self.structure.atomic_numbers)
+        #else:
+          #  types = self._set_colloid_labels_typemap(self.structure.species)
 
 #        radii = [radii_dict[str(t)].value_in_unit(unit.nanometer) for t in types]
 #        radii = np.array(radii) + brush_length + spacing
         
         # Store resized system
-        self.positions = positions_exp
-        self.types = types
-        self.scale = scale
-        self.box =  np.max(self.positions, axis=0) + np.max(radii) #+ padding
-        if padding_factor:
-            self.box += self.box * padding 
+        positions = positions_exp
+       # self.types = types
+       # self.scale = scale
+        box = np.max(positions, axis=0) + np.max(radii) #+ padding
+       # self.box =  np.max(self.positions, axis=0) + np.max(radii) #+ padding
+        if self._padding_factor:
+            box += box * self._padding_factor
 
-        #return self.position, self.types, self.box, self.scale, self.min_gap, self.pair
+        N = len(positions)
         
-        
-        {
-            "positions": self.positions,
-            "types": self.types,
-            "box": self.box,
-            "scale": self.scale,
-            "min_gap": min_gap,
-            "min_pair": pair,
-        }
-    
 
+        frame = gsd.hoomd.Frame()
+        frame.configuration.step = 0
+        frame.configuration.dimensions = 3
+        frame.configuration.box = [box[0], box[1], box[2], 0.0, 0.0, 0.0]
     
-    def _write_lammps_data(self, filename, positions, types, box, atom_type_map=None, triclinic=True):
+        # Particles
+        frame.particles.N = N
+        frame.particles.types = sorted(set(types))
+        frame.particles.typeid = np.array(
+        [frame.particles.types.index(t) for t in types], dtype=np.int32
+        )
+        frame.particles.position = np.array(positions, dtype=np.float32)
+
+        return frame
+
+
+    '''
+    def write_lammps_data(self, filename, positions, types, box, atom_type_map=None, triclinic=True):
          """
          Write a LAMMPS .lmp data file in 'full' style (no bonds).
          
@@ -330,3 +333,4 @@ class LatticeBuilder(ConfigurationGenerator):
         )
 
         return frame
+'''

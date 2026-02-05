@@ -120,25 +120,29 @@ def main():
     
     # Generate an initial configuration from LatticeBuilder
     if configuration_parameters.cif:
-        generator = LatticeBuilder(configuration_parameters.cif, configuration_parameters.lattice_repeats, 
-                                 configuration_parameters.radii, configuration_parameters.brush_length, 
-                                 configuration_parameters.lattice_scale_factor, configuration_parameters.lattice_scale_start, 
-                                 configuration_parameters.lattice_spacing, configuration_parameters.padding_factor)
+        builder = LatticeBuilder(configuration_parameters.cif, configuration_parameters.cluster_specifications,
+                                 configuration_parameters.lattice_repeats, configuration_parameters.radii, 
+                                 configuration_parameters.brush_length, configuration_parameters.lattice_scale_factor, 
+                                 configuration_parameters.lattice_scale_start, configuration_parameters.lattice_spacing, 
+                                 configuration_parameters.padding_factor)
                                  #configuration_parameters.optimize_lattice, configuration_parameters.lattice_scale_rate)
     
-        frame = generator.generate_configuration()
+        _positions, _box, _types = builder.resize_to_match_radii()
+        builder.write_lammps_data(_positions, _box, _types)
+        
+       # frame = generator.generate_configuration(_positions, _box, _types)
     
     # Generate an initial configuration from ClusterGenerator
-    else:
-        clusters = [read_lammps_data(spec, units="metal") for spec in configuration_parameters.cluster_specifications]
+    #else:
+    clusters = [read_lammps_data(spec, units="metal") for spec in configuration_parameters.cluster_specifications]
         
-        generator = ClusterGenerator(clusters, configuration_parameters.cluster_relative_weights,
-                                    configuration_parameters.lattice_repeats,
-                                    configuration_parameters.cluster_padding_factor,
-                                    configuration_parameters.padding_factor,
-                                    configuration_parameters.random_rotation)
+    generator = ClusterGenerator(clusters, configuration_parameters.cluster_relative_weights,
+                                configuration_parameters.lattice_repeats,
+                                configuration_parameters.cluster_padding_factor,
+                                configuration_parameters.padding_factor,
+                                configuration_parameters.random_rotation)
 
-        frame = generator.generate_configuration()
+    frame = generator.generate_configuration()
     
     _check_frame_changes(frame, generator.__class__.__name__)
 

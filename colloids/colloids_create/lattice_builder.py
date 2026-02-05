@@ -1,6 +1,4 @@
 from openmm import unit
-#from colloids.colloid_potentials_algebraic import ColloidPotentialsAlgebraic
-#from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
 import gsd.hoomd
 from gsd.hoomd import Frame
 import numpy as np
@@ -21,10 +19,31 @@ class LatticeBuilder(ConfigurationGenerator):
     ASE/pymatgen structure conversion, and resizing to match colloid radii.
     """
 
-    def __init__(self, cif: str, lattice_repeats: Union[int, Sequence[int]], radii: dict[str, unit.Quantity],
-                brush_length: unit.Quantity, lattice_scale_factor: float, lattice_scale_start: float, 
-                lattice_spacing: float, padding_factor: float):
+    def __init__(self, cif: str, cluster_specifications: list[str], lattice_repeats: Union[int, Sequence[int]], 
+                radii: dict[str, unit.Quantity], brush_length: unit.Quantity, lattice_scale_factor: float, 
+                lattice_scale_start: float, lattice_spacing: float, padding_factor: float):
         """Constructor of the LatticeBuilder class.
+
+        :param cif: 
+        The .cif file that specifies the desired lattice structure of the output configuration files.
+        :type cif: str
+        
+        :param lattice_repeats:
+        The number of repeats of the lattice in the three directions of the lattice vectors of the cluster.
+        If only a single integer is given, the same number of repeats is used in all directions.
+        Every repeat should be positive.
+        :type lattice_repeats: Union[int, list[int]]
+        :param cluster_padding_factor:
+            The factor by which the lattice vectors of every replicated cluster are scaled to space out the clusters.
+            The cluster padding factor should be greater than zero.
+        :type cluster_padding_factor: float
+        :param padding_factor:
+            The factor by which the overall lattice vectors are scaled to increase the distance between the outwards facing
+            colloids and the walls. This will scale the box dimensions specified in the cluster specification file without
+            changing the spacing in between clusters.
+            The padding factor should be greater than zero.
+
+
 
         lattice_spacing : float
             Extra gap added to effective radii. ?
@@ -35,6 +54,7 @@ class LatticeBuilder(ConfigurationGenerator):
         """
 
         self._cif = cif
+        self._cluster_file = cluster_specifications[0]
         self._radii = radii
         self._brush_length = brush_length
         self._lattice_scale_factor = lattice_scale_factor
@@ -139,12 +159,12 @@ class LatticeBuilder(ConfigurationGenerator):
 
         return min_dist, min_pair
 
-    def generate_configuration(self, matrix=(3, 3, 3), test_matrix=(3,3,3)):
+    def resize_to_match_radii(self, matrix=(4, 4, 4), test_matrix=(3,3,3)):
         """
         Expand supercell until no overlaps remain given target radii.
         """
         structure = self._load_lattice_from_cif(self._cif)
-        print(structure)
+        #print(structure)
         
         sc = structure.make_supercell(test_matrix)
         positions = sc.cart_coords
@@ -200,9 +220,12 @@ class LatticeBuilder(ConfigurationGenerator):
        # self.scale = scale
         box = np.max(positions, axis=0) + np.max(radii) #+ padding
        # self.box =  np.max(self.positions, axis=0) + np.max(radii) #+ padding
-        if self._padding_factor:
-            box += box * self._padding_factor
+       # if self._padding_factor:
+          #  box += box * self._padding_factor
 
+        return positions, box, types
+        
+        '''
         N = len(positions)
         
 
@@ -219,63 +242,85 @@ class LatticeBuilder(ConfigurationGenerator):
         )
         frame.particles.position = np.array(positions, dtype=np.float32)
 
+        return frame'''
+
+
+    def write_lammps_data(self, positions, box, types, atom_type_map=None, triclinic=True):
+        """
+        Write a LAMMPS .lmp data file in 'full' style (no bonds).
+        
+        Parameters
+        ----------
+        positions : ndarray (N,3)
+            Atomic positions in Cartesian coordinates.
+        types : list of str
+            Particle type labels (e.g. ['A','B',...]).
+        box : array_like (3,)
+            Simulation box size along x,y,z (for orthogonal).
+        atom_type_map : dict, optional
+            Map from type labels (e.g. {'A':1, 'B':2}).
+            If None, assigned in order of appearance.
+        triclinic : bool
+            If True, writes xy, xz, yz tilt factors (all set to 0).
+        """
+        
+        filename = self._cluster_file #path to output file
+
+        #positions, box, types = self._resize_to_match_radii(structure, matrix=(3, 3, 3), test_matrix=(3,3,3))
+         
+        positions = np.asarray(positions)
+        n_atoms = len(positions)
+        uniq_types = sorted(set(types))
+     
+        if atom_type_map is None:
+            atom_type_map = {t: i+1 for i, t in enumerate(uniq_types)}
+     
+        n_types = len(atom_type_map)
+     
+        with open(filename, "w") as f:
+             # Header counts
+            f.write("(written by ASE)\n\n")
+            f.write(f"{n_atoms} atoms\n")
+            f.write("0 bonds\n")
+            f.write(f"{n_types} atom types\n")
+            f.write("0 bond types\n\n")
+    
+            # Box boundaries
+            f.write(f"0.0 {box[0]:.6f} xlo xhi\n")
+            f.write(f"0.0 {box[1]:.6f} ylo yhi\n")
+            f.write(f"0.0 {box[2]:.6f} zlo zhi\n")
+            if triclinic:
+                f.write("0.0 0.0 0.0 xy xz yz\n")
+            f.write("\n")
+    
+            # Atom section
+            f.write("Atoms # full\n\n")
+            for i, (pos, t) in enumerate(zip(positions, types), start=1):
+                type_id = atom_type_map[t]
+                f.write(f"{i:6d}   0   {type_id:d}   0.0   {pos[0]:.6f}   {pos[1]:.6f}   {pos[2]:.6f}\n")
+
+
+    def generate_configuration(self, positions, box, types) -> Frame:
+
+        N = len(positions)
+        
+        frame = gsd.hoomd.Frame()
+        frame.configuration.step = 0
+        frame.configuration.dimensions = 3
+        frame.configuration.box = [box[0], box[1], box[2], 0.0, 0.0, 0.0]
+    
+        # Particles
+        frame.particles.N = N
+        frame.particles.types = sorted(set(types))
+        frame.particles.typeid = np.array(
+        [frame.particles.types.index(t) for t in types], dtype=np.int32
+        )
+        frame.particles.position = np.array(positions, dtype=np.float32)
+
         return frame
 
 
-    '''
-    def write_lammps_data(self, filename, positions, types, box, atom_type_map=None, triclinic=True):
-         """
-         Write a LAMMPS .lmp data file in 'full' style (no bonds).
-         
-         Parameters
-         ----------
-         filename : str
-             Path to output file.
-         positions : ndarray (N,3)
-             Atomic positions in Cartesian coordinates.
-         types : list of str
-             Particle type labels (e.g. ['A','B',...]).
-         box : array_like (3,)
-             Simulation box size along x,y,z (for orthogonal).
-         atom_type_map : dict, optional
-             Map from type labels (e.g. {'A':1, 'B':2}).
-             If None, assigned in order of appearance.
-         triclinic : bool
-             If True, writes xy, xz, yz tilt factors (all set to 0).
-         """
-         positions = np.asarray(positions)
-         n_atoms = len(positions)
-         uniq_types = sorted(set(types))
-     
-         if atom_type_map is None:
-             atom_type_map = {t: i+1 for i, t in enumerate(uniq_types)}
-     
-         n_types = len(atom_type_map)
-     
-         with open(filename, "w") as f:
-             # Header counts
-             f.write("(written by ASE)\n\n")
-             f.write(f"{n_atoms} atoms\n")
-             f.write("0 bonds\n")
-             f.write(f"{n_types} atom types\n")
-             f.write("0 bond types\n\n")
-     
-             # Box boundaries
-             f.write(f"0.0 {box[0]:.6f} xlo xhi\n")
-             f.write(f"0.0 {box[1]:.6f} ylo yhi\n")
-             f.write(f"0.0 {box[2]:.6f} zlo zhi\n")
-             if triclinic:
-                 f.write("0.0 0.0 0.0 xy xz yz\n")
-             f.write("\n")
-     
-             # Atom section
-             f.write("Atoms # full\n\n")
-             for i, (pos, t) in enumerate(zip(positions, types), start=1):
-                 type_id = atom_type_map[t]
-                 f.write(f"{i:6d}   0   {type_id:d}   0.0   {pos[0]:.6f}   {pos[1]:.6f}   {pos[2]:.6f}\n")
-
-    
-    def generate_configuration(self) -> Frame:
+        '''
 
         """
         Generate the initial positions of the colloids in a gsd.hoomd.Frame instance.

@@ -11,7 +11,7 @@
 #
 # The file may be used within the scientific community so long as
 # proper attribution is given to the journal article from which the
-# data were obtained.
+# data were obtained. 
 #
 data_9008789
 loop_

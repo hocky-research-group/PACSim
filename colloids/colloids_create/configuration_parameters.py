@@ -19,7 +19,7 @@ class ConfigurationParameters(Parameters):
     This dataclass can be written to and read from a yaml file. The yaml file contains the parameters as key-value
     pairs. Any OpenMM quantities are converted to Quantity objects that can be represented in a readable way in the
     yaml file.
-
+    
     The base configuration is constructed from several clusters of colloids. Each cluster is defined in a lammps-data
     file together with cell vectors. Every cluster of colloids is assumed to have the same cell vectors. To generate
     the initial configuration, the clusters are first centered. Then, the shared cell vectors of the clusters are
@@ -34,11 +34,12 @@ class ConfigurationParameters(Parameters):
     increases the distance between the outwards facing colloids and the walls. To make the simulation box smaller, use
     a padding factor less than 1.
 
+    Any bonds in the cluster definition in the lammps-data file are added as constraints, with the constraint distance
+    equal to the current bond length in the cluster definition. The bond lengths are not modified during the simulation.
+
     This dataclass assumes that the style of units in the lammps-data file is "nano" (see
     https://docs.lammps.org/units.html), that is, positions are in nanometers.
 
-    Any bonds in the cluster definition in the lammps-data file are added as constraints, with the constraint distance
-    equal to the current bond length in the cluster definition. The bond lengths are not modified during the simulation.
 
     In the lammps-data file, only the lattice vectors, the positions of the colloids in the Atoms section, and the bonds
     in the Bonds section are used. All other sections and information are ignored. In particular, the masses, radii, and
@@ -72,6 +73,7 @@ class ConfigurationParameters(Parameters):
     configuration) are applied after setting the particle properties.
 
     :param cif:
+        The filename of the lattice structure 
     :type cif: 
     :param cluster_specifications:
         The filenames of the cluster definitions in lammps-data format.
@@ -176,8 +178,6 @@ class ConfigurationParameters(Parameters):
     lattice_spacing: Optional[float] = None
     lattice_scale_factor: Optional[float] = None
     lattice_scale_start: Optional[float] = None
-    optimize_lattice: Optional[bool] = None
-    lattice_scale_rate: Optional[float] = None
     cluster_padding_factor: Optional[float] = None #float = 1.0
     padding_factor: Optional[float] = None #float = 1.0
     random_rotation: Optional[bool] = None #bool = False
@@ -252,8 +252,6 @@ class ConfigurationParameters(Parameters):
                 raise ValueError("Lattice scale start must be specified if using lattice builder method.")
             if not self.lattice_scale_factor:
                 raise ValueError("Lattice scale factor must be specified if using lattice builder method.")
-            if not self.lattice_scale_rate:
-                raise ValueError("Lattice scale rate must be specified if using lattice builder method.")
         else:
             if self.cluster_padding_factor <= 0.0:
                 raise ValueError("Cluster padding factor must be greater than zero.")
@@ -271,26 +269,29 @@ class ConfigurationParameters(Parameters):
         found_types = set()
         cell = None
         for cluster_specification in self.cluster_specifications:
-            atoms = read_lammps_data(cluster_specification, units="metal")
-            # If no cell is set in the lammps-data file, the lattice vectors are set to the identity matrix.
-            if np.equal(atoms.get_cell(), [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]).all():
-                warnings.warn("The lattice vectors of the cluster are probably not set in the lammps-data file."
-                              "The identity matrix is used as lattice vectors.")
-            if cell is None:
-                cell = atoms.get_cell()
-            else:
-                if not np.allclose(atoms.get_cell(), cell):
-                    raise ValueError("All clusters must have the same cell vectors.")
-            types = set(str(atom.number) for atom in atoms)
-            found_types.update(types)
-            for t in types:
-                if t not in self.masses:
-                    raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in masses dictionary.")
-                if t not in self.radii:
-                    raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in radii dictionary.")
-                if t not in self.surface_potentials:
-                    raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in surface potentials "
-                                     f"dictionary.")
+            try:
+                atoms = read_lammps_data(cluster_specification, units="metal")
+                # If no cell is set in the lammps-data file, the lattice vectors are set to the identity matrix.
+                if np.equal(atoms.get_cell(), [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]).all():
+                    warnings.warn("The lattice vectors of the cluster are probably not set in the lammps-data file."
+                                "The identity matrix is used as lattice vectors.")
+                if cell is None:
+                    cell = atoms.get_cell()
+                else:
+                    if not np.allclose(atoms.get_cell(), cell):
+                        raise ValueError("All clusters must have the same cell vectors.")
+                types = set(str(atom.number) for atom in atoms)
+                found_types.update(types)
+                for t in types:
+                    if t not in self.masses:
+                        raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in masses dictionary.")
+                    if t not in self.radii:
+                        raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in radii dictionary.")
+                    if t not in self.surface_potentials:
+                        raise ValueError(f"Type {t} of the atoms in the lammps-data file is not in surface potentials "
+                                        f"dictionary.")
+            except FileNotFoundError: #if cluster.lmp file is being generated via lattice builder
+                pass
 
         if isinstance(self.lattice_repeats, int):
             if self.lattice_repeats <= 0:

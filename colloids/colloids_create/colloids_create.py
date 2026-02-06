@@ -121,10 +121,9 @@ def main():
     # Generate an initial configuration from LatticeBuilder
     if configuration_parameters.cif:
         builder = LatticeBuilder(configuration_parameters.cif, configuration_parameters.cluster_specifications,
-                                 configuration_parameters.lattice_repeats, configuration_parameters.radii, 
+                                 configuration_parameters.lattice_vector_scaling_matrix, configuration_parameters.radii, 
                                  configuration_parameters.brush_length, configuration_parameters.lattice_scale_factor, 
-                                 configuration_parameters.lattice_scale_start, configuration_parameters.lattice_spacing, 
-                                 configuration_parameters.padding_factor)
+                                 configuration_parameters.lattice_scale_start, configuration_parameters.radii_padding_factor)
                                  #configuration_parameters.optimize_lattice, configuration_parameters.lattice_scale_rate)
     
         _positions, _box, _types = builder.resize_to_match_radii()

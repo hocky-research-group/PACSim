@@ -13,65 +13,65 @@ from scipy.optimize import minimize_scalar
 from colloids.colloids_create import ConfigurationGenerator
 
 
-class LatticeBuilder(ConfigurationGenerator):
+class LatticeBuilder():
     """
-    Configuration generator that handles structure creation from CIF or coordinates, supercell expansion, 
+    Builder that handles structure creation from CIF or coordinates, supercell expansion, 
     ASE/pymatgen structure conversion, and resizing to match colloid radii.
     """
 
-    def __init__(self, cif: str, cluster_specifications: list[str], lattice_repeats: Union[int, Sequence[int]], 
+    def __init__(self, cif: str, cluster_specifications: list[str], lattice_vector_scaling_matrix: Union[int, Sequence[int]], 
                 radii: dict[str, unit.Quantity], brush_length: unit.Quantity, lattice_scale_factor: float, 
-                lattice_scale_start: float, lattice_spacing: float, padding_factor: float):
+                lattice_scale_start: float, radii_padding_factor: unit.Quantity):
         """Constructor of the LatticeBuilder class.
 
         :param cif: 
-        The .cif file that specifies the desired lattice structure of the output configuration files.
+            The .cif file that specifies the desired lattice structure of the output configuration files.
         :type cif: str
-        
-        :param lattice_repeats:
-        The number of repeats of the lattice in the three directions of the lattice vectors of the cluster.
-        If only a single integer is given, the same number of repeats is used in all directions.
-        Every repeat should be positive.
-        :type lattice_repeats: Union[int, list[int]]
-        :param cluster_padding_factor:
-            The factor by which the lattice vectors of every replicated cluster are scaled to space out the clusters.
-            The cluster padding factor should be greater than zero.
-        :type cluster_padding_factor: float
-        :param padding_factor:
-            The factor by which the overall lattice vectors are scaled to increase the distance between the outwards facing
-            colloids and the walls. This will scale the box dimensions specified in the cluster specification file without
-            changing the spacing in between clusters.
-            The padding factor should be greater than zero.
-
-
-
-        lattice_spacing : float
-            Extra gap added to effective radii. ?
-        lattice_scale_factor : float
+        :param cluster_specifications:
+            If not using this lattice builder funcitonality, this parameter represents the filenames of existing lammps-data format files
+            that define the clusters from which to generate a configuration. If using the functionality in this class, the output will be a
+            lammps-data format file that is then passed into the configuration generator. This parameter should thus be a unit-length list with a 
+            string specifying the desired name of the lammps-data output with lattice information.
+        :type cluster_specifications: list[str]
+        :param lattice_vector_scaling_factor:
+            A scaling matrix for transforming the lattice vectors.
+            If only a single integer is given, the same scale factor is used in all directions.
+            Every scale factor in the matrix should be positive.
+        :type lattice_vector_scaling_factor: Union[int, list[int]]
+        :param radii:
+            The radii of the different types of colloidal particles that appear in the initial configuration file.
+            The keys of the dictionary are the types of the colloidal particles and the values are the radii.
+            The unit of the radii must be compatible with nanometers and the values must be greater than zero.
+        :type radii: dict[str, unit.Quantity]
+        :param brush_length:
+            The thickness of the brush in the Alexander-de Gennes polymer brush model [i.e., L in eq. (1)].
+            The unit of the brush_length must be compatible with nanometers and the value must be greater than zero.
+        :type brush_length: unit.Quantity
+        :param lattice_scale_factor:
             Scale-up increment factor.
-        lattice_scale_start : float
+            The lattice scale factor must be greater than zero.
+        :type lattice_scale_factor: float
+        :param lattice_scale_start:
             Starting scale factor.
-        """
+            The lattice scale start factor must be greater than zero.
+        :type lattice_scale_start: float
+        :param radii_padding_factor: 
+            Extra gap added to radii.
+            The unit of the radii padding factor should be compatible with nanometers and the value must be greater than zero.
+        :type radii_padding_factor: unit.Quantity
 
+        
+        :raises ValueError:
+
+        """
         self._cif = cif
         self._cluster_file = cluster_specifications[0]
         self._radii = radii
         self._brush_length = brush_length
+        self._lattice_vector_scaling_matrix = lattice_vector_scaling_matrix
         self._lattice_scale_factor = lattice_scale_factor
         self._lattice_scale_start = lattice_scale_start
-        self._padding_factor = padding_factor
-        self._lattice_spacing = lattice_spacing
-
-        
-        '''self.structure = None
-        self.positions = None
-        self.types = None
-        self.scale = None
-        self.box = None
-        self.type_map = None'''
-
-        #if cif_path:
-           # self.load_from_cif(cif_path)
+        self._radii_padding_factor = radii_padding_factor
 
     @staticmethod
     def _load_lattice_from_cif(cif_file):
@@ -85,12 +85,6 @@ class LatticeBuilder(ConfigurationGenerator):
        # """Manually define a structure (instead of CIF)."""
        # self.structure = Structure(lattice, species, coords)
 
-    @staticmethod
-    def _make_supercell(structure, matrix=(3, 3, 3)):
-        """Return a new supercell structure."""
-    #    if structure is None:
-    #        raise ValueError("Failed to define structure from cif file.")
-        return structure.make_supercell(matrix, in_place=False)
 
     @staticmethod
     def _set_colloid_labels_atomicnum(atomic_numbers):
@@ -159,14 +153,13 @@ class LatticeBuilder(ConfigurationGenerator):
 
         return min_dist, min_pair
 
-    def resize_to_match_radii(self, matrix=(4, 4, 4), test_matrix=(3,3,3)):
+    def resize_to_match_radii(self, test_matrix=(3,3,3)):
         """
         Expand supercell until no overlaps remain given target radii.
         """
-        structure = self._load_lattice_from_cif(self._cif)
-        #print(structure)
-        
-        sc = structure.make_supercell(test_matrix)
+
+        structure1 = self._load_lattice_from_cif(self._cif)
+        sc = structure1.make_supercell(test_matrix, in_place=False)
         positions = sc.cart_coords
 
         #if self.type_map is None:
@@ -179,7 +172,7 @@ class LatticeBuilder(ConfigurationGenerator):
 
         # Effective radii in same units as positions
         radii = [self._radii[str(t)].value_in_unit(unit.nanometer) for t in types]
-        radii = np.array(radii) + self._brush_length.value_in_unit(unit.nanometer) + self._lattice_spacing
+        radii = np.array(radii) + self._brush_length.value_in_unit(unit.nanometer) + self._radii_padding_factor
 
         dists = self._calculate_distances(positions)
         i = 0
@@ -196,9 +189,11 @@ class LatticeBuilder(ConfigurationGenerator):
         #print("Computing closest pairs...")
         min_gap, pair = self._give_smallest_connection(dists, radii)
         #print("...closest distance is",min_gap)
-
-        self.structure = self._make_supercell(structure, matrix)
-        positions2 = self.structure.cart_coords
+        
+        structure2 = self._load_lattice_from_cif(self._cif) #, self._lattice_vector_scaling_matrix)
+        structure = structure2.make_supercell(self._lattice_vector_scaling_matrix, in_place=False)
+        positions2 = structure.cart_coords
+        #positions_exp = positions2*scale
         positions_exp = positions2*scale
 
         #print("Final system size:",positions2.shape)
@@ -207,7 +202,7 @@ class LatticeBuilder(ConfigurationGenerator):
         positions_exp -= positions_exp.mean(axis=0)
 
         #if self.type_map is None:
-        types = self._set_colloid_labels_atomicnum(self.structure.atomic_numbers)
+        types = self._set_colloid_labels_atomicnum(structure.atomic_numbers)
         #else:
           #  types = self._set_colloid_labels_typemap(self.structure.species)
 

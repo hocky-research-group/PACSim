@@ -40,7 +40,6 @@ class ConfigurationParameters(Parameters):
     This dataclass assumes that the style of units in the lammps-data file is "nano" (see
     https://docs.lammps.org/units.html), that is, positions are in nanometers.
 
-
     In the lammps-data file, only the lattice vectors, the positions of the colloids in the Atoms section, and the bonds
     in the Bonds section are used. All other sections and information are ignored. In particular, the masses, radii, and
     surface potentials of the different types of colloidal particles appearing in the lammps-data file should be
@@ -65,6 +64,12 @@ class ConfigurationParameters(Parameters):
         Index of first atom involved in the bond.
         Index of second atom involved in the bond.
 
+    If working with a lattice structure that you would like to expand into a supercell and/or resize to match the colloid
+    radii, instead of supplying a lammps-data file, you can specify a .cif file and use the lattice builder functionality
+    to obtain a lammps-data file that is then used to generate the base configuration. In this case, you must specify parameters
+    to direct the scaling and resizing of the radii as well as the polymer brush length (which should match the brush
+    length in the pair potential parameters, if using). 
+
     After the base configuration has been created, it can be modified by applying a series of configuration modifiers.
     These modifiers can modify the positions of the colloids, add or remove colloids, or modify other properties of the
     colloids. The modifiers are applied in two stages: initial modifiers (such as adding a substrate at the bottom of
@@ -72,9 +77,10 @@ class ConfigurationParameters(Parameters):
     (such as including a seed of colloids from a gsd file while removing overlapping particles from the base
     configuration) are applied after setting the particle properties.
 
-    :param cif:
-        The filename of the lattice structure 
-    :type cif: 
+    :param cif: 
+        The .cif file that specifies the desired lattice structure of the output configuration files.
+        Defaults to None.
+    :type cif: Optional[str]
     :param cluster_specifications:
         The filenames of the cluster definitions in lammps-data format.
         Defaults to [cluster.lmp].
@@ -102,6 +108,33 @@ class ConfigurationParameters(Parameters):
         The padding factor must be greater than zero.
         Defaults to 1.0.
     :type padding_factor: float
+    :param lattice_vector_scaling_factor:
+        If using the lattice builder functionality, a scaling matrix for transforming the lattice vectors.
+        If only a single integer is given, the same scale factor is used in all directions.
+        Every scale factor in the matrix should be positive.
+        Defaults to None. 
+    :type lattice_vector_scaling_factor: Optional[Union[int, list[int]]]
+    :param brush_length:
+        If using the lattice builder functionality, the thickness of the brush in the Alexander-de Gennes polymer brush model 
+        [i.e., L in eq. (1)].
+        The unit of the brush_length must be compatible with nanometers and the value must be greater than zero.
+        Defaults to None.
+    :type brush_length: Optional[unit.Quantity]
+    :param lattice_scale_factor:
+        If using the lattice builder functionality, scale-up increment factor.
+        The lattice scale factor must be greater than zero.
+        Defaults to None.
+    :type lattice_scale_factor: Optional[float]
+    :param lattice_scale_start:
+        If using the lattice builder functionality, starting scale factor.
+        The lattice scale start factor must be greater than zero.
+        Defaults to None.
+    :type lattice_scale_start: Optional[float]
+    :param radii_padding_factor: 
+        If using the lattice builder functionality, extra gap added to radii.
+        The unit of the radii padding factor should be compatible with nanometers and the value must be greater than zero.
+        Defaults to None.
+    :type radii_padding_factor: Optional[unit.Quantity]
     :param random_rotation:
         A boolean that indicates whether every replica of the cluster should be randomly rotated.
         Defaults to False.
@@ -170,17 +203,17 @@ class ConfigurationParameters(Parameters):
         If final_modifiers is specified but final_modifiers_parameters is not, or vice versa.
         If the number of (initial or final) modifiers does not match the number of parameter dictionaries.
     """
-    
     cluster_specifications: list[str] = field(default_factory=lambda: ["cluster.lmp"])
+    cif: Optional[str] = None
     lattice_repeats: Union[int, list[int]] = 8
     cluster_relative_weights: list[float] = field(default_factory=lambda: [1.0])
-    cif: Optional[str] = None
-    lattice_spacing: Optional[float] = None
     lattice_scale_factor: Optional[float] = None
     lattice_scale_start: Optional[float] = None
-    cluster_padding_factor: Optional[float] = None #float = 1.0
-    padding_factor: Optional[float] = None #float = 1.0
-    random_rotation: Optional[bool] = None #bool = False
+    lattice_vector_scaling_matrix: Optional[Union[int, list[int]]] = None
+    cluster_padding_factor: float = 1.0
+    padding_factor: float = 1.0
+    radii_padding_factor: Optional[unit.Quantity] = None 
+    random_rotation: bool = False
     masses: dict[str, unit.Quantity] = field(default_factory=lambda: {"1": 1.0 * mass_unit,
                                                                       "2": (95.0 / 105.0) ** 3 * mass_unit})
     radii: dict[str, unit.Quantity] = field(default_factory=lambda: {"1": 105.0 * length_unit,
@@ -195,6 +228,7 @@ class ConfigurationParameters(Parameters):
 
     def __post_init__(self):
         """Post-initialization method for the ConfigurationParameters class."""
+        
         if not all(cluster_specification.endswith(".lmp") for cluster_specification in self.cluster_specifications):
             raise ValueError("The cluster specification file must be of the lammps-data file format.")
         if not len(self.cluster_specifications) > 0:
@@ -237,31 +271,33 @@ class ConfigurationParameters(Parameters):
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in masses dictionary.")
             if t not in self.radii:
                 raise ValueError(f"Type {t} of the surface potentials dictionary is not in radii dictionary.")
-        if self.brush_length:
+        if self.cluster_padding_factor <= 0.0:
+            raise ValueError("Cluster padding factor must be greater than zero.")
+        if self.padding_factor <= 0.0:
+            raise ValueError("Padding factor must be greater than zero.")
+        if self.cif:
+            if not self.cif.endswith(".cif"):
+                raise ValueError("The cif file must have the correct .cif extension.")
+            if not self.lattice_scale_start:
+                raise ValueError("Lattice scale start must be specified if using lattice builder method.")
+            if not self.lattice_scale_factor:
+                raise ValueError("Lattice scale factor must be specified if using lattice builder method.")
+            if not self.lattice_vector_scaling_matrix:
+                raise ValueError("Lattice vector scaling matrix must be specified if using lattice builder method.")
+            if not self.radii_padding_factor:
+                raise ValueError(("Radii padding factor must be specified if using lattice builder method."))
+            if not self.radii_padding_factor.unit.is_compatible(length_unit):
+                raise TypeError(f"Radii padding factor must have a unit compatible with nanometers.")
+            if self.radii_padding_factor <= 0.0 * length_unit:
+                raise ValueError(f"Radii padding factor must be greater than zero.")
+            if not self.brush_length:
+                    raise ValueError("Brush length must be specified if using lattice builder method.")
             if not self.brush_length.unit.is_compatible(length_unit):
                 raise TypeError(f"Brush length must have a unit compatible with nanometers.")
             if self.brush_length <= 0.0 * length_unit:
                 raise ValueError(f"Brush length must be greater than zero.")
 
-        if self.cif:
-            if not self.cif.endswith(".cif"):
-                raise ValueError("The cif file must have the correct .cif extension.")
-            if not self.lattice_spacing:
-                raise ValueError("Lattice spacing must be specified if using lattice builder method.")
-            if not self.lattice_scale_start:
-                raise ValueError("Lattice scale start must be specified if using lattice builder method.")
-            if not self.lattice_scale_factor:
-                raise ValueError("Lattice scale factor must be specified if using lattice builder method.")
-        else:
-            if self.cluster_padding_factor <= 0.0:
-                raise ValueError("Cluster padding factor must be greater than zero.")
-            if self.padding_factor <= 0.0:
-                raise ValueError("Padding factor must be greater than zero.")
-            if not self.cluster_padding_factor:
-                raise ValueError("Cluster padding factor must be specified if using cluster generator method.")
-            if not self.padding_factor:
-                raise ValueError("Padding factor must be specified if using cluster generator method.")
-        
+
         # We assume that the lammps-data file uses "nano" units where distances are measured in nanometers.
         # However, ase would transform the distances in the lammps-data file to Angstroms by multiplying them by 10 if
         # we specify units="nano". For units="metal", the ase distances are equal to the distances in the lammps-data

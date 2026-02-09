@@ -172,7 +172,7 @@ class LatticeBuilder():
 
         # Effective radii in same units as positions
         radii = [self._radii[str(t)].value_in_unit(unit.nanometer) for t in types]
-        radii = np.array(radii) + self._brush_length.value_in_unit(unit.nanometer) + self._radii_padding_factor
+        radii = np.array(radii) + self._brush_length.value_in_unit(unit.nanometer) + self._radii_padding_factor.value_in_unit(unit.nanometer)
 
         dists = self._calculate_distances(positions)
         i = 0

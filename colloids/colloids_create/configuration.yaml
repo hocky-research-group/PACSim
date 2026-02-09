@@ -1,15 +1,15 @@
-cif: CsCl.cif
+cif: null
 cluster_specifications: 
  - "cluster.lmp"
 cluster_relative_weights:
   - 1.0
-lattice_repeats: 1
+lattice_repeats: 2
 cluster_padding_factor: 3.0
-padding_factor: 1.0 #1.5
-lattice_scale_factor: 0.5
-lattice_scale_start: 50.0
-lattice_vector_scaling_matrix: [3,3,3]
-radii_padding_factor: 0.0
+padding_factor: 1.5
+lattice_scale_factor: null
+lattice_scale_start: null
+lattice_vector_scaling_matrix: null
+radii_padding_factor: null
 masses:
   "1": !Quantity
     unit: dalton
@@ -17,24 +17,31 @@ masses:
   "2": !Quantity
     unit: dalton
     value: 1.0
+  "3": !Quantity
+    unit: dalton
+    value: 1.0
 radii:
   "1": !Quantity
     unit: nanometer
-    value: 105.0
+    value: 1.0
   "2": !Quantity
     unit: nanometer
-    value: 85.0
+    value: 1.0
+  "3": !Quantity
+    unit: nanometer
+    value: 1.0
 surface_potentials:
   "1": !Quantity
     unit: millivolt
     value: 50.0
   "2": !Quantity
     unit: millivolt
-    value: -50.0
-brush_length: !Quantity
-    unit: nanometer
-    value: 10.0
-random_rotation: false #true
+    value: -30.0
+  "3": !Quantity
+    unit: millivolt
+    value: 40.0
+brush_length: null
+random_rotation: true
 initial_modifiers: null
 initial_modifiers_parameters: null
 final_modifiers: null

@@ -1,10 +1,10 @@
 UNITS LENGTH=nm TIME=ps ENERGY=kj/mol
 #https://www.plumed.org/doc-master/user-doc/html/COORDINATIONNUMBER/
 
-c_all: COORDINATIONNUMBER SPECIES=@mdatoms                  SWITCH={EXP D_0=300.0 R_0=50 D_MAX=600} MEAN
+c_all: COORDINATIONNUMBER SPECIES=@mdatoms SWITCH={EXP D_0=300.0 R_0=50 D_MAX=600} MEAN
 
 METAD ...
-  ARG=c_all_mean
+  ARG=c_all.mean
   CALC_RCT
   HEIGHT=1.0
   BIASFACTOR=50
@@ -21,5 +21,4 @@ METAD ...
   STRIDE=2
 ... METAD
 
-PRINT ARG=c_all_mean,c_N_N_mean,c_P_P_mean,c_N_P_mean FILE=colvars STRIDE=10000
 PRINT ARG=c_all.mean,metad.* FILE=bias STRIDE=10000

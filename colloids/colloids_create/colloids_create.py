@@ -1,13 +1,11 @@
 import argparse
 import inspect
 import warnings
-from ase.io.lammpsdata import read_lammps_data
 import gsd.hoomd
 import numpy as np
 from openmm import unit
 from colloids.colloids_create.configuration_parameters import ConfigurationParameters
-from colloids.colloids_create.cluster_generator import ClusterGenerator
-from colloids.colloids_create.lattice_builder import LatticeBuilder
+import colloids.colloids_create.configuration_generators as configuration_generators
 import colloids.colloids_create.final_modifiers as final_modifiers
 import colloids.colloids_create.initial_modifiers as initial_modifiers
 from colloids.units import electric_potential_unit, length_unit, mass_unit
@@ -113,33 +111,15 @@ def main():
 
     configuration_parameters = ConfigurationParameters.from_yaml(args.configuration_parameters)
 
-    # We assume that the lammps-data file uses "nano" units where distances are measured in nanometers.
-    # However, ase would transform the distances in the lammps-data file to Angstroms by multiplying them by 10 if
-    # we specify units="nano". For units="metal", the ase distances are equal to the distances in the lammps-data
-    # file. We then just pretend that the distances are in nanometers.
-    
-    # Generate an initial configuration from LatticeBuilder
-    if configuration_parameters.cif:
-        builder = LatticeBuilder(configuration_parameters.cif, configuration_parameters.cluster_specifications,
-                                 configuration_parameters.lattice_vector_scaling_matrix, configuration_parameters.radii, 
-                                 configuration_parameters.brush_length, configuration_parameters.lattice_scale_factor, 
-                                 configuration_parameters.lattice_scale_start, configuration_parameters.radii_padding_factor)
-                                 #configuration_parameters.optimize_lattice, configuration_parameters.lattice_scale_rate)
-    
-        _positions, _box, _types = builder.resize_to_match_radii()
-        builder.write_lammps_data(_positions, _box, _types)
-        
-       # frame = generator.generate_configuration(_positions, _box, _types)
-    
-    # Generate an initial configuration from ClusterGenerator
-    #else:
-    clusters = [read_lammps_data(spec, units="metal") for spec in configuration_parameters.cluster_specifications]
-        
-    generator = ClusterGenerator(clusters, configuration_parameters.cluster_relative_weights,
-                                configuration_parameters.lattice_repeats,
-                                configuration_parameters.cluster_padding_factor,
-                                configuration_parameters.padding_factor,
-                                configuration_parameters.random_rotation)
+    # Instantiate the configuration generator from the YAML-specified class name and parameters.
+    generator_class = getattr(configuration_generators, configuration_parameters.configuration_generator)
+    try:
+        generator = generator_class(**configuration_parameters.configuration_generator_parameters)
+    except TypeError:
+        raise TypeError(
+            f"Generator {configuration_parameters.configuration_generator} does not accept the given arguments "
+            f"{configuration_parameters.configuration_generator_parameters}. "
+            f"The expected signature is {inspect.signature(generator_class)}.")
 
     frame = generator.generate_configuration()
     

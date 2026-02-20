@@ -5,7 +5,7 @@ from typing import Sequence, Union
 from ase.io.lammpsdata import read_lammps_data
 from gsd.hoomd import Frame
 import numpy as np
-from colloids.colloids_create import ConfigurationGenerator
+from .abstracts import ConfigurationGenerator
 
 
 class ClusterGenerator(ConfigurationGenerator):

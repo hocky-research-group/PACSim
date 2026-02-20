@@ -2,7 +2,7 @@ from math import acos, pi
 from random import choices, uniform
 import re
 from typing import Sequence, Union
-from ase import Atoms
+from ase.io.lammpsdata import read_lammps_data
 from gsd.hoomd import Frame
 import numpy as np
 from colloids.colloids_create import ConfigurationGenerator
@@ -18,7 +18,7 @@ class ClusterGenerator(ConfigurationGenerator):
     Every replica of the cell is then filled with a randomly selected cluster from the list of clusters. The clusters
     are selected based on their relative weights. Every cluster can optionally be randomly rotated.
 
-    The clusters are specified by Atoms objects generated from a lammps-data file.
+    The clusters are specified as file paths to lammps-data files.
     See https://docs.lammps.org/2001/data_format.html for information about this file format.
 
     To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors before
@@ -26,15 +26,17 @@ class ClusterGenerator(ConfigurationGenerator):
     overall box size and thus increases the distance between the outwards facing colloids and the walls. To make the
     simulation box smaller, use a padding factor less than 1.
 
-    This dataclass assumes that the distances in the cluster are in units of nanometers.
+    This class assumes that the distances in the lammps-data files use "nano" units where distances are measured in
+    nanometers.
 
     Any bonds in the cluster are added as constraints, with the constraint distance equal to the current bond length in
     the cluster definition. The bond lengths are not modified during the simulation.
 
-    :param clusters:
-        A sequence of clusters of colloids with equal cell vectors that are used to generate the initial configuration.
-        All collooids in the centered clusters should lie in the unit cell defined by the lattice vectors.
-    :type clusters: Sequence[Atoms]
+    :param cluster_specifications:
+        The filenames of the cluster definitions in lammps-data format.
+        All clusters must have the same cell vectors.
+        All (centered) clusters should lie in the unit cell defined by the cell vectors.
+    :type cluster_specifications: list[str]
     :param cluster_relative_weights:
         The relative weights of the clusters. The weights are used to randomly select a cluster from the list of
         clusters when generating the initial configuration.
@@ -70,13 +72,16 @@ class ClusterGenerator(ConfigurationGenerator):
         If the clusters do not have the same cell vectors.
     """
 
-    def __init__(self, clusters: Sequence[Atoms], cluster_relative_weights: Sequence[float],
+    def __init__(self, cluster_specifications: list[str], cluster_relative_weights: Sequence[float],
                  lattice_repeats: Union[int, Sequence[int]], cluster_padding_factor: float,
                  padding_factor: float, random_rotation: bool) -> None:
         """Constructor of the ClusterGenerator class."""
         super().__init__()
-        # The format of these arguments is already checked in configuration_parameters.py.
-        self._clusters = clusters
+        # We assume that the lammps-data file uses "nano" units where distances are measured in nanometers.
+        # However, ase would transform the distances in the lammps-data file to Angstroms by multiplying them
+        # by 10 if we specify units="nano". For units="metal", the ase distances are equal to the distances in
+        # the lammps-data file. We then just pretend that the distances are in nanometers.
+        self._clusters = [read_lammps_data(spec, units="metal") for spec in cluster_specifications]
         self._cluster_relative_weights = cluster_relative_weights
         self._lattice_repeats = lattice_repeats
         self._cluster_padding_factor = cluster_padding_factor
@@ -86,13 +91,13 @@ class ClusterGenerator(ConfigurationGenerator):
             raise ValueError("The cluster padding factor must be greater than zero.")
         if self._padding_factor <= 0.0:
             raise ValueError("The padding factor must be greater than zero.")
-        if not len(clusters) > 0:
+        if not len(self._clusters) > 0:
             raise ValueError("At least one cluster must be provided.")
-        if len(clusters) != len(cluster_relative_weights):
+        if len(self._clusters) != len(cluster_relative_weights):
             raise ValueError("The number of clusters must match the number of cluster probabilities.")
         if not all(prob >= 0.0 for prob in cluster_relative_weights):
             raise ValueError("All cluster probabilities must be non-negative.")
-        if not all(np.allclose(c.cell, clusters[0].cell) for c in clusters):
+        if not all(np.allclose(c.cell, self._clusters[0].cell) for c in self._clusters):
             raise ValueError("All clusters must have the same cell vectors.")
 
     @staticmethod

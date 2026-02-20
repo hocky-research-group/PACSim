@@ -13,24 +13,51 @@ class ClusterGenerator(ConfigurationGenerator):
     Generator for an initial configuration in a gsd.hoomd.Frame instance for a colloid simulation based on several
     clusters of colloids.
 
-    Every cluster of colloids is assumed to have the same cell vectors. To generate the initial configuration,
-    the clusters are first centered. Then, the shared cell vectors of the clusters are repeated in all three directions.
-    Every replica of the cell is then filled with a randomly selected cluster from the list of clusters. The clusters
-    are selected based on their relative weights. Every cluster can optionally be randomly rotated.
+    Each cluster is defined in a lammps-data file together with cell vectors. Every cluster of colloids is assumed to
+    have the same cell vectors. To generate the initial configuration, the clusters are first centered. Then, the shared
+    cell vectors of the clusters are repeated in all three directions. Every replica of the cell is then filled with a
+    randomly selected cluster from the list of clusters. The clusters are selected based on their relative weights.
+    Every cluster can optionally be randomly rotated.
 
     The clusters are specified as file paths to lammps-data files.
     See https://docs.lammps.org/2001/data_format.html for information about this file format.
+
+    All colloid positions in the centered clusters must lie in the unit cell defined by the lattice vectors.
 
     To space out the clusters, one can increase a cluster padding factor that scales the lattice vectors before
     replication. This will also scale the box size. Additionally, one can increase a padding factor that scales just the
     overall box size and thus increases the distance between the outwards facing colloids and the walls. To make the
     simulation box smaller, use a padding factor less than 1.
 
-    This class assumes that the distances in the lammps-data files use "nano" units where distances are measured in
-    nanometers.
+    Any bonds in the cluster definition in the lammps-data file are added as constraints, with the constraint distance
+    equal to the current bond length in the cluster definition. The bond lengths are not modified during the simulation.
 
-    Any bonds in the cluster are added as constraints, with the constraint distance equal to the current bond length in
-    the cluster definition. The bond lengths are not modified during the simulation.
+    This dataclass assumes that the style of units in the lammps-data file is "nano" (see
+    https://docs.lammps.org/units.html), that is, positions are in nanometers.
+
+    In the lammps-data file, only the lattice vectors, the positions of the colloids in the Atoms section, and the bonds
+    in the Bonds section are used. All other sections and information are ignored. In particular, the masses, radii, and
+    surface potentials of the different types of colloidal particles appearing in the lammps-data file should be
+    specified in the masses, radii, and surface_potentials dictionaries in the yaml file of this data class (and, for
+    instance, not in the Masses section of the lammps-data file).
+
+    See https://docs.lammps.org/Howto_triclinic.html for more information about the lattice vectors in the lammps-data
+    files.
+
+    In the Atoms section of the lammps-data files, the different columns from left to right are as follows:
+        Atom Index (should go from 1 to number of atoms).
+        Molecule-ID (ignored)
+        Atom type (these are the types appearing as keys in the mass/diameter/surface potential dictionaries in the yaml file)
+        Charge (ignored)
+        x position
+        y position
+        z position
+
+    In the Bonds section of the lammps-data files, the different columns from left to right are as follows:
+        Bond index (should go from 1 to number of bonds)
+        Bond ID (ignored)
+        Index of first atom involved in the bond.
+        Index of second atom involved in the bond.
 
     :param cluster_specifications:
         The filenames of the cluster definitions in lammps-data format.

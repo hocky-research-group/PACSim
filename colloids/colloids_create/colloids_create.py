@@ -121,6 +121,20 @@ def main():
             f"{configuration_parameters.configuration_generator_parameters}. "
             f"The expected signature is {inspect.signature(generator_class)}.")
 
+    generator_types = generator.types()
+    for t in generator_types:
+        if t not in configuration_parameters.masses:
+            raise ValueError(f"Type {t} of the atoms in the configuration generator is not in masses dictionary.")
+        if t not in configuration_parameters.radii:
+            raise ValueError(f"Type {t} of the atoms in the configuration generator is not in radii dictionary.")
+        if t not in configuration_parameters.surface_potentials:
+            raise ValueError(f"Type {t} of the atoms in the configuration generator is not in surface potentials "
+                             f"dictionary.")
+    # Masses, radii, and surface potentials dictionaries contain the same types (see configuration_parameters.py).
+    for t in configuration_parameters.masses:
+        if t not in generator_types:
+            warnings.warn(f"Type {t} of the masses/radii/surface potentials dictionary is not in the configuration "
+                          f"generator.")
     frame = generator.generate_configuration()
     
     _check_frame_changes(frame, generator.__class__.__name__)

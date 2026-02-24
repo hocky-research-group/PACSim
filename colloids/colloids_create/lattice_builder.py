@@ -91,7 +91,6 @@ class LatticeBuilder():
         """Label atoms as '1' ... 'N' based on atomic number."""
         element_list = np.unique(atomic_numbers).tolist()
         type_map = {atomic_number: element_list.index(atomic_number)+1 for atomic_number in atomic_numbers}
-        #print("\tElement map:",type_map)
         type_list = [ str(type_map[atomic_number]) for atomic_number in atomic_numbers ]
         return type_list
 
@@ -99,7 +98,6 @@ class LatticeBuilder():
     def _set_colloid_labels_typemap(atomic_species):
         """Label atoms as '1' ... 'N' based on species using pymatgen atom names."""
         element_list = np.unique([str(x.name) for x in atomic_species]).tolist()
-        #print("\tElement map:",self.type_map)
         try:
             type_list = [ self.type_map[species.name] for species in atomic_species ]
             return type_list
@@ -173,7 +171,6 @@ class LatticeBuilder():
         # Effective radii in same units as positions
         radii = [self._radii[str(t)].value_in_unit(unit.nanometer) for t in types]
         radii = np.array(radii) + self._brush_length.value_in_unit(unit.nanometer) + self._radii_padding_factor.value_in_unit(unit.nanometer)
-
         dists = self._calculate_distances(positions)
         i = 0
 
@@ -220,24 +217,6 @@ class LatticeBuilder():
 
         return positions, box, types
         
-        '''
-        N = len(positions)
-        
-
-        frame = gsd.hoomd.Frame()
-        frame.configuration.step = 0
-        frame.configuration.dimensions = 3
-        frame.configuration.box = [box[0], box[1], box[2], 0.0, 0.0, 0.0]
-    
-        # Particles
-        frame.particles.N = N
-        frame.particles.types = sorted(set(types))
-        frame.particles.typeid = np.array(
-        [frame.particles.types.index(t) for t in types], dtype=np.int32
-        )
-        frame.particles.position = np.array(positions, dtype=np.float32)
-
-        return frame'''
 
 
     def write_lammps_data(self, positions, box, types, atom_type_map=None, triclinic=True):
@@ -313,64 +292,3 @@ class LatticeBuilder():
         frame.particles.position = np.array(positions, dtype=np.float32)
 
         return frame
-
-
-        '''
-
-        """
-        Generate the initial positions of the colloids in a gsd.hoomd.Frame instance.
-
-        The generated frame should contain the following attributes:
-        - frame.particles.N
-        - frame.particles.position
-        - frame.particles.types
-        - frame.particles.typeid
-        - frame.configuration.box
-
-        The generated frame should not populate the following attributes:
-        - frame.particles.type_shapes
-        - frame.particles.diameter
-        - frame.particles.charge
-        - frame.particles.mass attributes
-
-        :return:
-            The initial configuration of the colloids.
-        :rtype: gsd.hoomd.Frame
-        """
-    
-    #, positions, types, box, radii_dict, charges_dict, masses_dict,
-                #  mass_unit=unit.dalton, length_unit = unit.nanometer, electric_potential_unit= (unit.milli * unit.volt)) -> Frame:
-     #
-         
-        N = len(positions)
-        
-         #with gsd.hoomd.open(name=filename, mode='w') as traj:
-        frame = gsd.hoomd.Frame()
-        frame.configuration.step = 0
-        frame.configuration.dimensions = 3
-        frame.configuration.box = [box[0], box[1], box[2], 0.0, 0.0, 0.0]
-    
-        # Particles
-        frame.particles.N = N
-        frame.particles.types = sorted(set(types))
-        frame.particles.typeid = np.array(
-        [frame.particles.types.index(t) for t in types], dtype=np.int32
-        )
-        frame.particles.position = np.array(positions, dtype=np.float32)
-    
-        # Mass, charge, diameter using units
-        frame.particles.mass = np.array(
-        [masses_dict[frame.particles.types[i]].value_in_unit(mass_unit)
-        for i in frame.particles.typeid], dtype=np.float32
-        )
-        frame.particles.charge = np.array(
-        [charges_dict[frame.particles.types[i]].value_in_unit(electric_potential_unit)
-        for i in frame.particles.typeid], dtype=np.float32
-        )
-        frame.particles.diameter = np.array(
-        [2.0 * radii_dict[frame.particles.types[i]].value_in_unit(length_unit)
-        for i in frame.particles.typeid], dtype=np.float32
-        )
-
-        return frame
-'''

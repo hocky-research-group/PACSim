@@ -50,8 +50,8 @@ use_depletion: false
 use_gravity: false
 use_log: false
 use_plumed: true
-plumed_script: plumed.dat
-velocity_seed: 3
+plumed_script: plumed_unbiased.dat
+velocity_seed: 1
 wall_directions:
   - true
   - true

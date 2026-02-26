@@ -136,7 +136,8 @@ class LatticeBuilder(ConfigurationGenerator):
             for j in range(i + 1, len(effective_radii)):
                 required_scale_factor = max(required_scale_factor,
                                             (effective_radii[i] + effective_radii[j]) / dists[i, j])
-        # TODO: CAN I ASSERT THAT THIS IS CORRECT?
+        assert all(dists[i, j] * required_scale_factor >= effective_radii[i] + effective_radii[j]
+                   for i in range(len(effective_radii)) for j in range(i + 1, len(effective_radii)))
 
         # Apply scale factor to the full supercell.
         structure_full = self._structure.make_supercell(self._lattice_repeats, in_place=False)

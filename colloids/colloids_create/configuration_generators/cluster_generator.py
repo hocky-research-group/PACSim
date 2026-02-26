@@ -6,6 +6,7 @@ import warnings
 from ase.io.lammpsdata import read_lammps_data
 from gsd.hoomd import Frame
 import numpy as np
+from openmm import unit
 from .abstracts import ConfigurationGenerator
 
 
@@ -60,6 +61,15 @@ class ClusterGenerator(ConfigurationGenerator):
         Index of first atom involved in the bond.
         Index of second atom involved in the bond.
 
+    :param masses:
+        The masses dictionary with the particle types as keys and the masses as values.
+    :type masses: dict[str, unit.Quantity]
+    :param radii:
+        The radii dictionary with the particle types as keys and the radii as values.
+    :type radii: dict[str, unit.Quantity]
+    :param surface_potentials:
+        The surface potentials dictionary with the particle types as keys and the surface potentials as values.
+    :type surface_potentials: dict[str, unit.Quantity]
     :param cluster_specifications:
         The filenames of the cluster definitions in lammps-data format.
         All clusters must have the same cell vectors.
@@ -105,11 +115,12 @@ class ClusterGenerator(ConfigurationGenerator):
         If the lattice repeats is not a positive integer or a list of three positive integers.
     """
 
-    def __init__(self, cluster_specifications: list[str], cluster_relative_weights: Sequence[float],
-                 lattice_repeats: Union[int, Sequence[int]], cluster_padding_factor: float,
-                 padding_factor: float, random_rotation: bool) -> None:
+    def __init__(self, masses: dict[str, unit.Quantity], radii: dict[str, unit.Quantity],
+                 surface_potentials: dict[str, unit.Quantity], cluster_specifications: list[str],
+                 cluster_relative_weights: Sequence[float], lattice_repeats: Union[int, Sequence[int]],
+                 cluster_padding_factor: float, padding_factor: float, random_rotation: bool) -> None:
         """Constructor of the ClusterGenerator class."""
-        super().__init__()
+        super().__init__(masses=masses, radii=radii, surface_potentials=surface_potentials)
         if not all(cluster_specification.endswith(".lmp") for cluster_specification in cluster_specifications):
             raise ValueError("The cluster specification file must be of the lammps-data file format.")
         if not len(cluster_specifications) > 0:

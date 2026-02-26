@@ -114,12 +114,15 @@ def main():
     # Instantiate the configuration generator from the YAML-specified class name and parameters.
     generator_class = getattr(configuration_generators, configuration_parameters.configuration_generator)
     try:
-        generator = generator_class(**configuration_parameters.configuration_generator_parameters)
-    except TypeError:
+        generator = generator_class(configuration_parameters.masses, configuration_parameters.radii,
+                                    configuration_parameters.surface_potentials,
+                                    **configuration_parameters.configuration_generator_parameters)
+    except TypeError as e:
         raise TypeError(
             f"Generator {configuration_parameters.configuration_generator} does not accept the given arguments "
             f"{configuration_parameters.configuration_generator_parameters}. "
-            f"The expected signature is {inspect.signature(generator_class)}.")
+            f"The expected signature is {inspect.signature(generator_class)} (the masses, radii, and "
+            f"surface_potentials arguments should not be specified).") from e
 
     generator_types = generator.types()
     for t in generator_types:
@@ -151,11 +154,11 @@ def main():
                                           configuration_parameters.surface_potentials, **modifier_params)
                 modifier.modify_configuration(frame)
                 _check_frame_changes(frame, modifier.__class__.__name__)
-            except TypeError:
+            except TypeError as e:
                 raise TypeError(
                     f"Modifier {modifier_name} does not accept the given arguments {modifier_params}. "
                     f"The expected signature is {inspect.signature(modifier_class)} (the masses, radii, and "
-                    f"surface_potentials arguments should not be specified).")
+                    f"surface_potentials arguments should not be specified).") from e
 
     # Check if the frame has the necessary attributes.
     check_frame_types(frame, configuration_parameters.masses, configuration_parameters.radii,
@@ -180,10 +183,10 @@ def main():
             try:
                 modifier = modifier_class(**modifier_params)
                 modifier.modify_configuration(frame)
-            except TypeError:
+            except TypeError as e:
                 raise TypeError(
                     f"Modifier {modifier_name} does not accept the given arguments {modifier_params}. "
-                    f"The expected signature is {inspect.signature(modifier_class)}.")
+                    f"The expected signature is {inspect.signature(modifier_class)}.") from e
 
     with gsd.hoomd.open(name=args.save_file, mode="w") as f:
         f.append(frame)

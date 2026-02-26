@@ -1,14 +1,30 @@
 from abc import ABC, abstractmethod
 from gsd.hoomd import Frame
+from openmm import unit
 
 
 class ConfigurationGenerator(ABC):
     """
     Abstract base class for a generator of an initial configuration in a gsd.hoomd.Frame instance for a colloid
     simulation.
+
+    This generator receives the masses, radii, and surface potentials dictionaries to be able to use them during
+    configuration generation if necessary.
+
+    :param masses:
+        The masses dictionary with the particle types as keys and the masses as values.
+    :type masses: dict[str, unit.Quantity]
+    :param radii:
+        The radii dictionary with the particle types as keys and the radii as values.
+    :type radii: dict[str, unit.Quantity]
+    :param surface_potentials:
+        The surface potentials dictionary with the particle types as keys and the surface potentials as values.
+    :type surface_potentials: dict[str, unit.Quantity]
     """
 
-    def __init__(self) -> None:
+    # noinspection PyUnusedLocal
+    def __init__(self, masses: dict[str, unit.Quantity], radii: dict[str, unit.Quantity],
+                 surface_potentials: dict[str, unit.Quantity]) -> None:
         """Constructor of the ConfigurationGenerator class."""
         pass
 

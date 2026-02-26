@@ -13,12 +13,15 @@ class LatticeBuilder(ConfigurationGenerator):
     Generator for an initial configuration in a gsd.hoomd.Frame instance for a colloid simulation based on a
     crystal lattice structure defined in a CIF file.
 
-    The lattice structure is loaded from a CIF file, expanded into a supercell, and then uniformly scaled until no
-    particles overlap (accounting for colloid radii, brush length, and an extra padding gap). The resulting lattice
-    structure is then centered at the origin.
+    The lattice structure is loaded from a CIF file and expanded into a supercell. The supercell is then uniformly
+    scaled so that no particles overlap, accounting for colloid radii, brush length, and an extra radii padding gap.
+    The optimal scale factor is computed directly as the maximum ratio of the sum of effective radii to the distance
+    for all particle pairs, using a small (3, 3, 3) test supercell for efficiency. This scale factor is then applied to
+    the full supercell defined by the lattice repeats.
 
-    A smaller test supercell is used to find the optimal scale factor before applying it to the full supercell defined
-    by the lattice vector scaling matrix.
+    The scaled supercell is centered at the origin and embedded in a cubic orthorhombic simulation box. The box side
+    length is chosen so that the outermost particle (including its effective radius) plus a lattice padding gap fits
+    within the box in every direction.
 
     :param masses:
         The masses dictionary with the particle types as keys and the masses as values.
@@ -116,9 +119,6 @@ class LatticeBuilder(ConfigurationGenerator):
     def generate_configuration(self) -> Frame:
         """
         Generate the initial positions of the colloids in a gsd.hoomd.Frame instance.
-
-        Loads the CIF structure, finds the optimal lattice scale factor using a small (3, 3, 3) test supercell,
-        then applies it to the full supercell defined by the lattice repeats.
 
         :return:
             The initial configuration of the colloids.

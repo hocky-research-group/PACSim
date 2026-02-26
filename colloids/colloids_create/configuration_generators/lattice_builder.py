@@ -64,7 +64,7 @@ class LatticeBuilder(ConfigurationGenerator):
     def __init__(self, masses: dict[str, unit.Quantity], radii: dict[str, unit.Quantity],
                  surface_potentials: dict[str, unit.Quantity], lattice_specification: str,
                  lattice_repeats: Union[int, Sequence[int]], brush_length: unit.Quantity,
-                 radii_padding: unit.Quantity) -> None:
+                 radii_padding: unit.Quantity, lattice_padding: unit.Quantity) -> None:
         """Constructor of the LatticeBuilder class."""
         super().__init__(masses=masses, radii=radii, surface_potentials=surface_potentials)
         if not lattice_specification.endswith('.cif'):
@@ -117,13 +117,8 @@ class LatticeBuilder(ConfigurationGenerator):
         """
         Generate the initial positions of the colloids in a gsd.hoomd.Frame instance.
 
-        Loads the CIF structure, finds the optimal lattice scale factor using a small test supercell,
-        then applies it to the full supercell defined by the lattice vector scaling matrix.
-
-        :param test_matrix:
-            The supercell size used for the overlap test (should be small for speed).
-            Defaults to (3, 3, 3).
-        :type test_matrix: tuple[int, int, int]
+        Loads the CIF structure, finds the optimal lattice scale factor using a small (3, 3, 3) test supercell,
+        then applies it to the full supercell defined by the lattice repeats.
 
         :return:
             The initial configuration of the colloids.
@@ -145,14 +140,15 @@ class LatticeBuilder(ConfigurationGenerator):
 
         # Apply scale factor to the full supercell.
         structure_full = self._structure.make_supercell(self._lattice_repeats, in_place=False)
-        scaled_positions = structure_full.cart_coords * required_scale_factor
+        positions = structure_full.cart_coords * required_scale_factor
 
         # Center at origin.
-        positions -= scaled_positions.mean(axis=0)
-        effective_radii = [self._radii[self._type_map[atomic_number]].value_in_unit(unit.nanometer)
+        positions -= positions.mean(axis=0)
+        types = [self._type_map[atomic_number] for atomic_number in structure_full.atomic_numbers]
+        effective_radii = [self._radii[t].value_in_unit(unit.nanometer)
                            + self._brush_length.value_in_unit(unit.nanometer)
                            + self._radii_padding.value_in_unit(unit.nanometer)
-                           for atomic_number in structure_full.atomic_numbers]
+                           for t in types]
 
         # Embed in cubic box with padding.
         box_length = 2.0 * (np.max(np.abs(positions)) + np.max(effective_radii)
@@ -161,7 +157,7 @@ class LatticeBuilder(ConfigurationGenerator):
         # --- Build the Frame ---
         frame = Frame()
         frame.particles.N = len(positions)
-        frame.particles.types = sorted(set(types))
+        frame.particles.types = sorted(self.types())
         frame.particles.typeid = np.array(
             [frame.particles.types.index(t) for t in types], dtype=np.uint32)
         frame.particles.position = np.array(positions, dtype=np.float32)

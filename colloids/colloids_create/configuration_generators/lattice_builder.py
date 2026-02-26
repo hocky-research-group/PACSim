@@ -5,6 +5,7 @@ from openmm import unit
 from pymatgen.core import Element
 from pymatgen.io.cif import CifParser
 from scipy.spatial import distance_matrix
+from colloids.run_parameters import RunParameters
 from .abstracts import ConfigurationGenerator
 
 
@@ -40,10 +41,10 @@ class LatticeBuilder(ConfigurationGenerator):
         single integer (if the same number of repetitions is desired in all directions) or as a sequence of three
         integers (if different numbers of repetitions are desired in different directions).
     :type lattice_repeats: Union[int, Sequence[int]]
-    :param brush_length:
-        The thickness of the brush in the Alexander-de Gennes polymer brush model [i.e., L in eq. (1)].
-        The unit of the brush_length must be compatible with nanometers and the value must be greater than zero.
-    :type brush_length: unit.Quantity
+    :param run_parameters_file:
+        The path to the YAML file containing the run parameters. The brush length used for computing the effective
+        radii is read from this file.
+    :type run_parameters_file: str
     :param radii_padding:
         Extra gap added to the effective radii when checking for overlaps.
         The unit of the radii padding should be compatible with nanometers and the value must be greater than or equal
@@ -59,14 +60,14 @@ class LatticeBuilder(ConfigurationGenerator):
         If the lattice specification file is not a .cif file.
         If the CIF file does not contain exactly one structure.
         If the lattice repeats is not a positive integer or a sequence of three positive integers.
-        If the brush length is not compatible with nanometers or is not greater than zero.
+        If the run parameters file is not a .yaml file.
         If the radii padding is not compatible with nanometers or is negative.
         If the lattice padding is not compatible with nanometers or is negative.
     """
 
     def __init__(self, masses: dict[str, unit.Quantity], radii: dict[str, unit.Quantity],
                  surface_potentials: dict[str, unit.Quantity], lattice_specification: str,
-                 lattice_repeats: Union[int, Sequence[int]], brush_length: unit.Quantity,
+                 lattice_repeats: Union[int, Sequence[int]], run_parameters_file: str,
                  radii_padding: unit.Quantity, lattice_padding: unit.Quantity) -> None:
         """Constructor of the LatticeBuilder class."""
         super().__init__(masses=masses, radii=radii, surface_potentials=surface_potentials)
@@ -78,7 +79,10 @@ class LatticeBuilder(ConfigurationGenerator):
             raise ValueError("The CIF file must contain exactly one structure.")
         self._structure = structures[0]
         self._radii = radii
-        self._brush_length = brush_length  # TODO: SHOULD BE TAKEN FROM RUN.YAML
+        if not run_parameters_file.endswith('.yaml'):
+            raise ValueError("The run parameters file must be a .yaml file.")
+        run_parameters = RunParameters.from_yaml(run_parameters_file)
+        self._brush_length = run_parameters.brush_length
         self._lattice_repeats = lattice_repeats
         self._radii_padding = radii_padding
         self._lattice_padding = lattice_padding
@@ -93,10 +97,6 @@ class LatticeBuilder(ConfigurationGenerator):
                 raise ValueError("The lattice repeats must be either a single integer or a sequence of three integers.")
             if not all(r > 0 for r in self._lattice_repeats):
                 raise ValueError("All values in the lattice repeats must be greater than zero.")
-        if not self._brush_length.unit.is_compatible(unit.nanometer):
-            raise TypeError("The brush length must have a unit that is compatible with nanometers.")
-        if not self._brush_length.value_in_unit(unit.nanometer) > 0.0:
-            raise ValueError("The brush length must have a value greater than zero.")
         if not self._radii_padding.unit.is_compatible(unit.nanometer):
             raise TypeError("The radii padding must have a unit that is compatible with nanometers.")
         if not self._radii_padding.value_in_unit(unit.nanometer) >= 0.0:

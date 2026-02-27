@@ -203,8 +203,6 @@ class ClusterGenerator(ConfigurationGenerator):
                             bond_values += [(new_cluster.get_distance(first_index, second_index))
                                             for first_index, second_index in new_bond_pairs]
                     else:
-                        # Set the positions of the repeated cluster to the unwrapped positions.
-                        repeated_cluster.arrays["positions"][i0:i0 + len(new_cluster)] = unwrapped_positions
                         # Concatenate the arrays of the new cluster to the repeated cluster.
                         for name, a in new_cluster.arrays.items():
                             if name != "bonds":
@@ -212,12 +210,16 @@ class ClusterGenerator(ConfigurationGenerator):
                                                                                axis=0)
                             else:
                                 # For the bonds, we need to adjust the indices to account for the repetitions.
-                                new_bond_pairs = [(first_index + i0, second_index + i0)
+                                new_base_bond_pairs = [(first_index, second_index)
                                                   for first_index, bonds in enumerate(new_cluster.arrays["bonds"])
                                                   for second_index in self._extract_bonded_indices(bonds)]
+                                new_bond_pairs = [(first_index + i0, second_index + i0)
+                                                  for first_index, second_index in new_base_bond_pairs]
                                 bond_pairs += new_bond_pairs
                                 bond_values += [repeated_cluster.get_distance(first_index, second_index)
-                                                for first_index, second_index in new_bond_pairs]
+                                                for first_index, second_index in new_base_bond_pairs]
+                        # Set the positions of the repeated cluster to the unwrapped positions.
+                        repeated_cluster.arrays["positions"][i0:i0 + len(new_cluster)] = unwrapped_positions
                     i0 += len(new_cluster)
 
         # Enlarge the cell of the repeated cluster.

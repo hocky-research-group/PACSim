@@ -25,6 +25,10 @@ class LatticeBuilder(ConfigurationGenerator):
     for all particle pairs, using a small (3, 3, 3) test supercell for efficiency. This scale factor is then applied to
     the full supercell defined by the lattice repeats.
 
+    Optionally, the scale factor can be further optimized by minimizing the steric + electrostatic energy evaluated in
+    vacuum (non-periodic boundary conditions) using OpenMM. A grid of uniformly spaced scale factors around the
+    geometric scale factor is evaluated, and the one with the minimum energy is selected.
+
     The scaled supercell is centered at the origin and embedded in a cubic orthorhombic simulation box. The box side
     length is chosen so that the outermost particle (including its effective radius) plus a lattice padding gap fits
     within the box in every direction.
@@ -62,21 +66,21 @@ class LatticeBuilder(ConfigurationGenerator):
     :type lattice_padding: unit.Quantity
     :param optimize_energy:
         If True, the geometric scale factor is replaced by the scale factor that minimizes the steric +
-        electrostatic energy per particle evaluated in vacuum (non-periodic boundary conditions). The energy is
-        computed for a grid of uniformly spaced scale factors around the geometric scale factor and the one with the
-        minimum energy is selected.
+        electrostatic energy evaluated in vacuum (non-periodic boundary conditions). The energy is computed for a
+        grid of uniformly spaced scale factors around the geometric scale factor and the one with the minimum energy
+        is selected.
         Defaults to False.
     :type optimize_energy: bool
     :param energy_scale_range:
         The range of scale factors to evaluate, specified as (min_factor, max_factor) relative to the geometric
         scale factor. For example, (0.5, 1.5) means the scan range is from 50% to 150% of the geometric scale
         factor.
-        Defaults to (0.5, 1.5).
+        Only allowed when optimize_energy is True. Defaults to (0.5, 1.5) when not specified.
     :type energy_scale_range: Optional[Sequence[float]]
     :param energy_scale_samples:
         The number of uniformly spaced scale factors to evaluate in the scan range.
-        Defaults to 50.
-    :type energy_scale_samples: int
+        Only allowed when optimize_energy is True. Defaults to 50 when not specified.
+    :type energy_scale_samples: Optional[int]
 
     :raises ValueError:
         If the lattice specification file is not a .cif file.
@@ -85,6 +89,7 @@ class LatticeBuilder(ConfigurationGenerator):
         If the run parameters file is not a .yaml file.
         If the radii padding is not compatible with nanometers or is negative.
         If the lattice padding is not compatible with nanometers or is negative.
+        If energy_scale_range or energy_scale_samples is set when optimize_energy is False.
         If the energy scale range does not consist of exactly two floats satisfying 0 < min < max.
         If the energy scale samples is less than 2.
     :raises RuntimeError:
@@ -95,8 +100,8 @@ class LatticeBuilder(ConfigurationGenerator):
                  surface_potentials: dict[str, unit.Quantity], lattice_specification: str,
                  lattice_repeats: Union[int, Sequence[int]], run_parameters_file: str,
                  radii_padding: unit.Quantity, lattice_padding: unit.Quantity,
-                 optimize_energy: bool = False, energy_scale_range: Optional[Sequence[float]] = (0.5, 1.5),
-                 energy_scale_samples: int = 50) -> None:
+                 optimize_energy: bool = False, energy_scale_range: Optional[Sequence[float]] = None,
+                 energy_scale_samples: Optional[int] = None) -> None:
         """Constructor of the LatticeBuilder class."""
         super().__init__(masses=masses, radii=radii, surface_potentials=surface_potentials)
         if not lattice_specification.endswith('.cif'):
@@ -118,8 +123,13 @@ class LatticeBuilder(ConfigurationGenerator):
         self._radii_padding = radii_padding
         self._lattice_padding = lattice_padding
         self._optimize_energy = optimize_energy
-        self._energy_scale_range = energy_scale_range
-        self._energy_scale_samples = energy_scale_samples
+        if not optimize_energy:
+            if energy_scale_range is not None:
+                raise ValueError("energy_scale_range must not be set when optimize_energy is False.")
+            if energy_scale_samples is not None:
+                raise ValueError("energy_scale_samples must not be set when optimize_energy is False.")
+        self._energy_scale_range = energy_scale_range if energy_scale_range is not None else (0.5, 1.5)
+        self._energy_scale_samples = energy_scale_samples if energy_scale_samples is not None else 50
         # Label atoms as their element symbols based on atomic number, e.g. 'Fe', 'O', etc.
         self._type_map = {atomic_number: str(Element.from_Z(atomic_number))
                           for atomic_number in np.unique(self._structure.atomic_numbers)}
@@ -162,11 +172,11 @@ class LatticeBuilder(ConfigurationGenerator):
                                run_parameters: RunParameters, geometric_scale_factor: float,
                                scale_range: tuple[float, float], scale_samples: int) -> float:
         """
-        Find the scale factor that minimizes the steric + electrostatic energy per particle.
+        Find the scale factor that minimizes the steric + electrostatic energy.
 
         A grid of uniformly spaced scale factors is evaluated. For each scale factor, the positions
-        are computed as base_cart_coords * scale (centered at the origin), and the energy is computed
-        in vacuum (non-periodic). The scale factor with the minimum energy is returned.
+        are computed as base_cart_coords * scale (centered at the origin), and the total energy is
+        computed in vacuum (non-periodic). The scale factor with the minimum energy is returned.
 
         :param base_cart_coords:
             The unscaled Cartesian coordinates from pymatgen, shape (N, 3).
@@ -197,7 +207,7 @@ class LatticeBuilder(ConfigurationGenerator):
         :type scale_samples: int
 
         :return:
-            The optimal scale factor that minimizes the energy per particle.
+            The optimal scale factor that minimizes the total energy.
         :rtype: float
 
         :raises RuntimeError:

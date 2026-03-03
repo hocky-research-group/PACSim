@@ -231,8 +231,8 @@ class ClusterGenerator(ConfigurationGenerator):
             # See Properties section here: https://en.wikipedia.org/wiki/Rotation_matrix
             random_rotation_matrices = np.random.rand(r[0], r[1], r[2], 3, 3) # Shape: (r[0], r[1], r[2], 3, 3)
             u, _, vh = np.linalg.svd(random_rotation_matrices)
-            random_rotation_matrices = np.einsum("...ij,...jk->...ik", u, vh) # Shape: (r[0], r[1], r[2], 3, 3)
-            cluster_index_padded_positions = np.einsum("...ij,...pjk->...pik", random_rotation_matrices, cluster_index_padded_positions) # Shape: (r[0], r[1], r[2], max_cluster_size, 3)
+            random_rotation_matrices = u @ vh # Shape: (r[0], r[1], r[2], 3, 3)
+            positions = positions @ random_rotation_matrices # Shape: (r[0], r[1], r[2], max_cluster_size, 3)
 
         positions += position_displacements[:, :, :, np.newaxis, :] # Shape: (r[0], r[1], r[2], max_cluster_size, 3)
         
@@ -280,7 +280,7 @@ class ClusterGenerator(ConfigurationGenerator):
 
             # The offset that should be applied to the bond pairs associated with each cluster is given by the cumulative 
             # sum of the number of particles in the previous clusters. 
-            bond_pair_offset_values = np.cumsum(bond_pair_offset_values.reshape(-1)) # Shape: (r[0] * r[1] * r[2])
+            bond_pair_offset_values = np.cumsum(bond_pair_offset_values.reshape(-1)) - bond_pair_offset_values.reshape(-1)[0]
 
             # Get the indices for the bond pair offset indices
             bond_pair_offset_indices = (bond_pair_offset_indices * np.arange(r[0] * r[1] * r[2]).reshape(r)[:, :, :, np.newaxis]).reshape(-1) # Shape: (r[0] * r[1] * r[2] * max_n_bonds)

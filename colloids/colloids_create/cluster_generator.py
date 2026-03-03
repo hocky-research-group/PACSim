@@ -219,16 +219,12 @@ class ClusterGenerator(ConfigurationGenerator):
         # Select a cluster for each displacement based on the relative weights of the clusters.
         cluster_selections = np.random.choice(len(centered_padded_clusters), size=r, p=self._cluster_relative_weights)
 
-        # Assign the positions, bonds, and types of the selected clusters to the corresponding displacements. The positions and bonds of the
+        # Assign the positions and types of the selected clusters to the corresponding displacements. The positions and bonds of the
         # clusters are padded to the same size so that they can be indexed by the cluster selections. Offsets must be applied to positions and
         # bond pairs to account for the displacements of the clusters. The bond values and types do not need to be modified as they are just 
         # the bond lengths in the original cluster definition.
         positions = wrapped_positions_padded[cluster_selections] # Shape: (r[0], r[1], r[2], max_cluster_size, 3)
-        type_ids = type_ids_padded[cluster_selections] # Shape: (r[0], r[1], r[2], max_cluster_size)
-        bond_pairs = bond_pairs_padded[cluster_selections] # Shape: (r[0], r[1], r[2], max_n_bonds, 2)
-        bond_values = bond_values_padded[cluster_selections] # Shape: (r[0], r[1], r[2], max_n_bonds)
-        bond_pair_offset_values = bond_pair_offset_values[cluster_selections] # Shape: (r[0], r[1], r[2])
-        bond_pair_offset_indices = bond_pair_offset_indices_padded[cluster_selections] # Shape: (r[0], r[1], r[2], max_n_bonds)        
+        type_ids = type_ids_padded[cluster_selections] # Shape: (r[0], r[1], r[2], max_cluster_size)    
 
         if self._random_rotation:
             # Generate uniformly randomized rotations for each cluster and apply them to the unwrapped positions of the clusters.
@@ -245,26 +241,6 @@ class ClusterGenerator(ConfigurationGenerator):
         final_positions = positions.reshape(-1, 3) # Shape: (r[0] * r[1] * r[2] * max_cluster_size, 3)
         final_positions = final_positions[~np.any(np.isnan(final_positions), axis=1)]
         final_type_ids = type_ids[~np.isnan(type_ids)].astype(int)
-        final_bond_values = bond_values.reshape(-1) # Shape: (r[0] * r[1] * r[2] * max_n_bonds,)
-        final_bond_values = final_bond_values[~np.isnan(final_bond_values)]
-
-        # The offset that should be applied to the bond pairs associated with each cluster is given by the cumulative 
-        # sum of the number of particles in the previous clusters. 
-        bond_pair_offset_values = np.cumsum(bond_pair_offset_values.reshape(-1)) # Shape: (r[0] * r[1] * r[2])
-
-        # Get the indices for the bond pair offset indices
-        bond_pair_offset_indices = (bond_pair_offset_indices * np.arange(r[0] * r[1] * r[2]).reshape(r)[:, :, :, np.newaxis]).reshape(-1) # Shape: (r[0] * r[1] * r[2] * max_n_bonds)
-        bond_pair_offset_indices = bond_pair_offset_indices[~np.isnan(bond_pair_offset_indices)].astype(int)
-
-        bond_pair_offsets = bond_pair_offset_values[bond_pair_offset_indices] # Shape: (n_bonds,)
-
-        # Reshape the bond pairs to be a list of bond pairs for all clusters in all displacements. 
-        # Remove any bond pairs that are NaN (i.e., padding values).
-        # Apply the offsets to the bond pairs to get the correct indices for the repeated clusters. 
-        bond_pairs = bond_pairs.reshape(-1, 2) # Shape: (r[0] * r[1] * r[2] * max_n_bonds, 2)
-        bond_pairs = bond_pairs[~np.any(np.isnan(bond_pairs), axis=1)].astype(int) 
-
-        final_bond_pairs = bond_pairs + bond_pair_offsets[:, np.newaxis] # Shape: (n_bonds, 2)
 
         # Set the cell of the repeated cluster.
         full_cell = np.array([self._padding_factor * r[c] * cell[c] for c in range(3)])
@@ -286,7 +262,40 @@ class ClusterGenerator(ConfigurationGenerator):
              full_cell[2][0] / full_cell[2][2],
              full_cell[2][1] / full_cell[2][2]], dtype=np.float32)
 
-        if len(final_bond_pairs) > 0:
+        if bond_values_padded.size > 0:
+            # Assign the positions and types of the selected clusters to the corresponding displacements. The positions and bonds of the
+            # clusters are padded to the same size so that they can be indexed by the cluster selections. Offsets must be applied to positions and
+            # bond pairs to account for the displacements of the clusters. The bond values and types do not need to be modified as they are just 
+            # the bond lengths in the original cluster definition.
+            bond_pairs = bond_pairs_padded[cluster_selections] # Shape: (r[0], r[1], r[2], max_n_bonds, 2)
+            bond_values = bond_values_padded[cluster_selections] # Shape: (r[0], r[1], r[2], max_n_bonds)
+            bond_pair_offset_values = bond_pair_offset_values[cluster_selections] # Shape: (r[0], r[1], r[2])
+            bond_pair_offset_indices = bond_pair_offset_indices_padded[cluster_selections] # Shape: (r[0], r[1], r[2], max_n_bonds)
+        
+
+            # Reshape the bonds to be a list of positions and types for all clusters in all displacements. 
+            # Remove any positions that are NaN (i.e., padding values).
+            final_bond_values = bond_values.reshape(-1) # Shape: (r[0] * r[1] * r[2] * max_n_bonds,)
+            final_bond_values = final_bond_values[~np.isnan(final_bond_values)]
+
+            # The offset that should be applied to the bond pairs associated with each cluster is given by the cumulative 
+            # sum of the number of particles in the previous clusters. 
+            bond_pair_offset_values = np.cumsum(bond_pair_offset_values.reshape(-1)) # Shape: (r[0] * r[1] * r[2])
+
+            # Get the indices for the bond pair offset indices
+            bond_pair_offset_indices = (bond_pair_offset_indices * np.arange(r[0] * r[1] * r[2]).reshape(r)[:, :, :, np.newaxis]).reshape(-1) # Shape: (r[0] * r[1] * r[2] * max_n_bonds)
+            bond_pair_offset_indices = bond_pair_offset_indices[~np.isnan(bond_pair_offset_indices)].astype(int)
+
+            bond_pair_offsets = bond_pair_offset_values[bond_pair_offset_indices] # Shape: (n_bonds,)
+
+            # Reshape the bond pairs to be a list of bond pairs for all clusters in all displacements. 
+            # Remove any bond pairs that are NaN (i.e., padding values).
+            # Apply the offsets to the bond pairs to get the correct indices for the repeated clusters. 
+            bond_pairs = bond_pairs.reshape(-1, 2) # Shape: (r[0] * r[1] * r[2] * max_n_bonds, 2)
+            bond_pairs = bond_pairs[~np.any(np.isnan(bond_pairs), axis=1)].astype(int) 
+
+            final_bond_pairs = bond_pairs + bond_pair_offsets[:, np.newaxis] # Shape: (n_bonds, 2)
+
             all_constraints = np.array(final_bond_pairs, dtype=np.uint32)
             all_values = np.array(final_bond_values, dtype=np.float32)
             frame.constraints.N = len(final_bond_pairs)

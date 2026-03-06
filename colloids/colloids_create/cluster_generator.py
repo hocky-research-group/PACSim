@@ -2,7 +2,7 @@ from math import acos, pi
 from random import choices, uniform
 import re
 from typing import Sequence, Union
-from ase import Atoms
+from ase import Atoms, cell
 from gsd.hoomd import Frame
 import numpy as np
 from colloids.colloids_create import ConfigurationGenerator
@@ -164,6 +164,7 @@ class ClusterGenerator(ConfigurationGenerator):
 
         # All cells are assumed to be the same so we can use the first one.
         cell = centered_padded_clusters[0].get_cell()
+        individual_cell = np.array([self._padding_factor * cell[c] for c in range(3)])
 
         final_types_list = tuple(sorted(list(set([str(atom.number) for cluster_types in centered_padded_clusters for atom in cluster_types]))))
 
@@ -228,6 +229,15 @@ class ClusterGenerator(ConfigurationGenerator):
         type_ids = type_ids_padded[cluster_selections] # Shape: (r[0], r[1], r[2], max_cluster_size)    
 
         if self._random_rotation:
+            # Test to see if any positions in the clusters are outside the unit cell. If so, random rotations cannot be applied as 
+            # they could cause some colloids to be outside the box. In this case, an error is raised and the user should increase 
+            # the cluster padding factor to allow for rotations.
+            outside_unit_cell = np.any((np.linalg.norm(zero_min_positions, axis=-1)[:, np.newaxis] - 0.5 * np.linalg.norm(individual_cell, axis=-1))[np.newaxis, :] > 0)
+            if outside_unit_cell:
+                raise ValueError("Some positions in the centered and padded clusters are outside of the unit cell. "
+                                 "Random rotations cannot be applied as they could cause some colloids to be outside the box. "
+                                 "Increase the cluster padding factor to allow for rotations.")
+
             # Generate uniformly randomized rotations for each cluster and apply them to the unwrapped positions of the clusters.
             # See Properties section here: https://en.wikipedia.org/wiki/Rotation_matrix
             random_rotation_matrices = np.random.rand(r[0], r[1], r[2], 3, 3) # Shape: (r[0], r[1], r[2], 3, 3)
@@ -244,7 +254,7 @@ class ClusterGenerator(ConfigurationGenerator):
         final_type_ids = type_ids[~np.isnan(type_ids)].astype(int)
 
         # Set the cell of the repeated cluster.
-        full_cell = np.array([self._padding_factor * r[c] * cell[c] for c in range(3)])
+        full_cell = individual_cell * r
 
         # Shift the positions so that the center of the box is at the origin.
         final_positions -= (np.max(final_positions, axis=0) - np.min(final_positions, axis=0)) / 2

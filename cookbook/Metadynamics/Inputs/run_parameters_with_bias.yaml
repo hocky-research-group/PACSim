@@ -51,7 +51,7 @@ use_gravity: false
 use_log: false
 use_plumed: true
 plumed_script: plumed_metad.dat
-velocity_seed: 3
+velocity_seed: 5
 wall_directions:
   - true
   - true

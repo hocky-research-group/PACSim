@@ -1,7 +1,7 @@
 UNITS LENGTH=nm TIME=ps ENERGY=kj/mol
 #https://www.plumed.org/doc-master/user-doc/html/COORDINATIONNUMBER/
 
-c_all: COORDINATIONNUMBER SPECIES=@mdatoms SWITCH={EXP D_0=300.0 R_0=50 D_MAX=600} MEAN
+c_all: COORDINATIONNUMBER SPECIES=@mdatoms SWITCH={EXP D_0=300.0 R_0=50 D_MAX=400} MEAN
 
 METAD ...
   ARG=c_all.mean

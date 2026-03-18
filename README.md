@@ -150,15 +150,24 @@ The Python package requires Python 3.10 or newer. The `pyproject.toml` dependenc
 Additional optional components may require manual installation:
 
 - `hoomd` for the older HOOMD-related scripts and tests in this repository.
-- `plumed` and `openmm-plumed` for PLUMED-enabled simulations.
+- `PLUMED` and `openmm-plumed` for PLUMED-enabled simulations.
 
-If you use PLUMED, some modules needed by this codebase are not enabled by default. The repository previously documented enabling:
+Note that some `PLUMED` modules that are necessary for functionality such as calculation of local order parameters and adjacency matrices are not compiled by default, but can be enabled during configuration. 
+We recommend enabling the crystallization, multicolvar, and adjmat modules when compiling:
 
 ```bash
 ./configure --enable-modules=crystallization+multicolvar+adjmat
 ```
+ 
+PLUMED 2.9.0 is available for download [here](https://github.com/plumed/plumed2/releases/tag/v2.9.0). Instructions for configuring and compiling can be found [here](https://www.plumed.org/doc-v2.9/user-doc/html/_installation.html). 
 
-For `openmm-plumed`, building against your installed PLUMED version is the safest route.
+After installing and configuring PLUMED, openmm-plumed can be installed by following [these instructions](https://github.com/openmm/openmm-plumed). To ensure that openmm-plumed points to the right version of PLUMED, we strongly recommend building the openmm-plumed plugin from scratch using CMake rather than doing a conda install.
+
+If you are using PLUMED, it is not necessary to install the MPI version. However, one should carefully check that OpenMP
+is enabled during the configuration step of PLUMED. Then, increasing `PLUMED_NUM_THREADS` should speed up the 
+calculations and increase CPU usage.
+
+For the CPU platform of OpenMM, it might make sense for small systems to set `OPENMM_CPU_THREADS=1`.
 
 ## Typical workflow
 

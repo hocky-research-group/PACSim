@@ -1,42 +1,36 @@
-cif: CsCl.cif
-cluster_specifications: 
- - "cluster.lmp"
-cluster_relative_weights:
-  - 1.0
-lattice_repeats: 1
-cluster_padding_factor: 3.0
-padding_factor: 1.0
-lattice_scale_factor: 0.5
-lattice_scale_start: 50.0 
-lattice_vector_scaling_matrix: [6, 6, 6]
-radii_padding_factor: !Quantity
+configuration_generator: LatticeBuilder
+configuration_generator_parameters:
+  lattice_specification: CsCl.cif
+  lattice_repeats: 6
+  run_parameters_file: run.yaml
+  radii_padding: !Quantity
     unit: nanometer
-    value: 5.0
+    value: 20.0 
+  lattice_padding: !Quantity
+    unit: nanometer
+    value: 412.61
+  optimize_energy: true
 masses:
-  "1": !Quantity
+  "Cs": !Quantity
     unit: dalton
     value: 1.0
-  "2": !Quantity
+  "Cl": !Quantity
     unit: dalton
     value: 1.0
 radii:
-  "1": !Quantity
-    unit: nanometer
-    value: 105.0
-  "2": !Quantity
+  "Cs": !Quantity
     unit: nanometer
     value: 85.0
+  "Cl": !Quantity
+    unit: nanometer
+    value: 105.0
 surface_potentials:
-  "1": !Quantity
+  "Cs": !Quantity
     unit: millivolt
     value: 50.0
-  "2": !Quantity
+  "Cl": !Quantity
     unit: millivolt
     value: -50.0
-brush_length: !Quantity
-    unit: nanometer
-    value: 10.0
-random_rotation: false
 initial_modifiers: null
 initial_modifiers_parameters: null
 final_modifiers: null

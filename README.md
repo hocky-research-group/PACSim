@@ -1,8 +1,14 @@
-# Ionic Colloids
+# PACSim - stability version
+
+This code was used for the paper _Programming Ionic Colloidal Crystals with
+Molecular Surfactants_ by Steven van Kesteren and coworkers. 
+
+Simulation inputs and results are available from [NYU Box](https://nyu.box.com/v/pacsim-stability-results)
+
+## Dependencies
 
 Install and setup [Git Large File Storage](https://git-lfs.com) (used for the large files in the Literature directory.)
 
-## Dependencies
 
 If you only want to use the openmm part of this package, you can use Python 3.12 (or any older version >= 3.10).
 

@@ -35,7 +35,7 @@ alpha: 1.0
 run_steps: 100000000
 checkpoint_interval: 1000000
 state_data_interval: 10000
-trajectory_interval: 10000000
+trajectory_interval: 1000000
 final_configuration_gsd_filename: final_frame.gsd
 initial_configuration: initial_configuration.gsd
 checkpoint_filename: checkpoint.chk

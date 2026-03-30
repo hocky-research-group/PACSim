@@ -16,7 +16,7 @@ radii:
     value: 105.0
   "2": !Quantity
     unit: nanometer
-    value: 97.5
+    value: 85.0
 surface_potentials:
   "1": !Quantity
     unit: millivolt

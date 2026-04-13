@@ -15,6 +15,9 @@ masses:
   "2": !Quantity
     unit: dalton
     value: 1.885
+  "S": !Quantity
+    unit: dalton
+    value: 0.0
 radii:
   "1": !Quantity
     unit: nanometer
@@ -22,6 +25,9 @@ radii:
   "2": !Quantity
     unit: nanometer
     value: 85.0
+  "S": !Quantity
+    unit: nanometer
+    value: 30.0
 surface_potentials:
   "1": !Quantity
     unit: millivolt
@@ -29,8 +35,13 @@ surface_potentials:
   "2": !Quantity
     unit: millivolt
     value: 50.0
+  "S": !Quantity
+    unit: millivolt
+    value: -50.0
 random_rotation: false
-initial_modifiers: null
-initial_modifiers_parameters: null
+initial_modifiers: 
+    - "SubstrateModifier"
+initial_modifiers_parameters:
+  - "substrate_type": "S"
 final_modifiers: null
 final_modifiers_parameters: null

@@ -1,14 +1,14 @@
 configuration_generator: LatticeBuilder
 configuration_generator_parameters:
   lattice_specification: CsCl.cif
-  lattice_repeats: 6
+  lattice_repeats: 15
   run_parameters_file: run.yaml
   radii_padding: !Quantity
     unit: nanometer
     value: 20.0 
   lattice_padding: !Quantity
     unit: nanometer
-    value: 412.61
+    value: 1000
   optimize_energy: true
 masses:
   "Cs": !Quantity

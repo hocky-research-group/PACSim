@@ -22,7 +22,7 @@ class TestClusterGenerator(object):
     def test_cubic_lattice_with_satellites_generator(self, configuration_parameters_file,
                                                      initial_configuration_filename, reference_configuration_filename):
         # Comparison to reference configurations in gsd format created by a legacy script with hoomd.
-        subprocess.run(f"colloids-create {configuration_parameters_file} {initial_configuration_filename}",
+        subprocess.run(f"pacsim-create {configuration_parameters_file} {initial_configuration_filename}",
                        shell=True, check=True)
         assert os.path.isfile(initial_configuration_filename)
         type_map = {"1": "N", "2": "P"}  # Map from types in generated gsd file to types in reference gsd file.

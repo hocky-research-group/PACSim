@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "colloids"
+name = "PACSim"
 readme = "README.md"
 requires-python = ">=3.10"
 version = "0.0.1"
@@ -25,10 +25,10 @@ dependencies = [
 ]
 
 [project.scripts]
-colloids-run = "colloids.colloids_run:main"
-colloids-create = "colloids.colloids_create.colloids_create:main"
-colloids-analyze = "colloids.colloids_analyze.colloids_analyze:main"
-colloids-tune = "colloids.colloids_tune.colloids_tune:main"
+pacsim-run = "colloids.colloids_run:main"
+pacsim-create = "colloids.colloids_create.colloids_create:main"
+pacsim-analyze = "colloids.colloids_analyze.colloids_analyze:main"
+pacsim-tune = "colloids.colloids_tune.colloids_tune:main"
 
 [tool.setuptools.packages.find]
 exclude = ["Literature", "jupyter-scripts"]

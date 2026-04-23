@@ -1,34 +1,158 @@
-# Ionic Colloids
+# PACSim
 
-Install and setup [Git Large File Storage](https://git-lfs.com) (used for the large files in the Literature directory.)
+PACSim is a Python package for building, running, resuming, analyzing, and tuning simulations of patchy and ionic colloidal systems. The package is centered on OpenMM-based molecular simulation workflows and uses GSD files for configurations and trajectories.
 
-## Dependencies
+The repository includes:
 
-If you only want to use the openmm part of this package, you can use Python 3.12 (or any older version >= 3.10).
+- A simulation runner for colloidal dynamics in OpenMM.
+- A configuration generator that builds initial GSD structures from LAMMPS-style cluster definitions.
+- Analysis tools for comparing simulation state data across runs.
+- A tuning tool for matching target interaction well depths by solving for surface potentials.
+- Tests and benchmark scripts covering the implemented forces and workflows.
 
-If you want to use the Hoomd or openmm-plumed parts of this package, use Python 3.10 because that is the latest Python version that is supported by Hoomd < 3 and openmm-plumed v2.
+## What PACSim can do
 
-We recommend installing Python and the required packages using 
-[Anaconda](https://www.anaconda.com/products/distribution). 
+PACSim currently exposes the following capabilities in code:
 
-The following packages are required:
+- Simulate colloidal systems with steric and electrostatic pair interactions based on the parameterization described in Hueckel, Hocky, Palacci, and Sacanna, *Nature* 580, 487-490 (2020).
+- Optionally include shifted Lennard-Jones confining walls in the x, y, and z directions.
+- Optionally include an implicit charged substrate wall.
+- Optionally include gravity and analytical depletion interactions.
+- Optionally include PLUMED-driven biasing or collective-variable terms through `openmm-plumed`.
+- Start from GSD configurations containing particle positions, velocities, types, diameters, surface potentials, masses, box information, and constraints.
+- Resume simulations from OpenMM checkpoint files.
+- Write trajectories, state data, checkpoints, and final configurations during a run.
+- Ramp or otherwise update force parameters during a simulation via custom update reporters.
+- Generate initial configurations from one or more cluster templates stored as LAMMPS data files.
+- Apply configurable initial and final modifiers during configuration generation.
+- Plot and compare state-data output from multiple simulation runs.
+- Tune a particle type's surface potential to achieve a target interaction minimum against another particle type.
 
-- jupyterlab >= 4.1 
-- matplotlib >= 3.8
-- numpy >= 1.26
-- openmm >= 8.1
-- pytest >= 7.4
-- gsd >= 3.2
-- pyyaml >= 6.0
-- tqdm >= 4.65
-- pandas >= 2.2
-- hoomd == 2.9.7
-- plumed == 2.9.0
-- openmm-plumed v2
-- scipy >= 1.16.1
-- pymatgen >= 2024.10.3
+## Main command-line tools
 
-Note that some PLUMED modules that are necessary for functionality such as calculation of local order parameters and adjacency matrices are not compiled by default, but can be enabled during configuration. 
+Installing the package creates `pacsim-*` command-line tools:
+
+- `pacsim-run`
+- `pacsim-create`
+- `pacsim-analyze`
+- `pacsim-tune`
+
+Legacy `colloids-*` command names are still provided as compatibility aliases.
+
+### `pacsim-run`
+
+`pacsim-run` runs an OpenMM simulation from a YAML parameter file:
+
+```bash
+pacsim-run run.yaml
+```
+
+The run configuration controls:
+
+- Input GSD file and frame selection.
+- OpenMM platform and integrator settings.
+- Pair-potential parameters such as brush density, brush length, Debye length, and dielectric constant.
+- Optional walls, depletion, gravity, implicit substrate, and PLUMED forces.
+- Output filenames and reporting intervals.
+- Optional equilibration, minimization, and velocity initialization.
+- Optional time-dependent parameter updates via update reporters.
+
+An example configuration can be written with:
+
+```bash
+pacsim-run --example
+```
+
+See [`colloids/tests/run_test.yaml`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/tests/run_test.yaml) for a working example.
+
+### Resuming a run
+
+Simulation restarts are handled by `pacsim-run` itself using the `-c/--checkpoint_file` option:
+
+```bash
+pacsim-run run.yaml -c checkpoint.chk
+```
+
+When a checkpoint is provided, PACSim reloads the OpenMM state and continues writing trajectory, state-data, and update-reporter outputs in append mode.
+
+### `pacsim-create`
+
+`pacsim-create` builds an initial GSD configuration for a simulation:
+
+```bash
+pacsim-create configuration.yaml initial_configuration.gsd
+```
+
+The configuration-generation workflow supports:
+
+- Reading one or more cluster templates from LAMMPS data files.
+- Combining cluster types with specified relative weights.
+- Repeating clusters on a lattice.
+- Optional random cluster rotation.
+- Per-type masses, radii, and surface potentials.
+- Optional initial and final modifiers that alter the generated structure.
+
+An example configuration can be written with:
+
+```bash
+pacsim-create --example
+```
+
+See [`colloids/colloids_create/configuration.yaml`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_create/configuration.yaml) and [`colloids/colloids_create/cluster.lmp`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_create/cluster.lmp) for examples.
+
+### `pacsim-analyze`
+
+`pacsim-analyze` plots recorded simulation state data, including comparisons across multiple runs:
+
+```bash
+pacsim-analyze analysis.yaml Run1/run.yaml Run2/run.yaml Run3/run.yaml
+```
+
+This tool reads:
+
+- One analysis YAML file describing the plotting settings.
+- One or more simulation YAML files describing the runs whose output CSV files should be plotted.
+
+An example analysis configuration can be written with:
+
+```bash
+pacsim-analyze --example
+```
+
+See [`colloids/colloids_analyze/analysis.yaml`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_analyze/analysis.yaml) for an example.
+
+### `pacsim-tune`
+
+`pacsim-tune` solves for a surface potential that produces a desired interaction well depth between two colloid types:
+
+```bash
+pacsim-tune run.yaml tune.yaml
+```
+
+This is useful when you want the interaction between a chosen pair of particle types to match a target minimum without manually scanning parameter values.
+
+An example tuning configuration can be written with:
+
+```bash
+pacsim-tune --example
+```
+
+## Installation
+
+Install the package in your active environment from the repository root:
+
+```bash
+pip install -e .
+```
+
+The Python package requires Python 3.10 or newer. The `pyproject.toml` dependencies cover the core OpenMM and analysis workflow.
+
+Additional optional components may require manual installation:
+
+- `hoomd` for the older HOOMD-related scripts and tests in this repository.
+- `PLUMED` and `openmm-plumed` for PLUMED-enabled simulations.
+
+Note that some `PLUMED` modules that are necessary for functionality such as calculation of local order parameters and adjacency matrices are not compiled by default, but can be enabled during configuration. 
 We recommend enabling the crystallization, multicolvar, and adjmat modules when compiling:
 
 ```bash
@@ -45,103 +169,63 @@ calculations and increase CPU usage.
 
 For the CPU platform of OpenMM, it might make sense for small systems to set `OPENMM_CPU_THREADS=1`.
 
-## Installation
+## Typical workflow
 
-Clone the repository and install the package in editable mode in your virtual environment using pip:
+1. Generate an initial configuration:
 
 ```bash
-pip install -e .
+pacsim-create configuration.yaml first_frame.gsd
 ```
 
-Note that this attempts to install the requirements with pip, if you did not install them yourself before. However, because hoomd and openmm-plumed are not available on PyPI, you need to install them manually (or via conda). If plumed was not previously configured, it will be installed at this point with default modules and some functionality may not be available.
+2. Run the simulation:
+
+```bash
+pacsim-run run.yaml
+```
+
+3. Resume later if needed:
+
+```bash
+pacsim-run run.yaml -c checkpoint.chk
+```
+
+4. Analyze state data:
+
+```bash
+pacsim-analyze analysis.yaml run.yaml
+```
+
+5. Optionally tune interaction parameters for a later run:
+
+```bash
+pacsim-tune run.yaml tune.yaml
+```
+
+## Outputs
+
+Depending on the run configuration, PACSim writes:
+
+- A GSD trajectory.
+- A CSV file with time, kinetic energy, potential energy, temperature, and speed.
+- An OpenMM checkpoint file.
+- CSV files produced by update reporters when parameter ramps are enabled.
+- An optional final GSD configuration.
 
 ## Testing
 
-After installation, you can test whether your installation is working correctly by running the following command from 
-this directory:
+Run the test suite from the repository root with:
 
 ```bash
 pytest colloids
 ```
 
-If hoomd is not installed, some tests are automatically skipped.
+Some tests are skipped automatically when optional dependencies such as HOOMD are not installed.
 
-## Usage
+## Repository layout
 
-The installation process creates three executables `colloids-run`, `colloids-resume`, and `colloids-create`. You might 
-have to add the directory where pip installs executables to your PATH environment variable in order to access these 
-executables.
-
-### colloids-run
-
-The `colloids-run` executable is used to run simulations. It expects a configuration file in yaml format as the only 
-positional argument:
-
-```bash
-colloids-run run.yaml
-```
-
-An exemplary configuration file called `example.yaml` can be created with the command 
-`colloids-run --example`. Another exemplary configuration file is provided in [`colloids/tests/run_test.yaml`](colloids/tests/run_test.yaml).
-
-### colloids-resume
-A simulation that is run with the `colloids-run` executable creates checkpoints in periodic intervals. One can resume a 
-simulation from a checkpoint using the `colloids-resume` executable. It expects the original configuration file (because
-the checkpoint file only stores the positions and velocities of the particles in an OpenMM context), the checkpoint 
-file, and the number of time steps that should be run (the corresponding value in the configuration file is ignored). 
-For example, use the following command to continue a simulation for 100000 time steps:
-
-```bash
-colloids-resume run.yaml checkpoint.chk 100000
-```
-
-### colloids-create
-The configuration file for the `colloids-run` executable specifies the filename of an initial configuration for the 
-simulation in the `initial_configuration` key. This initial configuration should be stored in the [GSD/HOOMD file 
-format](https://www.ovito.org/docs/current/reference/file_formats/input/gsd.html#file-formats-input-gsd).
-
-The `colloids-create` executable can be used to create an initial configuration for simulations in the GSD file 
-format. It expects two positional arguments:
-1. A configuration file that specifies the parameters of the initial configuration. See 
-   [`colloids/colloids_create/configuration.yaml`](colloids/colloids_create/configuration.yaml) for an example. Another 
-   exemplary configuration file called `example_configuration.yaml` can be created with the command
-   `colloids-create --example`.
-2. The name of the GSD file of the initial configuration. See  [`colloids/colloids_create/tests/reference_configuration.gsd`](colloids/colloids_create/tests/reference_configuration.gsd) for an example.
-
-In the configuration yaml file, the `cluster_specification` key requires the filename of a LAMMPS data file specifying how
-to construct the initial configuration. See [`colloids/colloids_create/cluster.lmp`](colloids/colloids_create/cluster.lmp) for an example.
-
-A typical workflow for running a simulation with `colloids-run` from an initial configuration created by 
-`colloids-create` consists of creating a directory with `run.yaml`, `configuration.yaml`, and 'cluster.lmp` files, 
-and then running the following two commands:
-
-```bash
-colloids-create configuration.yaml first_frame.gsd
-colloids-run run.yaml
-```
-
-### colloids-analyze
-
-The `colloids-run` executable generates a trajectory in the GSD file format that can be visualized with 
-[Ovito](https://www.ovito.org) and 
-analyzed with the [GSD](https://gsd.readthedocs.io/en/stable/python-api.html) Python package.
-
-In addition, the `colloids-run` executable generates a CSV file that contains the time series of the potential energy,
-the kinetic energy, and the temperature of the system. The `colloids-analyze` executable can be used to plot these time
-series. Here, it can plot the results of several simulations at once.
-
-The `colloids-analyze` expects a configuration file in yaml format that specifies the parameters of the analysis (like 
-the output directory where the plots should be generated) as the first positional argument. An exemplary configuration 
-file called `example_analysis.yaml` can be created with the command `colloids-analyze --example`. Another exemplary 
-configuration file is provided in [`colloids/colloids_analyze/analysis.yaml`](colloids/colloids_analyze/analysis.yaml).
-
-After this, the `colloids-analyze` executable receives an arbitrary number of configuration files that specified the 
-parameters of the simulations that should be analyzed. These configuration files contain the name of the CSV files
-that will be plotted.
-
-Assume, for example, that you ran three simulations with `colloids-run` in the directories `Run1`, `Run2`, and `Run3` 
-based on configuration files called `run.yaml` in either of these directories. You can analyze and compare the results 
-of these simulations with the command:
-```bash
-colloids-analyze analysis.yaml Run1/run.yaml Run2/run.yaml Run3/run.yaml
-```
+- [`pyproject.toml`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/pyproject.toml): package metadata and entry points.
+- [`colloids/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids): core simulation code.
+- [`colloids/colloids_create/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_create): initial-configuration generation tools.
+- [`colloids/colloids_analyze/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_analyze): analysis and plotting tools.
+- [`colloids/colloids_tune/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_tune): interaction tuning workflow.
+- [`colloids/tests/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/tests): regression and validation tests.

@@ -392,7 +392,7 @@ class SeedModifier(FinalModifier):
         frame.particles.N  += seed_frame.particles.N
         for t in seed_frame.particles.types:
             if t not in frame.particles.types:
-                frame.particles.types += [t]
+                frame.particles.types += (t, )
         typeid_map = {seed_typeid: frame.particles.types.index(seed_type)
                       for seed_typeid, seed_type in enumerate(seed_frame.particles.types)}
         new_typeids = np.array([typeid_map[seed_typeid] for seed_typeid in seed_frame.particles.typeid],

@@ -393,9 +393,447 @@ class XPositionCV(OpenMMCollectiveVariableAbstract):
 
     def get_force(self) -> openmm.Force:
         return self.compute_cv()
+    
+class ExactSortedPIVDistanceModule(torch.nn.Module):
+    """
+    Exact sorted-PIV squared distance to one reference structure.
+
+    Returns:
+        D(X, X_ref) = sum_k (PIV_k(X) - PIV_k(X_ref))^2
+    """
+
+    def __init__(
+        self,
+        pair_i,
+        pair_j,
+        block_id,
+        reference_piv,
+        r0_by_block,
+        box_lengths,
+        nn=6,
+        mm=12,
+        use_pbc=True,
+    ):
+        super().__init__()
+
+        self.register_buffer("pair_i", torch.as_tensor(pair_i, dtype=torch.long))
+        self.register_buffer("pair_j", torch.as_tensor(pair_j, dtype=torch.long))
+        self.register_buffer("block_id", torch.as_tensor(block_id, dtype=torch.long))
+        self.register_buffer("reference_piv", torch.as_tensor(reference_piv, dtype=torch.float32))
+        self.register_buffer("r0_by_block", torch.as_tensor(r0_by_block, dtype=torch.float32))
+        self.register_buffer("box_lengths", torch.as_tensor(box_lengths, dtype=torch.float32))
+
+        self.nn = nn
+        self.mm = mm
+        self.use_pbc = use_pbc
+        self.n_blocks = len(r0_by_block)
+
+    def rational_switch(self, r, r0):
+        x = r / r0
+        numerator = 1.0 - x**self.nn
+        denominator = 1.0 - x**self.mm
+
+        # Limit at r == r0 is NN/MM.
+        limit_value = float(self.nn) / float(self.mm)
+        near_singular = torch.abs(denominator) < 1.0e-6
+        safe_denominator = torch.where(
+            near_singular,
+            torch.ones_like(denominator),
+            denominator,
+        )
+        value = numerator / safe_denominator
+        value = torch.where(near_singular, torch.full_like(value, limit_value), value)
+
+        return torch.clamp(value, min=0.0, max=1.0)
+
+    def minimum_image(self, displacements):
+        # Assumes orthorhombic/cubic boxes, which matches the current colloid setup.
+        return displacements - self.box_lengths * torch.round(displacements / self.box_lengths)
+
+    def forward(self, positions):
+        positions = positions.float()
+
+        displacements = positions[self.pair_j] - positions[self.pair_i]
+
+        if self.use_pbc:
+            displacements = self.minimum_image(displacements)
+
+        distances = torch.linalg.norm(displacements, dim=1)
+
+        r0 = self.r0_by_block[self.block_id]
+        switched = self.rational_switch(distances, r0)
+
+        sorted_blocks = []
+        for block in range(self.n_blocks):
+            block_values = switched[self.block_id == block]
+
+            # Match the Python classifier sorting convention.
+            sorted_values = torch.sort(block_values).values
+            sorted_blocks.append(sorted_values)
+
+        piv = torch.cat(sorted_blocks)
+
+        delta = piv - self.reference_piv
+        return torch.sum(delta * delta)
 
 
-'''class SteinhardtOrderModule(torch.nn.Module):
+class ExactSortedPIVDifferenceModule(torch.nn.Module):
+    """
+    Exact sorted-PIV squared-distance difference between two references.
+
+    Returns:
+        D(X, X_positive_ref) - D(X, X_negative_ref)
+    """
+
+    def __init__(
+        self,
+        pair_i,
+        pair_j,
+        block_id,
+        positive_reference_piv,
+        negative_reference_piv,
+        r0_by_block,
+        box_lengths,
+        nn=6,
+        mm=12,
+        use_pbc=True,
+    ):
+        super().__init__()
+
+        self.register_buffer("pair_i", torch.as_tensor(pair_i, dtype=torch.long))
+        self.register_buffer("pair_j", torch.as_tensor(pair_j, dtype=torch.long))
+        self.register_buffer("block_id", torch.as_tensor(block_id, dtype=torch.long))
+        self.register_buffer(
+            "positive_reference_piv",
+            torch.as_tensor(positive_reference_piv, dtype=torch.float32),
+        )
+        self.register_buffer(
+            "negative_reference_piv",
+            torch.as_tensor(negative_reference_piv, dtype=torch.float32),
+        )
+        self.register_buffer("r0_by_block", torch.as_tensor(r0_by_block, dtype=torch.float32))
+        self.register_buffer("box_lengths", torch.as_tensor(box_lengths, dtype=torch.float32))
+
+        self.nn = nn
+        self.mm = mm
+        self.use_pbc = use_pbc
+        self.n_blocks = len(r0_by_block)
+
+    def rational_switch(self, r, r0):
+        x = r / r0
+        numerator = 1.0 - x**self.nn
+        denominator = 1.0 - x**self.mm
+
+        # Limit at r == r0 is NN/MM.
+        limit_value = float(self.nn) / float(self.mm)
+        near_singular = torch.abs(denominator) < 1.0e-6
+        safe_denominator = torch.where(
+            near_singular,
+            torch.ones_like(denominator),
+            denominator,
+        )
+        value = numerator / safe_denominator
+        value = torch.where(near_singular, torch.full_like(value, limit_value), value)
+
+        return torch.clamp(value, min=0.0, max=1.0)
+
+    def minimum_image(self, displacements):
+        # Assumes orthorhombic/cubic boxes, which matches the current colloid setup.
+        return displacements - self.box_lengths * torch.round(displacements / self.box_lengths)
+
+    def forward(self, positions):
+        positions = positions.float()
+
+        displacements = positions[self.pair_j] - positions[self.pair_i]
+
+        if self.use_pbc:
+            displacements = self.minimum_image(displacements)
+
+        distances = torch.linalg.norm(displacements, dim=1)
+
+        r0 = self.r0_by_block[self.block_id]
+        switched = self.rational_switch(distances, r0)
+
+        sorted_blocks = []
+        for block in range(self.n_blocks):
+            block_values = switched[self.block_id == block]
+
+            # Match the Python classifier sorting convention.
+            sorted_values = torch.sort(block_values).values
+            sorted_blocks.append(sorted_values)
+
+        piv = torch.cat(sorted_blocks)
+
+        positive_delta = piv - self.positive_reference_piv
+        negative_delta = piv - self.negative_reference_piv
+        positive_distance = torch.sum(positive_delta * positive_delta)
+        negative_distance = torch.sum(negative_delta * negative_delta)
+        return positive_distance - negative_distance
+	    
+def build_piv_pair_index(particle_type_names, particle_type_a, particle_type_b):
+    pair_i = []
+    pair_j = []
+    block_id = []
+
+    n_particles = len(particle_type_names)
+
+    for i in range(n_particles - 1):
+        for j in range(i + 1, n_particles):
+            ti = particle_type_names[i]
+            tj = particle_type_names[j]
+
+            if ti == particle_type_a and tj == particle_type_a:
+                block = 0
+            elif ti == particle_type_b and tj == particle_type_b:
+                block = 1
+            elif {ti, tj} == {particle_type_a, particle_type_b}:
+                block = 2
+            else:
+                continue
+
+            pair_i.append(i)
+            pair_j.append(j)
+            block_id.append(block)
+
+    return pair_i, pair_j, block_id
+
+def load_reference_gsd(reference_file):
+    import gsd.hoomd
+    import numpy as np
+
+    with gsd.hoomd.open(reference_file, "r") as traj:
+        frame = traj[-1]
+        positions = np.asarray(frame.particles.position, dtype=float)
+        box_lengths = np.asarray(frame.configuration.box[:3], dtype=float)
+
+    return positions, box_lengths
+
+
+def rational_switch_numpy(distances, r0, nn, mm):
+    import numpy as np
+
+    x = distances / r0
+    numerator = 1.0 - x**nn
+    denominator = 1.0 - x**mm
+
+    values = numerator / np.where(np.abs(denominator) < 1.0e-12, np.nan, denominator)
+    values = np.where(np.abs(denominator) < 1.0e-12, nn / mm, values)
+
+    return np.clip(values, 0.0, 1.0)
+
+
+def compute_reference_piv_numpy(
+    positions,
+    box_lengths,
+    pair_i,
+    pair_j,
+    block_id,
+    r0_by_block,
+    nn,
+    mm,
+    sort_blocks=True,
+):
+    import numpy as np
+
+    pair_i = np.asarray(pair_i, dtype=int)
+    pair_j = np.asarray(pair_j, dtype=int)
+    block_id = np.asarray(block_id, dtype=int)
+
+    displacements = positions[pair_j] - positions[pair_i]
+    displacements -= box_lengths * np.rint(displacements / box_lengths)
+
+    distances = np.linalg.norm(displacements, axis=1)
+
+    piv_blocks = []
+    for block in range(3):
+        block_distances = distances[block_id == block]
+        block_values = rational_switch_numpy(
+            block_distances,
+            r0=r0_by_block[block],
+            nn=nn,
+            mm=mm,
+        )
+
+        if sort_blocks:
+            block_values = np.sort(block_values)
+
+        piv_blocks.append(block_values)
+
+    return np.concatenate(piv_blocks)
+
+
+def get_orthorhombic_box_lengths(system):
+    vectors = system.getDefaultPeriodicBoxVectors()
+    box_lengths = []
+
+    for axis, vector in enumerate(vectors):
+        component = vector[axis]
+        if hasattr(component, "value_in_unit"):
+            component = component.value_in_unit(length_unit)
+        box_lengths.append(float(component))
+
+    return box_lengths
+    
+class ExactSortedPIVDistanceCV(OpenMMCollectiveVariableAbstract):
+    def __init__(
+        self,
+        topology,
+        system,
+        reference_file,
+        particle_type_a,
+        particle_type_b,
+        switch_r0,
+        switch_nn=6,
+        switch_mm=12,
+        sort_blocks=True,
+    ):
+        super().__init__(topology=topology, system=system)
+
+        self._uses_pbc = system.usesPeriodicBoundaryConditions()
+
+        particle_type_names = [atom.name for atom in topology.atoms()]
+
+        pair_i, pair_j, block_id = build_piv_pair_index(
+            particle_type_names=particle_type_names,
+            particle_type_a=particle_type_a,
+            particle_type_b=particle_type_b,
+        )
+
+        reference_positions, reference_box = load_reference_gsd(reference_file)
+        box_lengths = get_orthorhombic_box_lengths(system)
+
+        reference_piv = compute_reference_piv_numpy(
+            positions=reference_positions,
+            box_lengths=reference_box,
+            pair_i=pair_i,
+            pair_j=pair_j,
+            block_id=block_id,
+            r0_by_block=switch_r0,
+            nn=switch_nn,
+            mm=switch_mm,
+            sort_blocks=sort_blocks,
+        )
+
+        self._module = ExactSortedPIVDistanceModule(
+            pair_i=pair_i,
+            pair_j=pair_j,
+            block_id=block_id,
+            reference_piv=reference_piv,
+            r0_by_block=switch_r0,
+            box_lengths=box_lengths,
+            nn=switch_nn,
+            mm=switch_mm,
+            use_pbc=self._uses_pbc,
+        )
+
+    def compute_cv(self):
+        scripted = torch.jit.script(self._module)
+
+        torch_force = TorchForce(scripted)
+        torch_force.setUsesPeriodicBoundaryConditions(self._uses_pbc)
+
+        cv_force = openmm.CustomCVForce("piv_D")
+        cv_force.setName("exact_sorted_piv_distance_cv")
+        cv_force.addCollectiveVariable("piv_D", torch_force)
+
+        return cv_force
+
+    def get_force(self):
+        return self.compute_cv()
+
+
+class ExactSortedPIVDifferenceCV(OpenMMCollectiveVariableAbstract):
+    """
+    Exact sorted-PIV distance-difference CV.
+
+    The returned scalar is:
+        D(X, positive_reference_file) - D(X, negative_reference_file)
+
+    For example, positive_reference_file=Th3P4-like.gsd and
+    negative_reference_file=blob.gsd gives d_th3p4_blob.
+    """
+
+    def __init__(
+        self,
+        topology,
+        system,
+        positive_reference_file,
+        negative_reference_file,
+        particle_type_a,
+        particle_type_b,
+        switch_r0,
+        switch_nn=6,
+        switch_mm=12,
+        sort_blocks=True,
+    ):
+        super().__init__(topology=topology, system=system)
+
+        self._uses_pbc = system.usesPeriodicBoundaryConditions()
+
+        particle_type_names = [atom.name for atom in topology.atoms()]
+
+        pair_i, pair_j, block_id = build_piv_pair_index(
+            particle_type_names=particle_type_names,
+            particle_type_a=particle_type_a,
+            particle_type_b=particle_type_b,
+        )
+
+        positive_positions, positive_box = load_reference_gsd(positive_reference_file)
+        negative_positions, negative_box = load_reference_gsd(negative_reference_file)
+        box_lengths = get_orthorhombic_box_lengths(system)
+
+        positive_reference_piv = compute_reference_piv_numpy(
+            positions=positive_positions,
+            box_lengths=positive_box,
+            pair_i=pair_i,
+            pair_j=pair_j,
+            block_id=block_id,
+            r0_by_block=switch_r0,
+            nn=switch_nn,
+            mm=switch_mm,
+            sort_blocks=sort_blocks,
+        )
+        negative_reference_piv = compute_reference_piv_numpy(
+            positions=negative_positions,
+            box_lengths=negative_box,
+            pair_i=pair_i,
+            pair_j=pair_j,
+            block_id=block_id,
+            r0_by_block=switch_r0,
+            nn=switch_nn,
+            mm=switch_mm,
+            sort_blocks=sort_blocks,
+        )
+
+        self._module = ExactSortedPIVDifferenceModule(
+            pair_i=pair_i,
+            pair_j=pair_j,
+            block_id=block_id,
+            positive_reference_piv=positive_reference_piv,
+            negative_reference_piv=negative_reference_piv,
+            r0_by_block=switch_r0,
+            box_lengths=box_lengths,
+            nn=switch_nn,
+            mm=switch_mm,
+            use_pbc=self._uses_pbc,
+        )
+
+    def compute_cv(self):
+        scripted = torch.jit.script(self._module)
+
+        torch_force = TorchForce(scripted)
+        torch_force.setUsesPeriodicBoundaryConditions(self._uses_pbc)
+
+        cv_force = openmm.CustomCVForce("piv_difference")
+        cv_force.setName("exact_sorted_piv_difference_cv")
+        cv_force.addCollectiveVariable("piv_difference", torch_force)
+
+        return cv_force
+
+    def get_force(self):
+        return self.compute_cv()
+
+class SteinhardtOrderModule(torch.nn.Module):
     def __init__(self, num_nbs, order, r0, d0):
         super().__init__()
         if torch.cuda.is_available():
@@ -471,5 +909,5 @@ class SteinhardtOrderCV(OpenMMCollectiveVariableAbstract):
         return cv_force
 
     def get_force(self) -> openmm.Force:
-        return self.compute_cv()'''
+        return self.compute_cv()
          

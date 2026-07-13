@@ -327,3 +327,90 @@ def VerletIntegrator(stepSize: unit.Quantity) -> openmm.Integrator:
     """
     # Checks of units and values are done within OpenMM.
     return openmm.VerletIntegrator(stepSize)
+
+
+# noinspection PyPep8Naming
+def MonteCarloBarostat(temperature: unit.Quantity, pressure: unit.Quantity, frequency: int = 25) -> openmm.Force:
+    """
+    Function to return the OpenMM Monte Carlo barostat that defines the keyword arguments (in contrast to OpenMM).
+
+    The following is the OpenMM documentation for the Monte Carlo barostat (see
+    https://docs.openmm.org/latest/api-python/generated/openmm.openmm.MonteCarloBarostat.html).
+
+    This isotropic barostat scales all three box dimensions by the same factor to maintain a constant
+    pressure. Note that this is a Force (added to the OpenMM system) rather than an integrator.
+
+    :param temperature:
+        The temperature at which the system is being maintained (in Kelvin).
+    :type temperature: unit.Quantity
+    :param pressure:
+        The target pressure for the Monte Carlo barostat.
+    :type pressure: unit.Quantity
+    :param frequency:
+        The number of integration steps between Monte Carlo barostat attempts.
+        Defaults to 25.
+    :type frequency: int
+
+    :return:
+        The Monte Carlo barostat.
+    :rtype: openmm.Force
+    """
+    return openmm.MonteCarloBarostat(
+        pressure.value_in_unit(unit.bar),
+        temperature.value_in_unit(unit.kelvin),
+        frequency,
+    )
+
+
+# noinspection PyPep8Naming
+def MonteCarloAnisotropicBarostat(temperature: unit.Quantity, pressure_x: unit.Quantity, pressure_y: unit.Quantity,
+                                  pressure_z: unit.Quantity, scale_x: bool = True, scale_y: bool = True,
+                                  scale_z: bool = True, frequency: int = 25) -> openmm.Force:
+    """
+    Function to return the OpenMM Monte Carlo anisotropic barostat that defines the keyword arguments.
+
+    The following is the OpenMM documentation for the Monte Carlo anisotropic barostat (see
+    https://docs.openmm.org/latest/api-python/generated/openmm.openmm.MonteCarloAnisotropicBarostat.html).
+
+    This barostat scales each box dimension independently (subject to the scale flags) to maintain a
+    constant pressure along each axis. Note that this is a Force (added to the OpenMM system) rather
+    than an integrator.
+
+    :param temperature:
+        The temperature at which the system is being maintained (in Kelvin).
+    :type temperature: unit.Quantity
+    :param pressure_x:
+        The pressure applied to the x axis.
+    :type pressure_x: unit.Quantity
+    :param pressure_y:
+        The pressure applied to the y axis.
+    :type pressure_y: unit.Quantity
+    :param pressure_z:
+        The pressure applied to the z axis.
+    :type pressure_z: unit.Quantity
+    :param scale_x:
+        Whether the x dimension of the periodic box may change size.
+        Defaults to True.
+    :type scale_x: bool
+    :param scale_y:
+        Whether the y dimension of the periodic box may change size.
+        Defaults to True.
+    :type scale_y: bool
+    :param scale_z:
+        Whether the z dimension of the periodic box may change size.
+        Defaults to True.
+    :type scale_z: bool
+    :param frequency:
+        The number of integration steps between Monte Carlo barostat attempts.
+        Defaults to 25.
+    :type frequency: int
+
+    :return:
+        The Monte Carlo anisotropic barostat.
+    :rtype: openmm.Force
+    """
+    pressure = openmm.Vec3(pressure_x.value_in_unit(unit.bar), pressure_y.value_in_unit(unit.bar),
+                           pressure_z.value_in_unit(unit.bar))
+    return openmm.MonteCarloAnisotropicBarostat(
+        pressure, temperature.value_in_unit(unit.kelvin), scale_x, scale_y, scale_z, frequency
+    )

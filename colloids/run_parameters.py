@@ -80,6 +80,24 @@ class RunParameters(Parameters):
         Defaults to sensible values for the LangevinIntegrator (temperature of 298 K, frictionCoeff of
         0.001574074286750681 / ps, stepSize of 0.00317647015905543 ps, and no specified random number seed).
     :type integrator_parameters: dict[str, Any]
+    :param npt_pressure:
+        The target pressure for an NPT simulation. A single Quantity uses an isotropic barostat
+        (MonteCarloBarostat); a list of exactly three Quantities uses an anisotropic barostat
+        (MonteCarloAnisotropicBarostat) applied along x, y, and z respectively. Units must be
+        compatible with bar. Set to None to disable the barostat (i.e., run NVT/NVE).
+        Defaults to None.
+    :type npt_pressure: Optional[unit.Quantity]
+    :param npt_frequency:
+        The number of integration steps between Monte Carlo barostat attempts. Must be a positive
+        integer and must be specified when npt_pressure is specified.
+        Defaults to None.
+    :type npt_frequency: Optional[int]
+    :param npt_scale:
+        For anisotropic NPT only, a list of three booleans indicating whether the x, y, and z box
+        dimensions may change size. Must not be specified for isotropic NPT or when npt_pressure is
+        None. If None during anisotropic NPT, all three axes are scaled.
+        Defaults to None.
+    :type npt_scale: Optional[list[bool]]
     :param brush_density:
         The polymer surface density in the Alexander-de Gennes polymer brush model [i.e., sigma in eq. (1)].
         The unit of the brush_density must be compatible with 1/nanometer^2 and the value must be greater than zero.
@@ -285,6 +303,9 @@ class RunParameters(Parameters):
             "frictionCoeff": 0.001574074286750681 / time_unit,
             "randomNumberSeed": None
         })
+    npt_pressure: Optional[Any] = None
+    npt_frequency: Optional[int] = None
+    npt_scale: Optional[list] = None
     brush_density: unit.Quantity = field(default_factory=lambda: 0.09 / (length_unit ** 2))
     brush_length: unit.Quantity = field(default_factory=lambda: 10.6 * length_unit)
     debye_length: unit.Quantity = field(default_factory=lambda: 5.726968 * length_unit)
@@ -327,7 +348,8 @@ class RunParameters(Parameters):
             raise ValueError("The filename of the initial configuration must end with '.gsd'.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
             raise ValueError("The platform name must be 'Reference', 'CPU', 'CUDA', or 'OpenCL'.")
-        possible_integrators = [name for name, _ in inspect.getmembers(integrators, inspect.isfunction)]
+        possible_integrators = [name for name, _ in inspect.getmembers(integrators, inspect.isfunction)
+                                if "Barostat" not in name]
         if self.integrator not in possible_integrators:
             raise ValueError(f"Integrator {self.integrator} not available, the integrator must be one of the "
                              f"following: {', '.join(possible_integrators)}.")
@@ -475,6 +497,39 @@ class RunParameters(Parameters):
         else:
             if self.plumed_script is not None:
                 raise ValueError("PLUMED input file must not be specified if PLUMED is not being used.")
+        if self.npt_pressure is not None:
+            if self.npt_frequency is None:
+                raise ValueError("npt_frequency must be specified when npt_pressure is specified.")
+            if not isinstance(self.npt_frequency, int):
+                raise TypeError("npt_frequency must be an int.")
+            if self.npt_frequency <= 0:
+                raise ValueError("npt_frequency must be greater than zero.")
+            if isinstance(self.npt_pressure, list):
+                if len(self.npt_pressure) != 3:
+                    raise ValueError("npt_pressure must contain exactly 3 quantities for anisotropic NPT.")
+                for p in self.npt_pressure:
+                    if not isinstance(p, unit.Quantity):
+                        raise TypeError("Each element of npt_pressure must be a unit.Quantity.")
+                    if not p.unit.is_compatible(unit.bar):
+                        raise TypeError("Each element of npt_pressure must have a unit compatible with bar.")
+                if self.npt_scale is not None:
+                    if len(self.npt_scale) != 3:
+                        raise ValueError("npt_scale must contain exactly 3 booleans.")
+                    for s in self.npt_scale:
+                        if not isinstance(s, bool):
+                            raise TypeError("Each element of npt_scale must be a bool.")
+            else:
+                if not isinstance(self.npt_pressure, unit.Quantity):
+                    raise TypeError("npt_pressure must be a unit.Quantity or a list of 3 unit.Quantity objects.")
+                if not self.npt_pressure.unit.is_compatible(unit.bar):
+                    raise TypeError("npt_pressure must have a unit compatible with bar.")
+                if self.npt_scale is not None:
+                    raise ValueError("npt_scale must not be specified for isotropic NPT.")
+        else:
+            if self.npt_frequency is not None:
+                raise ValueError("npt_frequency must not be specified when npt_pressure is not specified.")
+            if self.npt_scale is not None:
+                raise ValueError("npt_scale must not be specified when npt_pressure is not specified.")
 
 if __name__ == '__main__':
     RunParameters(initial_configuration="tests/first_frame.xyz").to_yaml("example.yaml")

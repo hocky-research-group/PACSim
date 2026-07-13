@@ -61,6 +61,34 @@ class ExampleAction(argparse.Action):
         parser.exit()
 
 
+def initialize_barostat(parameters: RunParameters) -> Optional[openmm.Force]:
+    """
+    Instantiate the optional Monte Carlo barostat for an NPT run.
+
+    A single ``npt_pressure`` quantity gives an isotropic MonteCarloBarostat; a list of three
+    pressures gives an anisotropic MonteCarloAnisotropicBarostat. The barostat temperature is the
+    ``potential_temperature`` of the run.
+
+    :param parameters:
+        The run parameters.
+    :type parameters: RunParameters
+
+    :return:
+        The barostat force, or None if no barostat is requested.
+    :rtype: Optional[openmm.Force]
+    """
+    if parameters.npt_pressure is None:
+        return None
+    temperature = parameters.potential_temperature
+    if isinstance(parameters.npt_pressure, list):
+        pressure_x, pressure_y, pressure_z = parameters.npt_pressure
+        scale = parameters.npt_scale if parameters.npt_scale is not None else [True, True, True]
+        return integrators.MonteCarloAnisotropicBarostat(
+            temperature, pressure_x, pressure_y, pressure_z,
+            scale[0], scale[1], scale[2], parameters.npt_frequency)
+    return integrators.MonteCarloBarostat(temperature, parameters.npt_pressure, parameters.npt_frequency)
+
+
 def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
     """Check the frame and the run parameters."""
     for diameter in frame.particles.diameter:
@@ -351,6 +379,16 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
             cm_motion_remover.setForceGroup(system.getNumForces())
             system.addForce(cm_motion_remover)
 
+    barostat = initialize_barostat(parameters)
+    if barostat is not None:
+        # The Monte Carlo barostat scales the periodic box, so it requires periodic boundary
+        # conditions (i.e., not all walls active).
+        if all_walls:
+            raise ValueError("An NPT barostat requires periodic boundary conditions, but all walls "
+                             "are active (fully closed box). Disable at least one wall or the barostat.")
+        barostat.setForceGroup(system.getNumForces())
+        system.addForce(barostat)
+
     # -------------------------------------- Set up the simulation. ----------------------------------------------------
     if parameters.platform_name == "CUDA":
         simulation = app.Simulation(topology, system, integrator, platform,
@@ -363,11 +401,15 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
 
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
                      total_number_steps: int, initial_frame: gsd.hoomd.Frame) -> None:
+    # With walls, the OpenMM box is artificially enlarged, so the true (fixed) cell is recorded.
+    # Without walls the box may change during the run (e.g. under an NPT barostat), so pass cell=None
+    # to record the live simulation box each frame.
+    gsd_cell = (get_cell_from_box(initial_frame.configuration.box) * length_unit
+                if any(parameters.wall_directions) else None)
     simulation.reporters.append(GSDReporter(parameters.trajectory_filename, parameters.trajectory_interval,
                                             initial_frame.particles.diameter / 2.0 * length_unit,
                                             initial_frame.particles.charge * electric_potential_unit, simulation,
-                                            append_file=append_file,
-                                            cell=get_cell_from_box(initial_frame.configuration.box) * length_unit))
+                                            append_file=append_file, cell=gsd_cell))
     simulation.reporters.append(StatusReporter(max(1, total_number_steps // 100), total_number_steps,
                                                desc="Production"))
     simulation.reporters.append(app.StateDataReporter(parameters.state_data_filename,

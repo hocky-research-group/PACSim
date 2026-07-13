@@ -81,6 +81,14 @@ class LatticeBuilder(ConfigurationGenerator):
         The number of uniformly spaced scale factors to evaluate in the scan range.
         Only allowed when optimize_energy is True. Defaults to 50 when not specified.
     :type energy_scale_samples: Optional[int]
+    :param periodic:
+        If True, generate a bulk periodic crystal: the simulation box is the (uniformly scaled)
+        supercell lattice itself, so the crystal tiles space under periodic boundary conditions.
+        The lattice_padding is ignored in this case (there is no surrounding vacuum). If False (the
+        default), the scaled supercell is centered in a large cubic box padded by lattice_padding,
+        i.e. an isolated crystal cluster in vacuum.
+        Defaults to False.
+    :type periodic: bool
 
     :raises ValueError:
         If the lattice specification file is not a .cif file.
@@ -101,9 +109,10 @@ class LatticeBuilder(ConfigurationGenerator):
                  lattice_repeats: Union[int, Sequence[int]], run_parameters_file: str,
                  radii_padding: unit.Quantity, lattice_padding: unit.Quantity,
                  optimize_energy: bool = False, energy_scale_range: Optional[Sequence[float]] = None,
-                 energy_scale_samples: Optional[int] = None) -> None:
+                 energy_scale_samples: Optional[int] = None, periodic: bool = False) -> None:
         """Constructor of the LatticeBuilder class."""
         super().__init__(masses=masses, radii=radii, surface_potentials=surface_potentials)
+        self._periodic = periodic
         if not lattice_specification.endswith('.cif'):
             raise ValueError("The lattice specification must be a .cif file.")
         parser = CifParser(lattice_specification, site_tolerance=0.0, frac_tolerance=0.0)
@@ -302,6 +311,26 @@ class LatticeBuilder(ConfigurationGenerator):
                 run_parameters=self._run_parameters, geometric_scale_factor=required_scale_factor,
                 scale_range=self._energy_scale_range, scale_samples=self._energy_scale_samples)
 
+        # --- Build the Frame ---
+        frame = Frame()
+        frame.particles.types = sorted(self.types())
+        frame.particles.typeid = np.array(
+            [frame.particles.types.index(t) for t in types], dtype=np.uint32)
+
+        if self._periodic:
+            # Bulk periodic crystal: the simulation box is the uniformly scaled supercell lattice,
+            # and the particles are placed at their fractional coordinates within that box. This
+            # tiles space under periodic boundary conditions (no surrounding vacuum, lattice_padding
+            # is ignored).
+            scaled_lattice = required_scale_factor * structure_full.lattice.matrix
+            box, hoomd_matrix = self._lattice_to_hoomd_box(scaled_lattice)
+            fractional_coordinates = structure_full.frac_coords % 1.0
+            positions = fractional_coordinates @ hoomd_matrix
+            frame.particles.N = len(positions)
+            frame.particles.position = np.array(positions, dtype=np.float32)
+            frame.configuration.box = np.array(box, dtype=np.float32)
+            return frame
+
         positions = structure_full.cart_coords * required_scale_factor
 
         # Center at origin.
@@ -315,13 +344,44 @@ class LatticeBuilder(ConfigurationGenerator):
         box_length = 2.0 * (float(np.max(np.abs(positions))) + float(np.max(effective_radii))
                             + self._lattice_padding.value_in_unit(length_unit))
 
-        # --- Build the Frame ---
-        frame = Frame()
         frame.particles.N = len(positions)
-        frame.particles.types = sorted(self.types())
-        frame.particles.typeid = np.array(
-            [frame.particles.types.index(t) for t in types], dtype=np.uint32)
         frame.particles.position = np.array(positions, dtype=np.float32)
         frame.configuration.box = np.array([box_length, box_length, box_length, 0.0, 0.0, 0.0], dtype=np.float32)
 
         return frame
+
+    @staticmethod
+    def _lattice_to_hoomd_box(lattice_matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Convert a lattice matrix (rows = lattice vectors a, b, c) to the HOOMD/GSD box convention.
+
+        The GSD box is [Lx, Ly, Lz, xy, xz, yz], where (xy, xz, yz) are the dimensionless tilt
+        factors and the box vectors in the rotated frame are the rows of the returned lower-triangular
+        matrix (see helper_functions.get_cell_from_box):
+        a = (Lx, 0, 0), b = (Ly*xy, Ly, 0), c = (Lz*xz, Lz*yz, Lz).
+
+        Because the box is expressed in a rotated frame, particle positions must be reconstructed from
+        their (rotation-invariant) fractional coordinates using the returned matrix.
+
+        :param lattice_matrix:
+            The lattice matrix with the lattice vectors a, b, c as its rows.
+        :type lattice_matrix: np.ndarray
+
+        :return:
+            A tuple (box, hoomd_matrix) where box is the length-6 GSD box array and hoomd_matrix is
+            the 3x3 lower-triangular matrix whose rows are the box vectors in the rotated frame.
+        :rtype: tuple[np.ndarray, np.ndarray]
+        """
+        a, b, c = lattice_matrix[0], lattice_matrix[1], lattice_matrix[2]
+        lx = np.linalg.norm(a)
+        a_hat = a / lx
+        xy_component = np.dot(b, a_hat)
+        ly = np.sqrt(np.dot(b, b) - xy_component ** 2)
+        xz_component = np.dot(c, a_hat)
+        yz_component = (np.dot(b, c) - xy_component * xz_component) / ly
+        lz = np.sqrt(np.dot(c, c) - xz_component ** 2 - yz_component ** 2)
+        hoomd_matrix = np.array([[lx, 0.0, 0.0],
+                                 [xy_component, ly, 0.0],
+                                 [xz_component, yz_component, lz]])
+        box = np.array([lx, ly, lz, xy_component / ly, xz_component / lz, yz_component / lz])
+        return box, hoomd_matrix

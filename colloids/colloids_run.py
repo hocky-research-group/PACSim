@@ -61,25 +61,39 @@ class ExampleAction(argparse.Action):
         parser.exit()
 
 
-def initialize_barostat(parameters: RunParameters) -> Optional[openmm.Force]:
+def initialize_barostat(parameters: RunParameters, integrator: openmm.Integrator) -> Optional[openmm.Force]:
     """
     Instantiate the optional Monte Carlo barostat for an NPT run.
 
     A single ``npt_pressure`` quantity gives an isotropic MonteCarloBarostat; a list of three
     pressures gives an anisotropic MonteCarloAnisotropicBarostat. The barostat temperature is the
-    ``potential_temperature`` of the run.
+    thermostat temperature of the integrator (not the ``potential_temperature``, which sets the
+    strength of the colloidal potentials and may differ from the thermostat temperature).
 
     :param parameters:
         The run parameters.
     :type parameters: RunParameters
+    :param integrator:
+        The integrator of the simulation. Its temperature is used for the barostat, so the
+        integrator must be a thermostatted integrator (i.e., it must define a temperature).
+    :type integrator: openmm.Integrator
 
     :return:
         The barostat force, or None if no barostat is requested.
     :rtype: Optional[openmm.Force]
+
+    :raises ValueError:
+        If a barostat is requested but the integrator does not define a temperature (e.g., a
+        VerletIntegrator), because constant-pressure sampling requires a thermostat.
     """
     if parameters.npt_pressure is None:
         return None
-    temperature = parameters.potential_temperature
+    try:
+        temperature = integrator.getTemperature()
+    except AttributeError:
+        raise ValueError("An NPT barostat requires a thermostatted integrator that defines a "
+                         "temperature (e.g., LangevinMiddleIntegrator or NoseHooverIntegrator), but "
+                         f"the chosen integrator '{parameters.integrator}' does not.")
     if isinstance(parameters.npt_pressure, list):
         pressure_x, pressure_y, pressure_z = parameters.npt_pressure
         scale = parameters.npt_scale if parameters.npt_scale is not None else [True, True, True]
@@ -379,7 +393,7 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
             cm_motion_remover.setForceGroup(system.getNumForces())
             system.addForce(cm_motion_remover)
 
-    barostat = initialize_barostat(parameters)
+    barostat = initialize_barostat(parameters, integrator)
     if barostat is not None:
         # The Monte Carlo barostat scales the periodic box, so it requires periodic boundary
         # conditions (i.e., not all walls active).

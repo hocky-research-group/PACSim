@@ -71,19 +71,37 @@ class TestNPTRunParameters(object):
 
 
 class TestInitializeBarostat(object):
+    @staticmethod
+    def _thermostatted_integrator(temperature=280.0):
+        return openmm.LangevinMiddleIntegrator(temperature * unit.kelvin, 1.0 / unit.picosecond,
+                                               0.002 * unit.picosecond)
+
     def test_none_when_no_pressure(self):
-        assert initialize_barostat(RunParameters()) is None
+        assert initialize_barostat(RunParameters(), self._thermostatted_integrator()) is None
 
     def test_isotropic_dispatch(self):
-        barostat = initialize_barostat(RunParameters(npt_pressure=1.0 * unit.bar, npt_frequency=25))
+        barostat = initialize_barostat(RunParameters(npt_pressure=1.0 * unit.bar, npt_frequency=25),
+                                       self._thermostatted_integrator())
         assert isinstance(barostat, openmm.MonteCarloBarostat)
+
+    def test_barostat_uses_integrator_temperature(self):
+        # The barostat temperature must be the thermostat (integrator) temperature, not the
+        # potential_temperature (298 K by default), so they can be set independently.
+        barostat = initialize_barostat(RunParameters(npt_pressure=1.0 * unit.bar, npt_frequency=25),
+                                       self._thermostatted_integrator(temperature=123.0))
+        assert abs(barostat.getDefaultTemperature().value_in_unit(unit.kelvin) - 123.0) < 1e-9
 
     def test_anisotropic_dispatch(self):
         barostat = initialize_barostat(RunParameters(
             npt_pressure=[1.0 * unit.bar, 1.0 * unit.bar, 2.0 * unit.bar], npt_frequency=25,
-            npt_scale=[True, False, True]))
+            npt_scale=[True, False, True]), self._thermostatted_integrator())
         assert isinstance(barostat, openmm.MonteCarloAnisotropicBarostat)
         assert barostat.getScaleY() is False
+
+    def test_non_thermostatted_integrator_raises(self):
+        with pytest.raises(ValueError):
+            initialize_barostat(RunParameters(npt_pressure=1.0 * unit.bar, npt_frequency=25),
+                                openmm.VerletIntegrator(0.002 * unit.picosecond))
 
 
 if __name__ == '__main__':

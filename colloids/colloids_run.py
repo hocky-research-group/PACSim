@@ -8,11 +8,13 @@ import numpy as np
 import openmm
 from openmm import app
 from colloids import (ColloidPotentialsAlgebraic, ColloidPotentialsParameters, ShiftedLennardJonesWalls,
-                      ImplicitSubstrateWall, DepletionPotential, Gravity, PlumedPotential, __version__)
+                      ImplicitSubstrateWall, DepletionPotential, Gravity, HarmonicRestraint, PlumedPotential,
+                      __version__)
 from colloids.gsd_reporter import GSDReporter
 from colloids.helper_functions import get_cell_from_box, read_gsd_file, write_gsd_file
 import colloids.integrators as integrators
 from colloids.run_parameters import RunParameters
+from colloids.ti_parameters import TIParameters
 from colloids.status_reporter import StatusReporter
 import colloids.update_reporters as update_reporters
 from colloids.units import electric_potential_unit, length_unit
@@ -103,7 +105,62 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
             raise ValueError("A substrate can only be used if all walls are active.")
 
 
-def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.Simulation:
+def set_up_harmonic_restraint(ti_parameters: TIParameters, frame: gsd.hoomd.Frame,
+                              reference_frame: gsd.hoomd.Frame) -> HarmonicRestraint:
+    """
+    Build the Einstein-crystal harmonic restraint for a thermodynamic-integration run.
+
+    Every mobile particle (mass greater than zero) is restrained to its position in the reference
+    frame, unless ``ti_parameters.restrain_types`` limits the restraint to particular types.
+
+    :param ti_parameters:
+        The thermodynamic-integration parameters.
+    :type ti_parameters: TIParameters
+    :param frame:
+        The frame that is used as the initial configuration of the run (used for the particle types
+        and masses).
+    :type frame: gsd.hoomd.Frame
+    :param reference_frame:
+        The frame that supplies the reference (lattice) positions r0.
+    :type reference_frame: gsd.hoomd.Frame
+
+    :return:
+        The harmonic restraint with all restrained particles added.
+    :rtype: HarmonicRestraint
+
+    :raises ValueError:
+        If the reference frame does not have the same number of particles as the run frame.
+        If a type in restrain_types is not present in the frame.
+    """
+    if reference_frame.particles.N != frame.particles.N:
+        raise ValueError("The reference configuration must have the same number of particles as the "
+                         "initial configuration.")
+    if ti_parameters.restrain_types is not None:
+        for restrain_type in ti_parameters.restrain_types:
+            if restrain_type not in frame.particles.types:
+                raise ValueError(f"Type {restrain_type} of restrain_types is not in the frame.")
+
+    restraint = HarmonicRestraint(spring_constant=ti_parameters.spring_constant,
+                                  coupling=ti_parameters.coupling)
+    reference_positions = reference_frame.particles.position
+    restrained_any = False
+    for i in range(frame.particles.N):
+        # Never restrain immobile substrate particles (mass zero).
+        if not frame.particles.mass[i] > 0.0:
+            continue
+        if ti_parameters.restrain_types is not None:
+            if frame.particles.types[frame.particles.typeid[i]] not in ti_parameters.restrain_types:
+                continue
+        restraint.add_particle(i, reference_positions[i] * length_unit)
+        restrained_any = True
+    if not restrained_any:
+        raise ValueError("No particles were restrained. Check the masses and restrain_types.")
+    return restraint
+
+
+def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
+                      ti_parameters: Optional[TIParameters] = None,
+                      reference_frame: Optional[gsd.hoomd.Frame] = None) -> app.Simulation:
     radii = frame.particles.diameter / 2.0 * length_unit
     surface_potentials = frame.particles.charge * electric_potential_unit
 
@@ -212,6 +269,12 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
     else:
         plumed = None
 
+    if ti_parameters is not None:
+        assert reference_frame is not None
+        harmonic_restraint = set_up_harmonic_restraint(ti_parameters, frame, reference_frame)
+    else:
+        harmonic_restraint = None
+
     # --------------------------- Add all particles and constraints to the system. -------------------------------------
     for mass in frame.particles.mass:
         system.addParticle(mass)
@@ -277,6 +340,17 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame) -> app.
             force.setForceGroup(system.getNumForces())
             system.addForce(force)
 
+    if harmonic_restraint is not None:
+        for force in harmonic_restraint.yield_potentials():
+            force.setForceGroup(system.getNumForces())
+            system.addForce(force)
+        # The Einstein-crystal method requires the center of mass to be fixed to remove the
+        # quasi-divergence of the thermodynamic-integration integrand at small coupling.
+        if ti_parameters.fix_center_of_mass:
+            cm_motion_remover = openmm.CMMotionRemover(1)
+            cm_motion_remover.setForceGroup(system.getNumForces())
+            system.addForce(cm_motion_remover)
+
     # -------------------------------------- Set up the simulation. ----------------------------------------------------
     if parameters.platform_name == "CUDA":
         simulation = app.Simulation(topology, system, integrator, platform,
@@ -325,6 +399,8 @@ Perform a molecular-dynamics simulation using OpenMM.
     parser.add_argument("yaml_file", help="YAML file with PACSim parameters", type=str)
     parser.add_argument("-c", "--checkpoint_file", help="OpenMM checkpoint file", type=str,
                         default=None)
+    parser.add_argument("-t", "--ti_file", help="YAML file with thermodynamic-integration "
+                        "(Frenkel-Ladd / Einstein-crystal) parameters", type=str, default=None)
     parser.add_argument("--example", help="write an example YAML file and exit", action=ExampleAction)
     args = parser.parse_args(args=argv)
 
@@ -337,7 +413,20 @@ Perform a molecular-dynamics simulation using OpenMM.
 
     check_frame(parameters, frame)
 
-    simulation = set_up_simulation(parameters, frame)
+    if args.ti_file is not None:
+        if not args.ti_file.endswith(".yaml"):
+            raise ValueError("The TI file must have the .yaml extension.")
+        ti_parameters = TIParameters.from_yaml(args.ti_file)
+        if ti_parameters.reference_configuration is not None:
+            reference_frame = read_gsd_file(ti_parameters.reference_configuration,
+                                            ti_parameters.reference_frame_index)
+        else:
+            reference_frame = frame
+    else:
+        ti_parameters = None
+        reference_frame = None
+
+    simulation = set_up_simulation(parameters, frame, ti_parameters, reference_frame)
 
     if args.checkpoint_file is not None:
         if not args.checkpoint_file.endswith(".chk"):

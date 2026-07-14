@@ -87,9 +87,15 @@ class HarmonicRestraint(OpenMMPotentialAbstract):
 
     def _set_up_restraint_potential(self) -> CustomExternalForce:
         """Set up the basic functional form of the harmonic restraint."""
+        # Use periodicdistance rather than (x - x0)^2 + (y - y0)^2 + (z - z0)^2: the latter is
+        # discontinuous across periodic images, so when a GPU platform wraps a particle's position
+        # into the primary box the displacement jumps by a box length and the restraint diverges.
+        # periodicdistance computes the minimum-image distance, which is continuous and (for a particle
+        # near its reference site) equals |r - r0|, giving the same Einstein energy. This makes the
+        # restraint stable on the CUDA and OpenCL platforms.
         restraint_potential = CustomExternalForce(
             f"{self._coupling_parameter_name} * {self._spring_constant_parameter_name} * "
-            "((x - x0)^2 + (y - y0)^2 + (z - z0)^2)")
+            "periodicdistance(x, y, z, x0, y0, z0)^2")
         restraint_potential.addGlobalParameter(self._coupling_parameter_name, self._coupling)
         restraint_potential.addGlobalParameter(
             self._spring_constant_parameter_name,

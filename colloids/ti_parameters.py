@@ -61,6 +61,19 @@ class TIParameters(Parameters):
         restrained. If given, only particles of these types are restrained.
         Defaults to None.
     :type restrain_types: Optional[list[str]]
+    :param use_virtual_particles:
+        If True (the default), the Einstein restraint is applied with the "virtual particle" method:
+        a fixed (mass-zero) virtual particle is added at each reference position and the real particle
+        is tied to it by a harmonic bond. This is numerically stable on the CUDA and OpenCL platforms.
+        If False, the restraint is a single CustomExternalForce; this is simpler and gives an identical
+        free energy, but the combination of a CustomExternalForce (with per-particle parameters) and a
+        periodic nonbonded force diverges to NaN on both GPU platforms (all precisions), so it must
+        only be used on the CPU or Reference platform (see develop-crystal-TI/openmm_opencl_bug).
+        Because virtual particles have mass zero, the virtual-particle method cannot be combined with
+        an explicit (mass-zero) substrate; an error is raised if the initial configuration contains
+        immobile particles.
+        Defaults to True.
+    :type use_virtual_particles: bool
 
     :raises TypeError:
         If the spring constant has an incompatible unit.
@@ -77,6 +90,7 @@ class TIParameters(Parameters):
     reference_frame_index: int = -1
     fix_center_of_mass: bool = True
     restrain_types: Optional[list[str]] = None
+    use_virtual_particles: bool = True
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""

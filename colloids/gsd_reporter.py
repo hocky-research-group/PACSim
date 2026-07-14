@@ -94,7 +94,10 @@ class GSDReporter(object):
             raise ValueError("The report interval must be greater than zero.")
         assert simulation.topology.getNumChains() == 1
         assert simulation.topology.getNumResidues() == 1
-        assert simulation.topology.getNumAtoms() == simulation.system.getNumParticles()
+        # The system may contain more particles than the topology when a thermodynamic-integration run
+        # adds mass-zero virtual reference particles; only the topology (real) particles are reported.
+        assert simulation.topology.getNumAtoms() <= simulation.system.getNumParticles()
+        self._number_of_reported_particles = simulation.topology.getNumAtoms()
         self._report_interval = report_interval
         if not all(r.unit.is_compatible(length_unit) for r in radii):
             raise TypeError("All radii must have a unit compatible with nanometers.")
@@ -197,10 +200,11 @@ class GSDReporter(object):
         """
         assert state.getStepCount() == simulation.currentStep
         self._frame.configuration.step = state.getStepCount()
-        positions = state.getPositions(asNumpy=True)
+        # Report only the real (topology) particles; any trailing TI virtual particles are dropped.
+        positions = state.getPositions(asNumpy=True)[:self._number_of_reported_particles]
         assert len(positions) == self._frame.particles.N
         self._frame.particles.position = positions.value_in_unit(length_unit)
-        velocities = state.getVelocities(asNumpy=True)
+        velocities = state.getVelocities(asNumpy=True)[:self._number_of_reported_particles]
         assert len(velocities) == self._frame.particles.N
         self._frame.particles.velocity = velocities.value_in_unit(self._velocity_unit)
         periodic_box_vectors = self._cell if self._cell is not None else state.getPeriodicBoxVectors()

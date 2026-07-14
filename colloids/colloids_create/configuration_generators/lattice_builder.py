@@ -322,7 +322,11 @@ class LatticeBuilder(ConfigurationGenerator):
             # is ignored).
             scaled_lattice = required_scale_factor * structure_full.lattice.matrix
             box, hoomd_matrix = self._lattice_to_hoomd_box(scaled_lattice)
-            fractional_coordinates = structure_full.frac_coords % 1.0
+            # Wrap fractional coordinates into [0, 1), then shift to [-0.5, 0.5) so the crystal is
+            # centered on the origin. The HOOMD/GSD box is centered at the origin (spanning
+            # [-L/2, L/2)); placing particles at the raw fractional coordinates would offset the whole
+            # crystal by half a box length in each direction.
+            fractional_coordinates = (structure_full.frac_coords % 1.0) - 0.5
             positions = fractional_coordinates @ hoomd_matrix
             frame.particles.N = len(positions)
             frame.particles.position = np.array(positions, dtype=np.float32)

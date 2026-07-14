@@ -122,31 +122,31 @@ class TestOutputPrefix(object):
 
     def test_prefix_resolves_all_default_filenames(self):
         parameters = RunParameters(initial_configuration="first_frame.gsd", output_prefix="run1")
-        assert parameters.state_data_filename == "run1_state_data.csv"
-        assert parameters.trajectory_filename == "run1_trajectory.gsd"
-        assert parameters.checkpoint_filename == "run1_checkpoint.chk"
-        assert parameters.final_configuration_gsd_filename == "run1_final_frame.gsd"
+        assert parameters.state_data_filename == "run1.state.csv"
+        assert parameters.trajectory_filename == "run1.trajectory.gsd"
+        assert parameters.checkpoint_filename == "run1.chk"
+        assert parameters.final_configuration_gsd_filename == "run1.final.gsd"
 
     def test_explicit_filename_overrides_prefix(self):
         parameters = RunParameters(initial_configuration="first_frame.gsd", output_prefix="run1",
                                    trajectory_filename="custom.gsd")
         # The explicitly set filename is untouched; the others are still derived from the prefix.
         assert parameters.trajectory_filename == "custom.gsd"
-        assert parameters.state_data_filename == "run1_state_data.csv"
-        assert parameters.checkpoint_filename == "run1_checkpoint.chk"
-        assert parameters.final_configuration_gsd_filename == "run1_final_frame.gsd"
+        assert parameters.state_data_filename == "run1.state.csv"
+        assert parameters.checkpoint_filename == "run1.chk"
+        assert parameters.final_configuration_gsd_filename == "run1.final.gsd"
 
     def test_prefix_leaves_disabled_final_configuration_none(self):
         parameters = RunParameters(initial_configuration="first_frame.gsd", output_prefix="run1",
                                    final_configuration_gsd_filename=None)
         # Explicitly disabling the final configuration takes precedence over the prefix.
         assert parameters.final_configuration_gsd_filename is None
-        assert parameters.trajectory_filename == "run1_trajectory.gsd"
+        assert parameters.trajectory_filename == "run1.trajectory.gsd"
 
     def test_prefix_may_contain_directory(self):
         parameters = RunParameters(initial_configuration="first_frame.gsd",
                                    output_prefix="results/run1")
-        assert parameters.trajectory_filename == "results/run1_trajectory.gsd"
+        assert parameters.trajectory_filename == "results/run1.trajectory.gsd"
 
     def test_empty_prefix_raises(self):
         with pytest.raises(ValueError):
@@ -161,10 +161,10 @@ class TestOutputPrefix(object):
             os.remove("test_prefix.yaml")
         # Resolution is idempotent: reloading the already-resolved filenames does not prefix twice.
         assert yaml_parameters.output_prefix == "run1"
-        assert yaml_parameters.trajectory_filename == "run1_trajectory.gsd"
-        assert yaml_parameters.state_data_filename == "run1_state_data.csv"
-        assert yaml_parameters.checkpoint_filename == "run1_checkpoint.chk"
-        assert yaml_parameters.final_configuration_gsd_filename == "run1_final_frame.gsd"
+        assert yaml_parameters.trajectory_filename == "run1.trajectory.gsd"
+        assert yaml_parameters.state_data_filename == "run1.state.csv"
+        assert yaml_parameters.checkpoint_filename == "run1.chk"
+        assert yaml_parameters.final_configuration_gsd_filename == "run1.final.gsd"
 
 
 if __name__ == '__main__':

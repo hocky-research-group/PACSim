@@ -9,14 +9,14 @@ import colloids.update_reporters as update_reporters
 from colloids.units import energy_unit, length_unit, temperature_unit, time_unit, electric_potential_unit
 
 
-# The output-filename fields that are derived from output_prefix when it is given. The default value
-# of each field (e.g. "trajectory.gsd") is read from the dataclass itself, so these stay in sync.
-_OUTPUT_FILENAME_FIELDS = (
-    "state_data_filename",
-    "trajectory_filename",
-    "checkpoint_filename",
-    "final_configuration_gsd_filename",
-)
+# The suffix appended to output_prefix to derive each output filename when output_prefix is given,
+# e.g. output_prefix "run1" gives "run1.trajectory.gsd", "run1.state.csv", "run1.chk", "run1.final.gsd".
+_OUTPUT_PREFIX_SUFFIXES = {
+    "state_data_filename": ".state.csv",
+    "trajectory_filename": ".trajectory.gsd",
+    "checkpoint_filename": ".chk",
+    "final_configuration_gsd_filename": ".final.gsd",
+}
 
 
 @dataclass(order=True, frozen=True)
@@ -205,13 +205,13 @@ class RunParameters(Parameters):
     :type final_configuration_gsd_filename: Optional[str]
     :param output_prefix:
         An optional common prefix for the output files. When given, any output filename that is
-        still at its default value is replaced by "<output_prefix>_<default>", so that the four
+        still at its default value is replaced by the prefix plus a fixed suffix, so that the four
         output files do not have to be specified individually. For example, output_prefix "run1"
-        yields "run1_trajectory.gsd", "run1_state_data.csv", "run1_checkpoint.chk", and
-        "run1_final_frame.gsd". An output filename that is set explicitly always takes precedence
-        over the prefix (including final_configuration_gsd_filename set to None to disable writing
-        the final configuration). If None, the default (unprefixed) filenames are used.
-        The prefix may itself contain a directory, e.g. "results/run1".
+        yields "run1.trajectory.gsd" (trajectory), "run1.state.csv" (state data), "run1.chk"
+        (checkpoint), and "run1.final.gsd" (final configuration). An output filename that is set
+        explicitly always takes precedence over the prefix (including final_configuration_gsd_filename
+        set to None to disable writing the final configuration). If None, the default (unprefixed)
+        filenames are used. The prefix may itself contain a directory, e.g. "results/run1".
         Defaults to None.
     :type output_prefix: Optional[str]
     :param wall_directions:
@@ -367,19 +367,19 @@ class RunParameters(Parameters):
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
         # Resolve the output filenames from a common prefix when output_prefix is given. Every output
-        # filename that is still at its default value is replaced by "<output_prefix>_<default>"; a
-        # filename that was set explicitly (including final_configuration_gsd_filename set to None to
-        # disable writing the final configuration) is left untouched. This runs before the filename
-        # validations below so that they operate on the resolved names. It is idempotent, because a
-        # resolved (prefixed) filename no longer equals its default.
+        # filename that is still at its default value is replaced by "<output_prefix><suffix>" (e.g.
+        # "<output_prefix>.trajectory.gsd"); a filename that was set explicitly (including
+        # final_configuration_gsd_filename set to None to disable writing the final configuration) is
+        # left untouched. This runs before the filename validations below so that they operate on the
+        # resolved names. It is idempotent, because a resolved (prefixed) filename no longer equals its
+        # default.
         if self.output_prefix is not None:
             if not isinstance(self.output_prefix, str) or self.output_prefix == "":
                 raise ValueError("The output prefix must be a non-empty string.")
-            for filename_field in _OUTPUT_FILENAME_FIELDS:
+            for filename_field, suffix in _OUTPUT_PREFIX_SUFFIXES.items():
                 default_filename = type(self).__dataclass_fields__[filename_field].default
                 if getattr(self, filename_field) == default_filename:
-                    object.__setattr__(self, filename_field,
-                                       f"{self.output_prefix}_{default_filename}")
+                    object.__setattr__(self, filename_field, f"{self.output_prefix}{suffix}")
         if not self.initial_configuration.endswith(".gsd"):
             raise ValueError("The filename of the initial configuration must end with '.gsd'.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:

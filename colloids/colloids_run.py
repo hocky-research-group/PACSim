@@ -17,7 +17,7 @@ from colloids.run_parameters import RunParameters
 from colloids.ti_parameters import TIParameters
 from colloids.status_reporter import StatusReporter
 import colloids.update_reporters as update_reporters
-from colloids.units import electric_potential_unit, energy_unit, length_unit
+from colloids.units import electric_potential_unit, length_unit
 
 
 def simple_formatwarning(msg: str, category: Warning, filename: str, lineno: int, line: Optional[str] = None) -> str:
@@ -200,90 +200,6 @@ def set_up_harmonic_restraint(ti_parameters: TIParameters, frame: gsd.hoomd.Fram
     return restraint
 
 
-def set_up_virtual_particle_restraint(system: openmm.System, ti_parameters: TIParameters,
-                                      frame: gsd.hoomd.Frame,
-                                      reference_frame: gsd.hoomd.Frame) -> np.ndarray:
-    """
-    Add the Einstein-crystal restraint using the virtual-particle method (GPU-safe alternative to a
-    CustomExternalForce).
-
-    A fixed (mass-zero) virtual particle is added to the system at the reference position of every
-    restrained particle, and the real particle is tied to it by a harmonic bond
-    u = coupling * spring_constant * r^2 (r = distance to the virtual particle), which is exactly the
-    coupled Einstein energy. Every CustomNonbondedForce is restricted to the real particles via an
-    interaction group so that the virtual particles do not interact with anything (and the coincident
-    real/virtual pair at r = 0 is never evaluated). The virtual particles are added to the system only,
-    not to the topology, so the trajectory still contains only the real particles.
-
-    This must be called after all real particles and all real forces have been added to the system.
-
-    :param system: The OpenMM system (with all real particles and forces already added).
-    :param ti_parameters: The thermodynamic-integration parameters.
-    :param frame: The initial-configuration frame (for masses and types).
-    :param reference_frame: The frame that supplies the reference positions r0.
-
-    :return: The reference positions of the virtual particles (in nanometers), in the order in which
-        the virtual particles were added to the system.
-    :rtype: np.ndarray
-
-    :raises ValueError:
-        If the reference frame does not have the same number of particles as the initial frame.
-        If the initial frame contains immobile (mass-zero) particles (the virtual-particle method
-        cannot be combined with an explicit substrate).
-        If a type in restrain_types is not present in the frame, or no particle is restrained.
-    """
-    if reference_frame.particles.N != frame.particles.N:
-        raise ValueError("The reference configuration must have the same number of particles as the "
-                         "initial configuration.")
-    if any(mass == 0.0 for mass in frame.particles.mass):
-        raise ValueError("The virtual-particle Einstein restraint cannot be combined with an "
-                         "explicit (mass-zero) substrate. Set use_virtual_particles to false and use "
-                         "the CPU platform, or remove the immobile particles.")
-    if ti_parameters.restrain_types is not None:
-        for restrain_type in ti_parameters.restrain_types:
-            if restrain_type not in frame.particles.types:
-                raise ValueError(f"Type {restrain_type} of restrain_types is not in the frame.")
-
-    n_real = frame.particles.N
-    reference_positions = reference_frame.particles.position
-    restrained_indices = []
-    for i in range(n_real):
-        if not frame.particles.mass[i] > 0.0:
-            continue
-        if (ti_parameters.restrain_types is not None
-                and frame.particles.types[frame.particles.typeid[i]] not in ti_parameters.restrain_types):
-            continue
-        restrained_indices.append(i)
-    if not restrained_indices:
-        raise ValueError("No particles were restrained. Check the masses and restrain_types.")
-    n_virtual = len(restrained_indices)
-
-    # Fixed virtual reference particles (mass zero -> not integrated).
-    for _ in range(n_virtual):
-        system.addParticle(0.0)
-
-    # Restrict every nonbonded interaction to the real particles.
-    real_set = set(range(n_real))
-    for force in system.getForces():
-        if isinstance(force, openmm.CustomNonbondedForce):
-            number_of_parameters = force.getNumPerParticleParameters()
-            for _ in range(n_virtual):
-                force.addParticle([1.0] * number_of_parameters)
-            force.addInteractionGroup(real_set, real_set)
-
-    spring_constant_value = ti_parameters.spring_constant.value_in_unit(energy_unit / (length_unit ** 2))
-    tether = openmm.CustomBondForce("lambda_ein * spring_constant * r^2")
-    tether.addGlobalParameter("lambda_ein", ti_parameters.coupling)
-    tether.addGlobalParameter("spring_constant", spring_constant_value)
-    for virtual_offset, real_index in enumerate(restrained_indices):
-        tether.addBond(real_index, n_real + virtual_offset, [])
-    tether.setName("harmonic_restraint_energy")
-    tether.setForceGroup(system.getNumForces())
-    system.addForce(tether)
-
-    return np.array([reference_positions[i] for i in restrained_indices], dtype=np.float64)
-
-
 def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
                       ti_parameters: Optional[TIParameters] = None,
                       reference_frame: Optional[gsd.hoomd.Frame] = None) -> app.Simulation:
@@ -395,7 +311,7 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
     else:
         plumed = None
 
-    if ti_parameters is not None and not ti_parameters.use_virtual_particles:
+    if ti_parameters is not None:
         assert reference_frame is not None
         harmonic_restraint = set_up_harmonic_restraint(ti_parameters, frame, reference_frame)
     else:
@@ -466,24 +382,16 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
             force.setForceGroup(system.getNumForces())
             system.addForce(force)
 
-    # The Einstein-crystal restraint. Either a single CustomExternalForce (CPU only) or the
-    # virtual-particle method (GPU-safe). The virtual particles must be added after all real forces.
-    virtual_reference_positions = None
     if harmonic_restraint is not None:
         for force in harmonic_restraint.yield_potentials():
             force.setForceGroup(system.getNumForces())
             system.addForce(force)
-    elif ti_parameters is not None and ti_parameters.use_virtual_particles:
-        assert reference_frame is not None
-        virtual_reference_positions = set_up_virtual_particle_restraint(
-            system, ti_parameters, frame, reference_frame)
-
-    if ti_parameters is not None and ti_parameters.fix_center_of_mass:
         # The Einstein-crystal method requires the center of mass to be fixed to remove the
         # quasi-divergence of the thermodynamic-integration integrand at small coupling.
-        cm_motion_remover = openmm.CMMotionRemover(1)
-        cm_motion_remover.setForceGroup(system.getNumForces())
-        system.addForce(cm_motion_remover)
+        if ti_parameters.fix_center_of_mass:
+            cm_motion_remover = openmm.CMMotionRemover(1)
+            cm_motion_remover.setForceGroup(system.getNumForces())
+            system.addForce(cm_motion_remover)
 
     barostat = initialize_barostat(parameters, integrator)
     if barostat is not None:
@@ -501,11 +409,6 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
                                     platformProperties={"Precision": "mixed"})
     else:
         simulation = app.Simulation(topology, system, integrator, platform)
-
-    # The reference positions of any TI virtual particles (mass-zero particles that were added to the
-    # system but not the topology); None if the virtual-particle restraint is not used. They must be
-    # appended to the particle positions when the state is initialized (see colloids_run).
-    simulation.ti_virtual_reference_positions = virtual_reference_positions
 
     return simulation
 
@@ -589,12 +492,7 @@ Perform a molecular-dynamics simulation using OpenMM.
 
         set_up_reporters(parameters, simulation, True, parameters.run_steps, frame)
     else:
-        # If TI virtual particles were added to the system, append their (fixed) reference positions
-        # and zero velocities so the position/velocity arrays match the system particle count.
-        initial_positions = frame.particles.position
-        if simulation.ti_virtual_reference_positions is not None:
-            initial_positions = np.vstack([initial_positions, simulation.ti_virtual_reference_positions])
-        simulation.context.setPositions(initial_positions)
+        simulation.context.setPositions(frame.particles.position)
 
         if parameters.velocity_seed is not None:
             if not np.all(frame.particles.velocity == 0.0):
@@ -609,11 +507,7 @@ Perform a molecular-dynamics simulation using OpenMM.
                 warnings.warn(
                     "All initial velocities in the GSD file are zero. Set a velocity seed to assign random "
                     "values based on the temperature (use a negative seed to generate a random seed automatically).")
-            initial_velocities = frame.particles.velocity
-            if simulation.ti_virtual_reference_positions is not None:
-                initial_velocities = np.vstack(
-                    [initial_velocities, np.zeros_like(simulation.ti_virtual_reference_positions)])
-            simulation.context.setVelocities(initial_velocities)
+            simulation.context.setVelocities(frame.particles.velocity)
 
         if parameters.minimize_energy_initially:
             # Add reporter during minimization?

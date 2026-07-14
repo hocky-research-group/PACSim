@@ -30,17 +30,13 @@ def read_gsd_file(filename: str, frame_index: int) -> gsd.hoomd.Frame:
 def write_gsd_file(filename: str, openmm_simulation: app.Simulation, radii: npt.NDArray[unit.Quantity],
                    surface_potentials: npt.NDArray[unit.Quantity], cell: npt.NDArray[unit.Quantity]) -> None:
     state = openmm_simulation.context.getState(getPositions=True, getVelocities=True, enforcePeriodicBox=False)
-    topology = openmm_simulation.topology
-    # The system may contain more particles than the topology when a thermodynamic-integration run adds
-    # mass-zero virtual reference particles; only the topology (real) particles are written.
-    number_of_real_particles = topology.getNumAtoms()
-    positions = state.getPositions(asNumpy=True)[:number_of_real_particles]
-    velocities = state.getVelocities(asNumpy=True)[:number_of_real_particles]
+    positions = state.getPositions(asNumpy=True)
+    velocities = state.getVelocities(asNumpy=True)
 
+    topology = openmm_simulation.topology
     assert topology.getNumChains() == 1
     assert topology.getNumResidues() == 1
-    assert topology.getNumAtoms() <= openmm_simulation.system.getNumParticles()
-    assert len(positions) == number_of_real_particles
+    assert topology.getNumAtoms() == openmm_simulation.system.getNumParticles() == len(positions)
     assert len(cell) == 3
     assert cell[0][1].value_in_unit(length_unit) == 0.0
     assert cell[0][2].value_in_unit(length_unit) == 0.0

@@ -71,7 +71,7 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
     _name = "wall_energy"
 
     def __init__(self, wall_distances: Sequence[Optional[unit.Quantity]], epsilon: unit.Quantity, alpha: float,
-                 wall_directions: Sequence[bool] = (True, True, True), use_substrate: bool = False) -> None:
+                 wall_directions: Sequence[bool] = (True, True, True), use_substrate: bool = False, use_pbc: bool = True) -> None:
         """Constructor of the ShiftedLennardJonesWalls class."""
         super().__init__()
 
@@ -101,14 +101,15 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
         if alpha != 1.0:
             warnings.warn("The force of the shifted Lennard-Jones potential as a wall is only continuous if alpha = 1.")
         if use_substrate:
-            if not all(wall_directions):
-                raise ValueError("all wall directions must be active if a substrate is used")
+            if not wall_directions[-1]:
+                raise ValueError("z walls must be active if a substrate is used")
 
         self._wall_distances = wall_distances
         self._epsilon = epsilon
         self._alpha = alpha
         self._wall_directions = wall_directions
         self._use_substrate = use_substrate
+        self._use_pbc = use_pbc
         self._slj_potential = self._set_up_slj_potential()
 
     def _set_up_slj_potential(self) -> CustomExternalForce:
@@ -130,15 +131,21 @@ class ShiftedLennardJonesWalls(OpenMMPotentialAbstract):
                  "- alpha * (radius / (wall_distance_z_over_two_minus_delta - periodicdistance(0, 0, z, 0, 0, 0)))^6)"
                  "+ shift)")
         # Using periodicdistance switches on periodic boundary conditions in the OpenMM system.
-        # If there are walls in all directions, we don't want periodic boundary conditions though.
-        if all(self._wall_directions):
+        # If there are walls in all directions or for other reasons, we might not want periodic 
+        # boundary conditions though.
+        if self._use_pbc and self._use_substrate:
+            # Only the bottom wall is replaced by a substrate.
+            # The top wall is still a shifted Lennard-Jones wall.
+            slj_z = slj_z.replace("periodicdistance(0, 0, z, 0, 0, 0)", "z")
+        
+        elif not self._use_pbc:
             slj_x = slj_x.replace("periodicdistance(x, 0, 0, 0, 0, 0)", "abs(x)")
             slj_y = slj_y.replace("periodicdistance(0, y, 0, 0, 0, 0)", "abs(y)")
-            slj_z = slj_z.replace("periodicdistance(0, 0, z, 0, 0, 0)", "abs(z)")
             if self._use_substrate:
-                # Only the bottom wall is replaced by a substrate.
-                # The top wall is still a shifted Lennard-Jones wall.
-                slj_z = slj_z.replace("abs(z)", "z")
+                slj_z = slj_z.replace("periodicdistance(0, 0, z, 0, 0, 0)", "z")
+            else:
+                slj_z = slj_z.replace("periodicdistance(0, 0, z, 0, 0, 0)", "abs(z)")
+
 
         slj_string = "+".join(slj for slj, wdir in zip([slj_x, slj_y, slj_z], self._wall_directions) if wdir)
         assert slj_string

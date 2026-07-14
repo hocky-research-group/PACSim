@@ -6,7 +6,7 @@ integrator_parameters:
   randomNumberSeed: 3
   stepSize: !Quantity
     unit: picosecond
-    value: 0.0317647015
+    value: 0.317647015
   temperature: !Copy
     key: potential_temperature
 potential_temperature: !Quantity
@@ -47,5 +47,6 @@ update_reporter: null
 update_reporter_parameters: null
 use_depletion: false
 use_gravity: false
+use_pbc: false
 use_plumed: false
 velocity_seed: 5

@@ -220,6 +220,10 @@ class RunParameters(Parameters):
         If any of the wall directions is active, epsilon and alpha must be specified.
         Defaults to [False, False, False].
     :type wall_directions: list[bool]
+    :param use_pbc:
+        If True, use periodic boundary conditions in the simulation.
+        Defaults to True.
+    :type use_pbc: bool
     :param epsilon:
         The unshifted Lennard-Jones potential well-depth for closed-wall simulations with shifted Lennard-Jones
         potential walls.
@@ -350,6 +354,7 @@ class RunParameters(Parameters):
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
+    use_pbc: bool = True
     use_implicit_substrate: bool = False
     substrate_wall_charge: Optional[unit.Quantity] = None
     use_depletion: bool = False
@@ -474,8 +479,8 @@ class RunParameters(Parameters):
             if self.depletant_radius is not None:
                 raise ValueError("Depletant radius must not be specified if depletion potential is not on.")
         if self.use_implicit_substrate:
-            if not all(self.wall_directions):
-                raise ValueError("A substrate can only be used if all walls are active.")
+            if not self.wall_directions[-1]:
+                raise ValueError("The z wall must be active if using an implicit substrate.")
             if self.substrate_wall_charge is None:
                 raise ValueError("Substrate wall charge must be specified if using implicit substrate.")
             if not self.substrate_wall_charge.unit.is_compatible(electric_potential_unit):
@@ -504,9 +509,8 @@ class RunParameters(Parameters):
                 raise TypeError("The particle density must have a unit compatible with grams per centimeter cubed.")
             if self.particle_density <= 0.0 * (unit.gram / length_unit ** 3):
                 raise ValueError("The particle density must be greater than zero.")
-            if not all(self.wall_directions):
-                raise ValueError("Gravity can only be turned on if all walls are active and, hence, no periodic "
-                                 "boundary conditions are present.")
+            if not self.wall_directions[-1]:
+                raise ValueError("Gravity can only be turned on if z walls are active.")
         else:
             if self.gravitational_acceleration is not None:
                 raise ValueError("Gravitational acceleration must not be specified if gravity is not on.")

@@ -24,7 +24,7 @@ integrator_parameters:
   randomNumberSeed: 3
   stepSize: !Quantity
     unit: picosecond
-    value: 0.0317647015
+    value: 0.3
   temperature: !Copy
     key: potential_temperature
 potential_temperature: !Quantity

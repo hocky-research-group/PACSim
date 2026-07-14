@@ -143,8 +143,8 @@ def check_frame(parameters: RunParameters, frame: gsd.hoomd.Frame) -> None:
     if use_explicit_substrate and parameters.use_implicit_substrate:
         raise ValueError("Cannot use both explicit and implicit substrate.")
     if use_explicit_substrate or parameters.use_implicit_substrate:
-        if not all(parameters.wall_directions):
-            raise ValueError("A substrate can only be used if all walls are active.")
+        if not parameters.wall_directions[-1]:
+            raise ValueError("A substrate can only be used if z walls are active.")
 
 
 def set_up_harmonic_restraint(ti_parameters: TIParameters, frame: gsd.hoomd.Frame,
@@ -235,23 +235,26 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
             assert (not parameters.use_depletion
                     or parameters.depletant_radius
                     > (parameters.cutoff_factor * parameters.debye_length - 2.0 * parameters.brush_length) / 2.0)
-            for index, wall_direction in enumerate(parameters.wall_directions):
-                if wall_direction:
-                    # The shifted Lennard Jones walls diverge at distance r = radius - 1 from the location of the wall,
-                    # where radius is the radius of the particle. The minimum distance between periodic images through
-                    # a wall is thus 2 * radius_min - 2, where radius_min is the smallest radius in the system.
-                    # The maximum cutoff of the electrostatic interactions is
-                    # 2 * radius_max + cutoff_factor * debye_length. In order to prevent particles from interacting
-                    # through the walls, we thus increase the length of the periodic box vectors (not the wall) by
-                    # 2 * (radius_max - radius_min) + 2 + cutoff_factor * debye_length.
-                    final_cell[index][index] += \
-                        (2.0 * (max(radii) - min(radii)) + 2.0 * length_unit
-                         + parameters.cutoff_factor * parameters.debye_length).value_in_unit(length_unit)
+        else:
+            if parameters.use_pbc:
+                warnings.warn("All walls are included, so particles will not be able to leave the box. Consider disabling periodic boundary conditions to improve performance.")
+        for index, wall_direction in enumerate(parameters.wall_directions):
+            if wall_direction:
+                # The shifted Lennard Jones walls diverge at distance r = radius - 1 from the location of the wall,
+                # where radius is the radius of the particle. The minimum distance between periodic images through
+                # a wall is thus 2 * radius_min - 2, where radius_min is the smallest radius in the system.
+                # The maximum cutoff of the electrostatic interactions is
+                # 2 * radius_max + cutoff_factor * debye_length. In order to prevent particles from interacting
+                # through the walls, we thus increase the length of the periodic box vectors (not the wall) by
+                # 2 * (radius_max - radius_min) + 2 + cutoff_factor * debye_length.
+                final_cell[index][index] += \
+                    (2.0 * (max(radii) - min(radii)) + 2.0 * length_unit
+                        + parameters.cutoff_factor * parameters.debye_length).value_in_unit(length_unit)
     else:
         wall_distances = None
         final_cell = cell
 
-    if not all_walls:
+    if parameters.use_pbc:
         topology.setPeriodicBoxVectors(final_cell)
         system.setDefaultPeriodicBoxVectors(openmm.Vec3(*final_cell[0]), openmm.Vec3(*final_cell[1]),
                                             openmm.Vec3(*final_cell[2]))
@@ -273,13 +276,13 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
     # ---------------------------------------- Create all forces. ------------------------------------------------------
     colloid_potentials = ColloidPotentialsAlgebraic(
         colloid_potentials_parameters=potentials_parameters, use_log=parameters.use_log,
-        cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=not all_walls,
+        cutoff_factor=parameters.cutoff_factor, periodic_boundary_conditions=parameters.use_pbc,
         steric_radius_average=parameters.steric_radius_average,
         electrostatic_radius_average=parameters.electrostatic_radius_average)
 
     if include_walls:
         slj_walls = ShiftedLennardJonesWalls(wall_distances, parameters.epsilon, parameters.alpha,
-                                             parameters.wall_directions, use_substrate)
+                                             parameters.wall_directions, use_substrate, use_pbc=parameters.use_pbc)
     else:
         slj_walls = None
 
@@ -287,12 +290,11 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
         depletion_potential = DepletionPotential(parameters.depletion_phi, parameters.depletant_radius,
                                                  brush_length=parameters.brush_length,
                                                  temperature=parameters.potential_temperature,
-                                                 periodic_boundary_conditions=not all_walls)
+                                                 periodic_boundary_conditions=parameters.use_pbc)
     else:
         depletion_potential = None
 
     if parameters.use_gravity:
-        assert all_walls
         gravitational_potential = Gravity(parameters.gravitational_acceleration, parameters.water_density,
                                           parameters.particle_density)
     else:
@@ -365,14 +367,11 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
             system.addForce(force)
 
     if parameters.use_gravity:
-        assert all_walls
         for force in gravitational_potential.yield_potentials():
             force.setForceGroup(system.getNumForces())
             system.addForce(force)
-        assert not system.usesPeriodicBoundaryConditions()
 
     if parameters.use_implicit_substrate:
-        assert all_walls
         for force in substrate_wall.yield_potentials():
             force.setForceGroup(system.getNumForces())
             system.addForce(force)

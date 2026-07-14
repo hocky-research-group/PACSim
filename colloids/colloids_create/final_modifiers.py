@@ -196,8 +196,9 @@ class SeedModifier(FinalModifier):
         :type cutoff_distance: float
         """
         positions = frame.particles.position
-        # Freud box does not matter without periodic boundaries.
-        freud_box = freud.box.Box(Lx=1.0, Ly=1.0, Lz=1.0)
+        box = frame.configuration.box
+        freud_box = freud.box.Box(box[0], box[1], box[2], 0.0, 0.0, 0.0)
+        positions = freud_box.wrap(positions)
         freud_box.periodic = False
         cluster = freud.cluster.Cluster()
         cluster.compute((freud_box, positions), neighbors={"r_max": cutoff_distance, "exclude_ii": True})
@@ -219,7 +220,7 @@ class SeedModifier(FinalModifier):
         frame.particles.mass = frame.particles.mass[filtered_indices]
         frame.particles.charge = frame.particles.charge[filtered_indices]
         frame.particles.diameter = frame.particles.diameter[filtered_indices]
-        frame.particles.position = frame.particles.position[filtered_indices]
+        frame.particles.position = positions[filtered_indices]
 
         if frame.constraints.N == 0:
             return
@@ -295,6 +296,10 @@ class SeedModifier(FinalModifier):
         seed_positions = seed_frame.particles.position
         radii = frame.particles.diameter / 2.0
         seed_radii = seed_frame.particles.diameter / 2.0
+
+        box = frame.configuration.box[:3]
+        positions = positions % box
+        seed_positions = seed_positions % box
 
         # Broadcasting (N, 1, 3) - (1, N_s, 3) leads to shape (N, N_s, 3).
         # Taking norm along axis 2 leads to shape (N, N_s).

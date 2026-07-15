@@ -224,11 +224,17 @@ class TestShiftedLennardJonesWallsExceptions(TestShiftedLennardJonesWallsParamet
                                      wall_directions=[True, False, True])
 
     def test_exception_substrate(self):
-        # Test exception on missing wall distance and wall direction for substrate.
+        # A substrate only requires the z wall to be active; x and y may be inactive (e.g. periodic).
+        ShiftedLennardJonesWalls(
+            wall_distances=[1000.0 * (unit.nano * unit.meter), None, 2000.0 * (unit.nano * unit.meter)],
+            epsilon=1.0 * unit.kilojoule_per_mole, alpha=1.0, wall_directions=[True, False, True],
+            use_substrate=True)
+
+        # Test exception on missing z wall direction for substrate.
         with pytest.raises(ValueError):
             ShiftedLennardJonesWalls(
-                wall_distances=[1000.0 * (unit.nano * unit.meter), None, 2000.0 * (unit.nano * unit.meter)],
-                epsilon=1.0 * unit.kilojoule_per_mole, alpha=1.0, wall_directions=[True, False, True],
+                wall_distances=[1000.0 * (unit.nano * unit.meter), 1500.0 * (unit.nano * unit.meter), None],
+                epsilon=1.0 * unit.kilojoule_per_mole, alpha=1.0, wall_directions=[True, True, False],
                 use_substrate=True)
 
 

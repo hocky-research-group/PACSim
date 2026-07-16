@@ -1,5 +1,6 @@
 import argparse
 import inspect
+import os
 import sys
 from typing import Optional, Sequence
 import warnings
@@ -412,8 +413,20 @@ def set_up_simulation(parameters: RunParameters, frame: gsd.hoomd.Frame,
     return simulation
 
 
+def _ensure_parent_directory(path: Optional[str]) -> None:
+    """Create the parent directory of an output file if it does not exist (e.g. for output_prefix)."""
+    if path:
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+
+
 def set_up_reporters(parameters: RunParameters, simulation: app.Simulation, append_file: bool,
                      total_number_steps: int, initial_frame: gsd.hoomd.Frame) -> None:
+    # Create the output directory (e.g. the output_prefix folder) before any reporter opens a file.
+    for output_path in (parameters.trajectory_filename, parameters.state_data_filename,
+                        parameters.checkpoint_filename):
+        _ensure_parent_directory(output_path)
     # With walls, the OpenMM box is artificially enlarged, so the true (fixed) cell is recorded.
     # Without walls the box may change during the run (e.g. under an NPT barostat), so pass cell=None
     # to record the live simulation box each frame.
@@ -527,6 +540,7 @@ Perform a molecular-dynamics simulation using OpenMM.
     simulation.step(parameters.run_steps)
 
     if parameters.final_configuration_gsd_filename is not None:
+        _ensure_parent_directory(parameters.final_configuration_gsd_filename)
         write_gsd_file(parameters.final_configuration_gsd_filename, simulation,
                        frame.particles.diameter / 2.0 * length_unit,
                        frame.particles.charge * electric_potential_unit,

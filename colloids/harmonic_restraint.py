@@ -26,7 +26,7 @@ class HarmonicRestraint(OpenMMPotentialAbstract):
     therefore has units of energy per squared length. With this convention the free energy of the
     ideal Einstein crystal is
 
-        A0 / (N kB T) = -(1/N) ln[ (1 / Lambda_dB^(3N)) (pi / (beta Lambda_E))^(3(N-1)/2) N^(3/2) V ]
+        A0 / (N kB T) = -(1/N) ln[ (1 / Lambda_dB^(3N)) (pi / (beta Lambda_E))^(3(N-1)/2) N^(1/2) V ]
 
     for an atomic solid with fixed center of mass (eq. (48) of the review), where Lambda_dB is the
     thermal de Broglie wavelength (conventionally set to the unit of length) and V is the volume.

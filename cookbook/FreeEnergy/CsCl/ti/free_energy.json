@@ -1,0 +1,120 @@
+{
+  "run_yaml": "run.yaml",
+  "n_particles": 432,
+  "volume_nm3": 3147964691.1306896,
+  "temperature_K": 300.0,
+  "d_nn_nm": 211.5384393494247,
+  "lambda_E_kJ_per_mol_nm2": 59.86413085070333,
+  "windows": 10,
+  "windows_requested": 10,
+  "w_range": 0.5450746922893704,
+  "equil_steps": 2000,
+  "prod_steps": 4000,
+  "A0_NkT": 2.9852770726227664,
+  "dA1_NkT": -13.155580934483663,
+  "dA2_NkT": -9.394246782034944,
+  "U_lattice_NkT": -13.145108471870369,
+  "dA1_log_correction_NkT": -0.010472462613293487,
+  "A_sol_NkT": -19.564550643895842,
+  "A_sol_FL_NkT": -19.536456080987303,
+  "windows_data": [
+    {
+      "window": 0,
+      "lambda_ein": 0.00984742031240445,
+      "bare_spring_energy_kJmol": 157967.4883439746,
+      "coupled_mean_kJmol": 1555.5722534179688,
+      "coupled_std_kJmol": 53.685573889601045,
+      "step_size_ps": 0.1,
+      "prod_steps": 4000
+    },
+    {
+      "window": 1,
+      "lambda_ein": 0.051687491948534316,
+      "bare_spring_energy_kJmol": 35357.66290315813,
+      "coupled_mean_kJmol": 1827.5489166259765,
+      "coupled_std_kJmol": 64.06340009768903,
+      "step_size_ps": 0.1,
+      "prod_steps": 4000
+    },
+    {
+      "window": 2,
+      "lambda_ein": 0.12598154610887372,
+      "bare_spring_energy_kJmol": 13584.694980613898,
+      "coupled_mean_kJmol": 1711.4208770751952,
+      "coupled_std_kJmol": 63.67125211327435,
+      "step_size_ps": 0.1,
+      "prod_steps": 4000
+    },
+    {
+      "window": 3,
+      "lambda_ein": 0.2304034950087773,
+      "bare_spring_energy_kJmol": 7220.929665965337,
+      "coupled_mean_kJmol": 1663.7274322509766,
+      "coupled_std_kJmol": 86.1580016755636,
+      "step_size_ps": 0.1,
+      "prod_steps": 4000
+    },
+    {
+      "window": 4,
+      "lambda_ein": 0.3602322806954736,
+      "bare_spring_energy_kJmol": 4522.361163549907,
+      "coupled_mean_kJmol": 1629.1004760742187,
+      "coupled_std_kJmol": 38.5847551905559,
+      "step_size_ps": 0.1,
+      "prod_steps": 4000
+    },
+    {
+      "window": 5,
+      "lambda_ein": 0.5073198350196009,
+      "bare_spring_energy_kJmol": 3237.355024864744,
+      "coupled_mean_kJmol": 1642.3744171142578,
+      "coupled_std_kJmol": 68.35373557237232,
+      "step_size_ps": 0.1,
+      "prod_steps": 4000
+    },
+    {
+      "window": 6,
+      "lambda_ein": 0.6594759090731097,
+      "bare_spring_energy_kJmol": 2439.655382828629,
+      "coupled_mean_kJmol": 1608.8939514160156,
+      "coupled_std_kJmol": 64.53219221835967,
+      "step_size_ps": 0.1,
+      "prod_steps": 4000
+    },
+    {
+      "window": 7,
+      "lambda_ein": 0.8008940164501887,
+      "bare_spring_energy_kJmol": 2056.350980342613,
+      "coupled_mean_kJmol": 1646.9191958778783,
+      "coupled_std_kJmol": 69.69302900087783,
+      "step_size_ps": 0.09624657068577037,
+      "prod_steps": 4156
+    },
+    {
+      "window": 8,
+      "lambda_ein": 0.9140715273031678,
+      "bare_spring_energy_kJmol": 1800.8181125130375,
+      "coupled_mean_kJmol": 1646.0765625,
+      "coupled_std_kJmol": 69.32451822040372,
+      "step_size_ps": 0.09009126774170635,
+      "prod_steps": 4440
+    },
+    {
+      "window": 9,
+      "lambda_ein": 0.9831361416886099,
+      "bare_spring_energy_kJmol": 1649.6599390920119,
+      "coupled_mean_kJmol": 1621.8403076171876,
+      "coupled_std_kJmol": 72.25882716628647,
+      "step_size_ps": 0.08686922719203653,
+      "prod_steps": 4605
+    }
+  ],
+  "npt_equilibration": null,
+  "autotuned_msd_nm2": null,
+  "spring_rule": {
+    "rule": "fraction_of_decay_length",
+    "fraction": 0.05,
+    "target_displacement_nm": 0.25,
+    "measured_rms_nm": null
+  }
+}

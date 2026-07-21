@@ -164,7 +164,9 @@ in units of `N kB T`, plus a diagnostics figure. Companion scripts cover the MBA
 
 See [`scripts/crystal-TI/README.md`](scripts/crystal-TI/README.md) for the full workflow, the
 recommended production settings, and the platform notes. The MBAR parts additionally require
-`pymbar`.
+`pymbar`. A worked example ranking CsCl against Th3P4 is in the cookbook, under
+[`cookbook/FreeEnergy/`](cookbook/FreeEnergy) and section I of
+[`cookbook/Tutorial.ipynb`](cookbook/Tutorial.ipynb).
 
 ## Installation
 

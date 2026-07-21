@@ -8,6 +8,7 @@ The repository includes:
 - A configuration generator that builds initial GSD structures from LAMMPS-style cluster definitions.
 - Analysis tools for comparing simulation state data across runs.
 - A tuning tool for matching target interaction well depths by solving for surface potentials.
+- Standalone workflow scripts under `scripts/`, including crystal free-energy calculations by thermodynamic integration.
 - Tests and benchmark scripts covering the implemented forces and workflows.
 
 ## What PACSim can do
@@ -27,6 +28,8 @@ PACSim currently exposes the following capabilities in code:
 - Apply configurable initial and final modifiers during configuration generation.
 - Plot and compare state-data output from multiple simulation runs.
 - Tune a particle type's surface potential to achieve a target interaction minimum against another particle type.
+- Build true periodic bulk crystals with `LatticeBuilder` and relax the box with an NPT Monte Carlo barostat.
+- Restrain particles to reference lattice sites with a periodic-image-safe harmonic (Einstein) force, for Frenkel-Ladd thermodynamic integration.
 
 ## Main command-line tools
 
@@ -137,6 +140,32 @@ An example tuning configuration can be written with:
 pacsim-tune --example
 ```
 
+## Workflow scripts
+
+The `scripts/` directory holds standalone command-line workflows that build on the package but are
+not installed as `pacsim-*` entry points. Run them with `python scripts/<workflow>/<script>.py`.
+
+### Crystal free energies (`scripts/crystal-TI/`)
+
+Compute the absolute Helmholtz free energy of a bulk colloidal crystal by Frenkel-Ladd /
+Einstein-crystal thermodynamic integration, so that competing candidate structures can be ranked at
+identical conditions. Build a periodic bulk crystal, then:
+
+```bash
+python scripts/crystal-TI/run_ti.py run.yaml --output-dir ti \
+    --windows 12 --equil-steps 20000 --prod-steps 60000 --sample-interval 200
+```
+
+This relaxes the box under the NPT barostat, auto-tunes the Einstein spring, runs one `pacsim-run`
+per Gauss-Legendre coupling window, and writes `ti/free_energy.json` with `A_sol = A0 + dA1 + dA2`
+in units of `N kB T`, plus a diagnostics figure. Companion scripts cover the MBAR cross-check
+(`mbar_analysis.py`), sampling convergence (`sampling_scan.py`), finite-size extrapolation
+(`finite_size_scaling.py`), and a g(r)/Lindemann crystal-stability verdict (`crystal_stability.py`).
+
+See [`scripts/crystal-TI/README.md`](scripts/crystal-TI/README.md) for the full workflow, the
+recommended production settings, and the platform notes. The MBAR parts additionally require
+`pymbar`.
+
 ## Installation
 
 Install the package in your active environment from the repository root:
@@ -151,6 +180,7 @@ Additional optional components may require manual installation:
 
 - `hoomd` for the older HOOMD-related scripts and tests in this repository.
 - `PLUMED` and `openmm-plumed` for PLUMED-enabled simulations.
+- `pymbar` for the optional MBAR cross-check of the crystal free-energy workflow in `scripts/crystal-TI/`.
 
 Note that some `PLUMED` modules that are necessary for functionality such as calculation of local order parameters and adjacency matrices are not compiled by default, but can be enabled during configuration. 
 We recommend enabling the crystallization, multicolvar, and adjmat modules when compiling:
@@ -201,6 +231,12 @@ pacsim-analyze analysis.yaml run.yaml
 pacsim-tune run.yaml tune.yaml
 ```
 
+6. Optionally compute the crystal's absolute free energy by thermodynamic integration:
+
+```bash
+python scripts/crystal-TI/run_ti.py run.yaml --output-dir ti
+```
+
 ## Outputs
 
 Depending on the run configuration, PACSim writes:
@@ -219,7 +255,13 @@ Run the test suite from the repository root with:
 pytest colloids
 ```
 
-Some tests are skipped automatically when optional dependencies such as HOOMD are not installed.
+The workflow scripts have their own tests:
+
+```bash
+pytest scripts
+```
+
+Some tests are skipped automatically when optional dependencies such as HOOMD or `pymbar` are not installed.
 
 ## Repository layout
 
@@ -229,3 +271,4 @@ Some tests are skipped automatically when optional dependencies such as HOOMD ar
 - [`colloids/colloids_analyze/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_analyze): analysis and plotting tools.
 - [`colloids/colloids_tune/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_tune): interaction tuning workflow.
 - [`colloids/tests/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/tests): regression and validation tests.
+- [`scripts/crystal-TI/`](scripts/crystal-TI): Frenkel-Ladd crystal free-energy workflow (standalone scripts plus their tests).

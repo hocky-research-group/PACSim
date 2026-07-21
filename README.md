@@ -66,7 +66,7 @@ An example configuration can be written with:
 pacsim-run --example
 ```
 
-See [`colloids/tests/run_test.yaml`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/tests/run_test.yaml) for a working example.
+See [`colloids/tests/run_test.yaml`](colloids/tests/run_test.yaml) for a working example.
 
 ### Resuming a run
 
@@ -101,7 +101,7 @@ An example configuration can be written with:
 pacsim-create --example
 ```
 
-See [`colloids/colloids_create/configuration.yaml`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_create/configuration.yaml) and [`colloids/colloids_create/cluster.lmp`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_create/cluster.lmp) for examples.
+See [`colloids/colloids_create/configuration.yaml`](colloids/colloids_create/configuration.yaml) and [`colloids/colloids_create/cluster.lmp`](colloids/colloids_create/cluster.lmp) for examples.
 
 ### `pacsim-analyze`
 
@@ -122,7 +122,7 @@ An example analysis configuration can be written with:
 pacsim-analyze --example
 ```
 
-See [`colloids/colloids_analyze/analysis.yaml`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_analyze/analysis.yaml) for an example.
+See [`colloids/colloids_analyze/analysis.yaml`](colloids/colloids_analyze/analysis.yaml) for an example.
 
 ### `pacsim-tune`
 
@@ -265,10 +265,10 @@ Some tests are skipped automatically when optional dependencies such as HOOMD or
 
 ## Repository layout
 
-- [`pyproject.toml`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/pyproject.toml): package metadata and entry points.
-- [`colloids/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids): core simulation code.
-- [`colloids/colloids_create/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_create): initial-configuration generation tools.
-- [`colloids/colloids_analyze/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_analyze): analysis and plotting tools.
-- [`colloids/colloids_tune/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/colloids_tune): interaction tuning workflow.
-- [`colloids/tests/`](/Volumes/HockyExtraSpace/Dropbox/research/projects/ionic-colloids/PACSim_docker/pacsim-main-18March2026/colloids/tests): regression and validation tests.
+- [`pyproject.toml`](pyproject.toml): package metadata and entry points.
+- [`colloids/`](colloids): core simulation code.
+- [`colloids/colloids_create/`](colloids/colloids_create): initial-configuration generation tools.
+- [`colloids/colloids_analyze/`](colloids/colloids_analyze): analysis and plotting tools.
+- [`colloids/colloids_tune/`](colloids/colloids_tune): interaction tuning workflow.
+- [`colloids/tests/`](colloids/tests): regression and validation tests.
 - [`scripts/crystal-TI/`](scripts/crystal-TI): Frenkel-Ladd crystal free-energy workflow (standalone scripts plus their tests).

@@ -10,12 +10,8 @@ import colloids.update_reporters as update_reporters
 from colloids.units import energy_unit, length_unit, temperature_unit, time_unit, electric_potential_unit
 
 
-# When output_prefix is given it names an output *directory*, and every output file inside it carries
-# the prefix's basename, e.g. output_prefix "run1" ->
-#   "run1/run1.trajectory.gsd", "run1/run1.state.csv", "run1/run1.chk", "run1/run1.final.gsd".
-# The directory is created at run time (see colloids_run). A descriptive prefix that encodes the
-# system and parameters keeps studies organized, e.g.
-# "run_CsCl_debye7.5_rP102_rN120_charges_p35_m35".
+# The suffix appended to output_prefix to derive each output filename when output_prefix is given,
+# e.g. output_prefix "run1" gives "run1.trajectory.gsd", "run1.state.csv", "run1.chk", "run1.final.gsd".
 _OUTPUT_PREFIX_SUFFIXES = {
     "state_data_filename": ".state.csv",
     "trajectory_filename": ".trajectory.gsd",
@@ -209,16 +205,14 @@ class RunParameters(Parameters):
         Defaults to "final_frame.gsd".
     :type final_configuration_gsd_filename: Optional[str]
     :param output_prefix:
-        An optional output directory for this run. When given, the outputs are written inside a
-        directory named by the prefix, and every file carries the prefix's basename, so each run's
-        outputs stay grouped in their own folder and every file name identifies the run. For example,
-        output_prefix "run1" yields "run1/run1.trajectory.gsd", "run1/run1.state.csv",
-        "run1/run1.chk", and "run1/run1.final.gsd"; the directory is created automatically. A
-        descriptive prefix that encodes the system and parameters keeps studies tidy, e.g.
-        "run_CsCl_debye7.5_rP102_rN120_charges_p35_m35". An output filename that is set explicitly
-        always takes precedence over the prefix (including final_configuration_gsd_filename set to
-        None to disable writing the final configuration). If None, the default (current-directory)
-        filenames are used.
+        An optional common prefix for the output files. When given, any output filename that is
+        still at its default value is replaced by the prefix plus a fixed suffix, so that the four
+        output files do not have to be specified individually. For example, output_prefix "run1"
+        yields "run1.trajectory.gsd" (trajectory), "run1.state.csv" (state data), "run1.chk"
+        (checkpoint), and "run1.final.gsd" (final configuration). An output filename that is set
+        explicitly always takes precedence over the prefix (including final_configuration_gsd_filename
+        set to None to disable writing the final configuration). If None, the default (unprefixed)
+        filenames are used. The prefix may itself contain a directory, e.g. "results/run1".
         Defaults to None.
     :type output_prefix: Optional[str]
     :param wall_directions:
@@ -378,23 +372,20 @@ class RunParameters(Parameters):
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
-        # Resolve the output filenames into the output_prefix directory when it is given. Every output
-        # filename that is still at its default value becomes "<output_prefix>/<basename>.<suffix>"
-        # (e.g. "run1/run1.trajectory.gsd"); a filename that was set explicitly (including
+        # Resolve the output filenames from a common prefix when output_prefix is given. Every output
+        # filename that is still at its default value is replaced by "<output_prefix><suffix>" (e.g.
+        # "<output_prefix>.trajectory.gsd"); a filename that was set explicitly (including
         # final_configuration_gsd_filename set to None to disable writing the final configuration) is
         # left untouched. This runs before the filename validations below so that they operate on the
-        # resolved names. It is idempotent, because a resolved filename no longer equals its default.
-        # The directory itself is created at run time by colloids_run.
+        # resolved names. It is idempotent, because a resolved (prefixed) filename no longer equals its
+        # default.
         if self.output_prefix is not None:
             if not isinstance(self.output_prefix, str) or self.output_prefix == "":
                 raise ValueError("The output prefix must be a non-empty string.")
-            # Directory is the full prefix; the filename inside carries the prefix basename.
-            basename = os.path.basename(self.output_prefix.rstrip("/")) or self.output_prefix
             for filename_field, suffix in _OUTPUT_PREFIX_SUFFIXES.items():
                 default_filename = type(self).__dataclass_fields__[filename_field].default
                 if getattr(self, filename_field) == default_filename:
-                    object.__setattr__(self, filename_field,
-                                       os.path.join(self.output_prefix, basename + suffix))
+                    object.__setattr__(self, filename_field, f"{self.output_prefix}{suffix}")
         if not self.initial_configuration.endswith(".gsd"):
             raise ValueError("The filename of the initial configuration must end with '.gsd'.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:

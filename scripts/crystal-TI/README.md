@@ -180,8 +180,8 @@ ti/
     └── ...
 ```
 
-For the surrounding simulations, a self-describing `output_prefix` keeps each run in its own folder
-with every filename identifying the run:
+For the surrounding simulations, a self-describing `output_prefix` makes every output filename
+identify the run it came from:
 
 ```
 <tag>_<Structure>_debye<lambda_D>_rP<r+>_rN<r->_charges_p<psi+>_m<|psi-|>
@@ -194,6 +194,30 @@ magnitudes (mV) of their surface potentials. Build the name from a run YAML and 
 python scripts/crystal-TI/pacs_naming.py CsCl run.yaml initial.gsd
 # -> run_CsCl_debye12_rP102_rN120_charges_p35_m35
 ```
+
+PACSim treats `output_prefix` as a **filename prefix**: every output filename still at its default
+becomes `<output_prefix><suffix>`, so the name above yields
+`run_CsCl_..._m35.trajectory.gsd`, `....state.csv`, `....chk` and `....final.gsd` in the working
+directory. Because the prefix may itself contain a directory, repeating the name groups a run's
+outputs in a folder of its own — `--nested` prints that form:
+
+```bash
+python scripts/crystal-TI/pacs_naming.py CsCl run.yaml initial.gsd --nested
+# -> run_CsCl_debye12_rP102_rN120_charges_p35_m35/run_CsCl_debye12_rP102_rN120_charges_p35_m35
+```
+
+```
+run_CsCl_debye12_rP102_rN120_charges_p35_m35/
+├── run_CsCl_debye12_rP102_rN120_charges_p35_m35.trajectory.gsd
+├── run_CsCl_debye12_rP102_rN120_charges_p35_m35.state.csv
+├── run_CsCl_debye12_rP102_rN120_charges_p35_m35.chk
+└── run_CsCl_debye12_rP102_rN120_charges_p35_m35.final.gsd
+```
+
+The directory is created at run time. An explicitly set output filename always overrides the prefix,
+including `final_configuration_gsd_filename: null` to skip writing the final frame. `run_ti.py` sets
+`output_prefix` to `null` in every YAML it generates and lays its own windows out under
+`--output-dir`, so the TI driver is unaffected by this setting either way.
 
 ## Dependencies
 

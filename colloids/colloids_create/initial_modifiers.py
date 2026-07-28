@@ -93,32 +93,64 @@ class SubstrateModifier(InitialModifier):
         x_spacing_hexagonal_lattice = diameter_substrate
         y_spacing_hexagonal_lattice = (3.0 ** 0.5) * diameter_substrate / 2.0
 
-        number_substrate_x = box_length_x // x_spacing_hexagonal_lattice
+        # Compute how many substrate particles fit in x and y directions.
+        # Use floor to make intent explicit and convert to int.
+        number_substrate_x = int(np.floor(box_length_x / x_spacing_hexagonal_lattice))
+        if number_substrate_x <= 0:
+            # Nothing fits in x direction — return empty substrate.
+            return np.empty((0, 3))
         shift_x = (box_length_x - number_substrate_x * x_spacing_hexagonal_lattice) / 2.0
-        assert 0.0 <= shift_x < x_spacing_hexagonal_lattice / 2.0
+        # Allow for tiny floating point tolerance when checking shift bounds.
+        tol = 1.0e-12
+        if not (-tol <= shift_x < x_spacing_hexagonal_lattice / 2.0 + tol):
+            raise ValueError(
+                f"Computed horizontal shift {shift_x} is out of expected range for box_length_x={box_length_x} "
+                f"and spacing={x_spacing_hexagonal_lattice}.")
 
-        number_substrate_y = box_length_y // y_spacing_hexagonal_lattice
+        number_substrate_y = int(np.floor(box_length_y / y_spacing_hexagonal_lattice))
+        if number_substrate_y <= 0:
+            # Nothing fits in y direction — return empty substrate.
+            return np.empty((0, 3))
         shift_y = (box_length_y - number_substrate_y * y_spacing_hexagonal_lattice) / 2.0
-        assert 0.0 <= shift_y < y_spacing_hexagonal_lattice / 2.0
+        if not (-tol <= shift_y < y_spacing_hexagonal_lattice / 2.0 + tol):
+            raise ValueError(
+                f"Computed vertical shift {shift_y} is out of expected range for box_length_y={box_length_y} "
+                f"and spacing={y_spacing_hexagonal_lattice}.")
 
         # The x coordinates in the first row.
-        x_one_positions = np.linspace(-box_length_x / 2.0 + x_spacing_hexagonal_lattice / 2.0 + shift_x,
-                                      box_length_x / 2.0 - x_spacing_hexagonal_lattice / 2.0 - shift_x,
-                                      num=int(number_substrate_x))
-        assert abs(x_one_positions[1] - x_one_positions[0] - x_spacing_hexagonal_lattice) < 1.0e-10
+        x_one_positions = np.linspace(
+            -box_length_x / 2.0 + x_spacing_hexagonal_lattice / 2.0 + shift_x,
+            box_length_x / 2.0 - x_spacing_hexagonal_lattice / 2.0 - shift_x,
+            num=int(number_substrate_x)
+        )
+        if x_one_positions.size >= 2:
+            if not abs(x_one_positions[1] - x_one_positions[0] - x_spacing_hexagonal_lattice) < 1.0e-10:
+                raise ValueError("Computed x spacing for first row does not match expected hexagonal spacing.")
         # The x coordinates in the second row that are shifted by the radius of the substrate particles.
         # The number of particles in the second row has to be one less than in the first row because shift_x is smaller
         # than the radius of the substrate particles.
-        x_two_positions = np.linspace(-box_length_x / 2.0 + x_spacing_hexagonal_lattice + shift_x,
-                                      box_length_x / 2.0 - x_spacing_hexagonal_lattice - shift_x,
-                                      num=int(number_substrate_x - 1))
-        assert abs(x_two_positions[1] - x_two_positions[0] - x_spacing_hexagonal_lattice) < 1.0e-10
+        # Second-row positions are shifted by one radius. There may be zero positions if number_substrate_x == 1.
+        if number_substrate_x - 1 > 0:
+            x_two_positions = np.linspace(
+                -box_length_x / 2.0 + x_spacing_hexagonal_lattice + shift_x,
+                box_length_x / 2.0 - x_spacing_hexagonal_lattice - shift_x,
+                num=int(number_substrate_x - 1)
+            )
+            if x_two_positions.size >= 2:
+                if not abs(x_two_positions[1] - x_two_positions[0] - x_spacing_hexagonal_lattice) < 1.0e-10:
+                    raise ValueError("Computed x spacing for second row does not match expected hexagonal spacing.")
+        else:
+            x_two_positions = np.array([])
 
         # The y coordinates in the different rows.
-        y_positions = np.linspace(-box_length_y / 2.0 + y_spacing_hexagonal_lattice / 2.0 + shift_y,
-                                  box_length_y / 2.0 - y_spacing_hexagonal_lattice / 2.0 - shift_y,
-                                  num=int(number_substrate_y))
-        assert abs(y_positions[1] - y_positions[0] - y_spacing_hexagonal_lattice) < 1.0e-10
+        y_positions = np.linspace(
+            -box_length_y / 2.0 + y_spacing_hexagonal_lattice / 2.0 + shift_y,
+            box_length_y / 2.0 - y_spacing_hexagonal_lattice / 2.0 - shift_y,
+            num=int(number_substrate_y)
+        )
+        if y_positions.size >= 2:
+            if not abs(y_positions[1] - y_positions[0] - y_spacing_hexagonal_lattice) < 1.0e-10:
+                raise ValueError("Computed y spacing does not match expected hexagonal spacing.")
 
         substrate_positions = []
         for y_index, y_position in enumerate(y_positions):

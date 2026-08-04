@@ -6,7 +6,7 @@ integrator_parameters:
     value: 0.001574074286750681
   stepSize: !Quantity
     unit: picosecond
-    value: 0.3
+    value: 0.03
   temperature: !Quantity
     unit: kelvin
     value: 298.0
@@ -32,7 +32,7 @@ epsilon: !Quantity
   unit: kilojoule/mole
   value: 2.477709860209665
 alpha: 1.0
-run_steps: 500000000
+run_steps: 250000000
 checkpoint_interval: 1000000
 state_data_interval: 10000
 trajectory_interval: 1000000

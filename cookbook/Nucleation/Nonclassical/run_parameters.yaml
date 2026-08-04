@@ -6,7 +6,7 @@ integrator_parameters:
   randomNumberSeed: 3
   stepSize: !Quantity
     unit: picosecond
-    value: 0.317647015
+    value: 0.03
   temperature: !Copy
     key: potential_temperature
 potential_temperature: !Quantity
@@ -32,7 +32,7 @@ alpha: 1.0
 epsilon: !Quantity
     unit: kilojoule/mole
     value: 2.477709860209665
-run_steps: 100000000
+run_steps: 250000000
 checkpoint_interval: 1000000
 state_data_interval: 10000
 trajectory_interval: 1000000

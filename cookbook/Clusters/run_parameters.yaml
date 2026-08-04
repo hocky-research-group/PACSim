@@ -22,7 +22,7 @@ integrator_parameters:
   randomNumberSeed: null
   stepSize: !Quantity
     unit: picosecond
-    value: 0.1
+    value: 0.01
   temperature: !Quantity
     unit: kelvin
     value: 300.0

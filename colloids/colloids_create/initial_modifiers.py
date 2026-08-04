@@ -79,6 +79,10 @@ class SubstrateModifier(InitialModifier):
         if not (box[3] == 0.0 and box[4] == 0.0 and box[5] == 0.0):
             raise ValueError("The box vectors must be orthogonal (all tilt factors zero) in order to allow for a "
                              "substrate.")
+        # frame.configuration.box is stored in single precision (float32). Doing the lattice-spacing arithmetic
+        # below in single precision introduces errors as large as ~1e-4 at typical box sizes, which spuriously
+        # trips the 1e-10 assertions further down. Upcast to double precision so those assertions are meaningful.
+        box = box.astype(np.float64)
 
         # The substrate is a hexagonal lattice of particles within the walls in the x and y directions.
         diameter_substrate = 2.0 * substrate_radius

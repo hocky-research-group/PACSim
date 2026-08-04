@@ -1,13 +1,11 @@
 # PACSim
 
-PACSim is a Python package for building, running, resuming, analyzing, and tuning simulations of patchy and ionic colloidal systems. The package is centered on OpenMM-based molecular simulation workflows and uses GSD files for configurations and trajectories.
+PACSim is a Python package for building, running, and resuming simulations of patchy and ionic colloidal systems. The package is centered on OpenMM-based molecular simulation workflows and uses GSD files for configurations and trajectories.
 
 The repository includes:
 
 - A simulation runner for colloidal dynamics in OpenMM.
 - A configuration generator that builds initial GSD structures from LAMMPS-style cluster definitions.
-- Analysis tools for comparing simulation state data across runs.
-- A tuning tool for matching target interaction well depths by solving for surface potentials.
 - Tests and benchmark scripts covering the implemented forces and workflows.
 
 ## What PACSim can do
@@ -25,8 +23,6 @@ PACSim currently exposes the following capabilities in code:
 - Ramp or otherwise update force parameters during a simulation via custom update reporters.
 - Generate initial configurations from one or more cluster templates stored as LAMMPS data files.
 - Apply configurable initial and final modifiers during configuration generation.
-- Plot and compare state-data output from multiple simulation runs.
-- Tune a particle type's surface potential to achieve a target interaction minimum against another particle type.
 
 ## Main command-line tools
 
@@ -34,8 +30,6 @@ Installing the package creates `pacsim-*` command-line tools:
 
 - `pacsim-run`
 - `pacsim-create`
-- `pacsim-analyze`
-- `pacsim-tune`
 
 Legacy `colloids-*` command names are still provided as compatibility aliases.
 
@@ -100,43 +94,6 @@ pacsim-create --example
 
 See [`colloids/colloids_create/configuration.yaml`](colloids/colloids_create/configuration.yaml) and [`colloids/colloids_create/cluster.lmp`](colloids/colloids_create/cluster.lmp) for examples.
 
-### `pacsim-analyze`
-
-`pacsim-analyze` plots recorded simulation state data, including comparisons across multiple runs:
-
-```bash
-pacsim-analyze analysis.yaml Run1/run.yaml Run2/run.yaml Run3/run.yaml
-```
-
-This tool reads:
-
-- One analysis YAML file describing the plotting settings.
-- One or more simulation YAML files describing the runs whose output CSV files should be plotted.
-
-An example analysis configuration can be written with:
-
-```bash
-pacsim-analyze --example
-```
-
-See [`colloids/colloids_analyze/analysis.yaml`](colloids/colloids_analyze/analysis.yaml) for an example.
-
-### `pacsim-tune`
-
-`pacsim-tune` solves for a surface potential that produces a desired interaction well depth between two colloid types:
-
-```bash
-pacsim-tune run.yaml tune.yaml
-```
-
-This is useful when you want the interaction between a chosen pair of particle types to match a target minimum without manually scanning parameter values.
-
-An example tuning configuration can be written with:
-
-```bash
-pacsim-tune --example
-```
-
 ## Installation
 
 Install the package in your active environment from the repository root:
@@ -180,18 +137,6 @@ pacsim-run run.yaml
 pacsim-run run.yaml -c checkpoint.chk
 ```
 
-4. Analyze state data:
-
-```bash
-pacsim-analyze analysis.yaml run.yaml
-```
-
-5. Optionally tune interaction parameters for a later run:
-
-```bash
-pacsim-tune run.yaml tune.yaml
-```
-
 ## Outputs
 
 Depending on the run configuration, PACSim writes:
@@ -217,6 +162,4 @@ Some tests are skipped automatically when optional dependencies such as HOOMD ar
 - [`pyproject.toml`](pyproject.toml): package metadata and entry points.
 - [`colloids/`](colloids): core simulation code.
 - [`colloids/colloids_create/`](colloids/colloids_create): initial-configuration generation tools.
-- [`colloids/colloids_analyze/`](colloids/colloids_analyze): analysis and plotting tools.
-- [`colloids/colloids_tune/`](colloids/colloids_tune): interaction tuning workflow.
 - [`colloids/tests/`](colloids/tests): regression and validation tests.

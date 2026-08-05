@@ -5,7 +5,9 @@ import numpy as np
 import openmm
 from openmm import unit
 from pymatgen.core import Element
+from pymatgen.core import Structure
 from pymatgen.io.cif import CifParser
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from scipy.spatial import distance_matrix
 from colloids.colloid_potentials_algebraic import ColloidPotentialsAlgebraic
 from colloids.colloid_potentials_parameters import ColloidPotentialsParameters
@@ -81,6 +83,26 @@ class LatticeBuilder(ConfigurationGenerator):
         The number of uniformly spaced scale factors to evaluate in the scan range.
         Only allowed when optimize_energy is True. Defaults to 50 when not specified.
     :type energy_scale_samples: Optional[int]
+    :param anisotropic_energy:
+        If True, optimize the three lattice vector lengths INDEPENDENTLY instead of applying one
+        uniform scale factor. Only allowed when optimize_energy is True. Defaults to False.
+
+        A uniform scale preserves the CIF's axial ratios (b/a, c/a). Those ratios come from the
+        atomic crystal the CIF describes, and they are in general wrong for a colloidal crystal
+        built from the same structure type, because the ideal ratios depend on the ratio of the
+        particle radii. Carrying the atomic ratios over can jam one sublattice while holding
+        another apart -- for AlB2 with 200 nm / 120 nm colloids the atomic c/a = 1.0906 leaves the
+        attractive large-small pairs ~21 nm apart while only the like-charge small-small pairs
+        touch, so the lattice comes out net repulsive purely as an artefact of the fixed ratio.
+        Optimizing the axes independently recovers the physical structure (for that example
+        c/a ~ 0.95 and a cohesive lattice).
+
+        Lattice vectors of equal length are scaled together, so the crystal family is preserved:
+        a cubic cell keeps one free parameter (identical to the uniform scan), a hexagonal or
+        tetragonal cell gets two (a=b, c), and an orthorhombic cell gets three. The search is a
+        coordinate descent over those parameters, which costs a few hundred single-point energies
+        rather than the scale_samples**3 of a full grid.
+    :type anisotropic_energy: bool
     :param periodic:
         If True, generate a bulk periodic crystal: the simulation box is the (uniformly scaled)
         supercell lattice itself, so the crystal tiles space under periodic boundary conditions.
@@ -109,7 +131,8 @@ class LatticeBuilder(ConfigurationGenerator):
                  lattice_repeats: Union[int, Sequence[int]], run_parameters_file: str,
                  radii_padding: unit.Quantity, lattice_padding: unit.Quantity,
                  optimize_energy: bool = False, energy_scale_range: Optional[Sequence[float]] = None,
-                 energy_scale_samples: Optional[int] = None, periodic: bool = False) -> None:
+                 energy_scale_samples: Optional[int] = None, periodic: bool = False,
+                 anisotropic_energy: bool = False) -> None:
         """Constructor of the LatticeBuilder class."""
         super().__init__(masses=masses, radii=radii, surface_potentials=surface_potentials)
         self._periodic = periodic
@@ -132,11 +155,14 @@ class LatticeBuilder(ConfigurationGenerator):
         self._radii_padding = radii_padding
         self._lattice_padding = lattice_padding
         self._optimize_energy = optimize_energy
+        self._anisotropic_energy = anisotropic_energy
         if not optimize_energy:
             if energy_scale_range is not None:
                 raise ValueError("energy_scale_range must not be set when optimize_energy is False.")
             if energy_scale_samples is not None:
                 raise ValueError("energy_scale_samples must not be set when optimize_energy is False.")
+            if anisotropic_energy:
+                raise ValueError("anisotropic_energy must not be set when optimize_energy is False.")
         self._energy_scale_range = tuple(energy_scale_range) if energy_scale_range is not None else (0.5, 1.5)
         self._energy_scale_samples = energy_scale_samples if energy_scale_samples is not None else 50
         # Label atoms as their element symbols based on atomic number, e.g. 'Fe', 'O', etc.
@@ -226,6 +252,61 @@ class LatticeBuilder(ConfigurationGenerator):
         scale_max = geometric_scale_factor * scale_range[1]
         candidates = np.linspace(scale_min, scale_max, scale_samples)
 
+        energy_of = LatticeBuilder._vacuum_energy_function(
+            types=types, radii=radii, surface_potentials=surface_potentials, masses=masses,
+            run_parameters=run_parameters)
+
+        energy_table = []
+        for scale in candidates:
+            energy_table.append((float(scale), energy_of(base_cart_coords * scale)))
+
+        # Select the scale with minimum finite energy.
+        finite_entries = [(s, e) for s, e in energy_table if np.isfinite(e)]
+        if not finite_entries:
+            raise RuntimeError("No valid scale factor found. All candidates had infinite or NaN energy.")
+        best_scale, best_energy = min(finite_entries, key=lambda x: x[1])
+
+        finite_scales = [s for s, _ in finite_entries]
+        minimum_at_boundary = (best_scale == finite_scales[0] or best_scale == finite_scales[-1])
+        if minimum_at_boundary:
+            warnings.warn(f"Energy minimum at boundary of scan range (scale={best_scale:.4f}). "
+                          f"Consider widening energy_scale_range.")
+
+        return best_scale
+
+    @staticmethod
+    def _vacuum_energy_function(types: list[str], radii: dict[str, unit.Quantity],
+                                surface_potentials: dict[str, unit.Quantity],
+                                masses: dict[str, unit.Quantity], run_parameters: RunParameters):
+        """
+        Build the steric + electrostatic system once and return a callable giving its energy.
+
+        The returned function takes Cartesian coordinates (shape (N, 3), nanometers), centers them
+        at the origin, and returns the potential energy as a float in the standard energy unit. The
+        energy is evaluated in vacuum (non-periodic boundary conditions), so it measures the
+        cohesion of the lattice itself and not of its periodic images.
+
+        :param types:
+            The type label for each particle.
+        :type types: list[str]
+        :param radii:
+            The radii dictionary with the particle types as keys and the radii as values.
+        :type radii: dict[str, unit.Quantity]
+        :param surface_potentials:
+            The surface potentials dictionary with the particle types as keys and the surface
+            potentials as values.
+        :type surface_potentials: dict[str, unit.Quantity]
+        :param masses:
+            The masses dictionary with the particle types as keys and the masses as values.
+        :type masses: dict[str, unit.Quantity]
+        :param run_parameters:
+            The run parameters.
+        :type run_parameters: RunParameters
+
+        :return:
+            A function mapping Cartesian coordinates to the potential energy as a float.
+        :rtype: Callable[[np.ndarray], float]
+        """
         system = openmm.System()
 
         potentials_parameters = ColloidPotentialsParameters(
@@ -252,28 +333,202 @@ class LatticeBuilder(ConfigurationGenerator):
         dummy_integrator = openmm.VerletIntegrator(0.001)
         context = openmm.Context(system, dummy_integrator, platform)
 
-        energy_table = []
-        for scale in candidates:
-            positions = base_cart_coords * scale
-            positions -= positions.mean(axis=0)
-            context.setPositions(positions * length_unit)
+        def energy_of(positions: np.ndarray) -> float:
+            centered = positions - positions.mean(axis=0)
+            context.setPositions(centered * length_unit)
             state = context.getState(getEnergy=True)
-            potential_energy = state.getPotentialEnergy()
-            energy_table.append((float(scale), float(potential_energy.value_in_unit(energy_unit))))
+            return float(state.getPotentialEnergy().value_in_unit(energy_unit))
 
-        # Select the scale with minimum finite energy.
-        finite_entries = [(s, e) for s, e in energy_table if np.isfinite(e)]
-        if not finite_entries:
-            raise RuntimeError("No valid scale factor found. All candidates had infinite or NaN energy.")
-        best_scale, best_energy = min(finite_entries, key=lambda x: x[1])
+        return energy_of
 
-        finite_scales = [s for s, _ in finite_entries]
-        minimum_at_boundary = (best_scale == finite_scales[0] or best_scale == finite_scales[-1])
-        if minimum_at_boundary:
-            warnings.warn(f"Energy minimum at boundary of scan range (scale={best_scale:.4f}). "
+    @staticmethod
+    def _axis_groups(structure: Structure, tolerance: float = 1e-6) -> list[list[int]]:
+        """
+        Group lattice vector indices that the structure's symmetry requires to scale together.
+
+        The crystal system fixes which axis lengths are constrained to stay equal, so scaling the
+        axes within each group by a common factor rescales the cell without lowering its symmetry:
+
+            cubic                    -> [[0, 1, 2]]  (a = b = c; equivalent to a uniform scale)
+            trigonal (rhombohedral)  -> [[0, 1, 2]]  (a = b = c)
+            hexagonal, tetragonal,
+            trigonal (hexagonal ax.) -> [[0, 1], [2]]  (a = b, c free)
+            orthorhombic, monoclinic,
+            triclinic                -> [[0], [1], [2]]  (all free)
+
+        The space group is determined from the coordinates rather than read from the CIF header, so
+        a file written in P1 -- as symmetry-expanded CIFs commonly are -- still yields its true
+        symmetry. Groups are indexed by lattice vector, which is why they apply unchanged to a
+        supercell: repeating along an axis scales that vector but does not change its direction or
+        which other axes it is equivalent to.
+
+        If symmetry cannot be determined the grouping falls back to equal lattice vector lengths,
+        which preserves symmetry whenever the cell is already in a conventional setting.
+
+        :param structure:
+            The structure whose symmetry determines the grouping. Pass the unit cell, not a
+            supercell: anisotropic lattice repeats can make equivalent axes unequal in length and
+            obscure the symmetry.
+        :type structure: Structure
+        :param tolerance:
+            Relative tolerance within which two lattice vector lengths count as equal, used only by
+            the fallback.
+        :type tolerance: float
+
+        :return:
+            A list of groups, each a list of lattice vector indices.
+        :rtype: list[list[int]]
+        """
+        try:
+            crystal_system = SpacegroupAnalyzer(structure).get_crystal_system()
+        except Exception:
+            crystal_system = None
+
+        if crystal_system in ("cubic",):
+            return [[0, 1, 2]]
+        if crystal_system in ("hexagonal", "tetragonal", "trigonal"):
+            # A trigonal cell may be given on rhombohedral axes (a = b = c) or on the more common
+            # hexagonal axes (a = b, c free); the lengths tell the two settings apart.
+            lengths = np.linalg.norm(structure.lattice.matrix, axis=1)
+            if crystal_system == "trigonal" and np.allclose(lengths, lengths[0], rtol=tolerance):
+                return [[0, 1, 2]]
+            return [[0, 1], [2]]
+        if crystal_system in ("orthorhombic", "monoclinic", "triclinic"):
+            return [[0], [1], [2]]
+
+        lengths = np.linalg.norm(structure.lattice.matrix, axis=1)
+        groups: list[list[int]] = []
+        for index, length in enumerate(lengths):
+            for group in groups:
+                if abs(length - lengths[group[0]]) <= tolerance * max(length, lengths[group[0]]):
+                    group.append(index)
+                    break
+            else:
+                groups.append([index])
+        return groups
+
+    @staticmethod
+    def _optimize_anisotropic_scale_factors(frac_coords: np.ndarray, lattice_matrix: np.ndarray,
+                                            types: list[str], radii: dict[str, unit.Quantity],
+                                            surface_potentials: dict[str, unit.Quantity],
+                                            masses: dict[str, unit.Quantity],
+                                            run_parameters: RunParameters,
+                                            geometric_scale_factor: float,
+                                            scale_range: tuple[float, float],
+                                            scale_samples: int,
+                                            symmetry_structure: Structure) -> np.ndarray:
+        """
+        Find per-lattice-vector scale factors that minimize the steric + electrostatic energy.
+
+        Starting from the isotropic geometric scale factor, each group of equivalent axes (see
+        _axis_groups) is scanned in turn while the others are held fixed, and the best value is
+        kept. Sweeps repeat until no group moves, or until a sweep cap is reached. This coordinate
+        descent costs O(sweeps * groups * scale_samples) energy evaluations instead of the
+        scale_samples ** 3 of a dense grid, which matters because each evaluation is a full
+        pairwise energy on the Reference platform.
+
+        Coordinate descent finds a local minimum. That is the intended behavior here: the search
+        starts from the geometric non-overlap scale, so it descends into the basin belonging to the
+        structure as specified, rather than wandering to a different packing.
+
+        :param frac_coords:
+            The fractional coordinates of the particles, shape (N, 3).
+        :type frac_coords: np.ndarray
+        :param lattice_matrix:
+            The unscaled lattice matrix whose rows are the lattice vectors.
+        :type lattice_matrix: np.ndarray
+        :param types:
+            The type label for each particle.
+        :type types: list[str]
+        :param radii:
+            The radii dictionary with the particle types as keys and the radii as values.
+        :type radii: dict[str, unit.Quantity]
+        :param surface_potentials:
+            The surface potentials dictionary with the particle types as keys and the surface
+            potentials as values.
+        :type surface_potentials: dict[str, unit.Quantity]
+        :param masses:
+            The masses dictionary with the particle types as keys and the masses as values.
+        :type masses: dict[str, unit.Quantity]
+        :param run_parameters:
+            The run parameters.
+        :type run_parameters: RunParameters
+        :param geometric_scale_factor:
+            The geometric (overlap-avoidance) scale factor, used as the isotropic starting point.
+        :type geometric_scale_factor: float
+        :param scale_range:
+            (min_factor, max_factor) relative to the geometric scale factor.
+        :type scale_range: tuple[float, float]
+        :param scale_samples:
+            The number of uniformly spaced scale factors to evaluate per axis group per sweep.
+        :type scale_samples: int
+        :param symmetry_structure:
+            The unit cell whose symmetry decides which axes are scaled together (see _axis_groups).
+        :type symmetry_structure: Structure
+
+        :return:
+            The optimal scale factor for each of the three lattice vectors, shape (3,).
+        :rtype: np.ndarray
+
+        :raises RuntimeError:
+            If no valid scale factors are found (all candidates are infinite or NaN).
+        """
+        max_sweeps = 10
+        energy_of = LatticeBuilder._vacuum_energy_function(
+            types=types, radii=radii, surface_potentials=surface_potentials, masses=masses,
+            run_parameters=run_parameters)
+
+        def energy_at(factors: np.ndarray) -> float:
+            return energy_of(frac_coords @ (factors[:, np.newaxis] * lattice_matrix))
+
+        scale_factors = np.full(3, float(geometric_scale_factor))
+        best_energy = energy_at(scale_factors)
+        if not np.isfinite(best_energy):
+            # The isotropic starting point overlaps; fall back to the widest finite candidate so the
+            # descent has somewhere to start from.
+            for trial in np.linspace(geometric_scale_factor, geometric_scale_factor * scale_range[1],
+                                     scale_samples):
+                candidate_energy = energy_at(np.full(3, float(trial)))
+                if np.isfinite(candidate_energy):
+                    scale_factors = np.full(3, float(trial))
+                    best_energy = candidate_energy
+                    break
+            else:
+                raise RuntimeError(
+                    "No valid scale factors found. All candidates had infinite or NaN energy.")
+
+        groups = LatticeBuilder._axis_groups(symmetry_structure)
+        candidates = np.linspace(geometric_scale_factor * scale_range[0],
+                                 geometric_scale_factor * scale_range[1], scale_samples)
+        hit_boundary = False
+        for _ in range(max_sweeps):
+            improved = False
+            for group in groups:
+                trial_factors = scale_factors.copy()
+                group_best_value, group_best_energy, group_finite = scale_factors[group[0]], best_energy, []
+                for candidate in candidates:
+                    trial_factors[group] = candidate
+                    candidate_energy = energy_at(trial_factors)
+                    if not np.isfinite(candidate_energy):
+                        continue
+                    group_finite.append(candidate)
+                    if candidate_energy < group_best_energy:
+                        group_best_value, group_best_energy = float(candidate), candidate_energy
+                trial_factors[group] = group_best_value
+                if group_best_energy < best_energy:
+                    scale_factors, best_energy, improved = trial_factors.copy(), group_best_energy, True
+                else:
+                    trial_factors[group] = scale_factors[group[0]]
+                if group_finite and group_best_value in (group_finite[0], group_finite[-1]):
+                    hit_boundary = True
+            if not improved:
+                break
+
+        if hit_boundary:
+            warnings.warn(f"Energy minimum at boundary of scan range (scale factors="
+                          f"{np.array2string(scale_factors, precision=4)}). "
                           f"Consider widening energy_scale_range.")
-
-        return best_scale
+        return scale_factors
 
     def generate_configuration(self) -> Frame:
         """
@@ -300,14 +555,29 @@ class LatticeBuilder(ConfigurationGenerator):
         structure_full = self._structure.make_supercell(self._lattice_repeats, in_place=False)
         types = [self._type_map[atomic_number] for atomic_number in structure_full.atomic_numbers]
 
-        # Optionally optimize the scale factor by energy minimization.
-        if self._optimize_energy:
+        # Optionally optimize the scale factor by energy minimization. scale_factors holds one
+        # factor per lattice vector; the uniform case simply repeats the same value three times, so
+        # everything downstream can treat the two cases identically.
+        scale_factors = np.full(3, float(required_scale_factor))
+        if self._optimize_energy and self._anisotropic_energy:
+            scale_factors = self._optimize_anisotropic_scale_factors(
+                frac_coords=structure_full.frac_coords, lattice_matrix=structure_full.lattice.matrix,
+                types=types, radii=self._radii, surface_potentials=self._surface_potentials,
+                masses=self._masses, run_parameters=self._run_parameters,
+                geometric_scale_factor=required_scale_factor, scale_range=self._energy_scale_range,
+                scale_samples=self._energy_scale_samples, symmetry_structure=self._structure)
+        elif self._optimize_energy:
             # noinspection PyTypeChecker
             required_scale_factor = self._optimize_scale_factor(
                 base_cart_coords=structure_full.cart_coords, types=types, radii=self._radii,
                 surface_potentials=self._surface_potentials, masses=self._masses,
                 run_parameters=self._run_parameters, geometric_scale_factor=required_scale_factor,
                 scale_range=self._energy_scale_range, scale_samples=self._energy_scale_samples)
+            scale_factors = np.full(3, float(required_scale_factor))
+
+        # Scale each lattice vector by its own factor. For the uniform case this reproduces the
+        # previous behavior exactly, since frac_coords @ (s * matrix) == s * cart_coords.
+        scaled_lattice = scale_factors[:, np.newaxis] * structure_full.lattice.matrix
 
         # --- Build the Frame ---
         frame = Frame()
@@ -320,7 +590,6 @@ class LatticeBuilder(ConfigurationGenerator):
             # and the particles are placed at their fractional coordinates within that box. This
             # tiles space under periodic boundary conditions (no surrounding vacuum, lattice_padding
             # is ignored).
-            scaled_lattice = required_scale_factor * structure_full.lattice.matrix
             box, hoomd_matrix = self._lattice_to_hoomd_box(scaled_lattice)
             # Wrap fractional coordinates into [0, 1), then shift to [-0.5, 0.5) so the crystal is
             # centered on the origin. The HOOMD/GSD box is centered at the origin (spanning
@@ -333,7 +602,7 @@ class LatticeBuilder(ConfigurationGenerator):
             frame.configuration.box = np.array(box, dtype=np.float32)
             return frame
 
-        positions = structure_full.cart_coords * required_scale_factor
+        positions = structure_full.frac_coords @ scaled_lattice
 
         # Center at origin.
         positions -= positions.mean(axis=0)

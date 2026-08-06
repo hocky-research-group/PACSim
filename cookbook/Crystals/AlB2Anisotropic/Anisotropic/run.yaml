@@ -1,0 +1,24 @@
+brush_length: !Quantity {unit: nanometer, value: 10.0}
+brush_density: !Quantity {unit: /(nanometer**2), value: 0.09}
+cutoff_factor: 21.0
+debye_length: !Quantity {unit: nanometer, value: 8.0}
+dielectric_constant: 80.0
+initial_configuration: first_frame.gsd
+integrator: LangevinMiddleIntegrator
+integrator_parameters:
+  frictionCoeff: !Quantity {unit: /picosecond, value: 1.0}
+  randomNumberSeed: 7
+  stepSize: !Quantity {unit: picosecond, value: 0.2}
+  temperature: !Copy {key: potential_temperature}
+minimize_energy_initially: false
+platform_name: CPU
+potential_temperature: !Quantity {unit: kelvin, value: 300.0}
+run_steps: 20000
+state_data_filename: state_data.csv
+state_data_interval: 1000
+steric_radius_average: harmonic
+trajectory_filename: trajectory.gsd
+trajectory_interval: 1000
+use_depletion: false
+use_gravity: false
+wall_directions: [false, false, false]

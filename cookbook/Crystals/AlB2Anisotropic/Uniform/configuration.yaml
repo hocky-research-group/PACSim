@@ -1,0 +1,23 @@
+configuration_generator: LatticeBuilder
+configuration_generator_parameters:
+  lattice_specification: "../AlB2.cif"
+  lattice_repeats: 4
+  run_parameters_file: "run.yaml"
+  radii_padding: !Quantity {unit: nanometer, value: 5.0}
+  lattice_padding: !Quantity {unit: nanometer, value: 0.0}
+  optimize_energy: true
+  energy_scale_samples: 40
+  periodic: true
+masses:
+  "Al": !Quantity {unit: dalton, value: 1.0}
+  "B": !Quantity {unit: dalton, value: 1.0}
+radii:
+  "Al": !Quantity {unit: nanometer, value: 200.0}
+  "B": !Quantity {unit: nanometer, value: 120.0}
+surface_potentials:
+  "Al": !Quantity {unit: millivolt, value: 40.0}
+  "B": !Quantity {unit: millivolt, value: -60.0}
+initial_modifiers: null
+initial_modifiers_parameters: null
+final_modifiers: null
+final_modifiers_parameters: null

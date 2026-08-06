@@ -46,6 +46,28 @@ pacsim-create configuration_bulk.yaml first_frame.gsd
 Make sure the electrostatic cutoff `2*r_max + cutoff_factor*debye_length` is smaller than half the
 box; increase `lattice_repeats` if it is not.
 
+**If the CIF is not cubic, set `anisotropic_energy: true`.** `LatticeBuilder` otherwise scales the
+cell uniformly and keeps the axial ratios of the *atomic* crystal the CIF describes, which are
+generally wrong for colloids of a different radius ratio. The result is a lattice where one
+sublattice jams while another is held apart, and if the pairs held apart are the attractive ones the
+crystal loses its cohesion. A free energy computed from such a reference is meaningless — and the
+failure looks like physics (the crystal "melts", or one candidate structure "loses"), so it is worth
+one check before spending TI time on it:
+
+- as-built energy near zero, or a warning that the energy minimum sits at the boundary of the scan
+  range, means the particles are not in contact at all;
+- the closest contact should be an *oppositely charged* pair. If a like-charge pair is the one
+  touching, the axial ratio is wrong.
+
+Cubic cells (CsCl, Th3P4, Cu3Au, …) are unaffected: uniform scaling is exact for them and the flag
+produces a bit-identical configuration. See
+[`cookbook/Crystals/AlB2Anisotropic/`](../../cookbook/Crystals/AlB2Anisotropic) for a worked
+before/after.
+
+Note that step 2 relaxes the box with an **anisotropic** NPT barostat, which refines the axial ratio
+further — but it can only do so from a starting structure that is bound well enough to survive the
+relaxation, so it does not remove the need to build the lattice correctly.
+
 ### 2. Run the thermodynamic integration
 
 ```bash

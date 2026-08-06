@@ -29,6 +29,7 @@ PACSim currently exposes the following capabilities in code:
 - Plot and compare state-data output from multiple simulation runs.
 - Tune a particle type's surface potential to achieve a target interaction minimum against another particle type.
 - Build true periodic bulk crystals with `LatticeBuilder` and relax the box with an NPT Monte Carlo barostat.
+- Relax a non-cubic crystal's axial ratios to the colloid size ratio with `anisotropic_energy`, instead of inheriting the ratios of the atomic crystal the CIF describes.
 - Restrain particles to reference lattice sites with a periodic-image-safe harmonic (Einstein) force, for Frenkel-Ladd thermodynamic integration.
 
 ## Main command-line tools
@@ -102,6 +103,49 @@ pacsim-create --example
 ```
 
 See [`colloids/colloids_create/configuration.yaml`](colloids/colloids_create/configuration.yaml) and [`colloids/colloids_create/cluster.lmp`](colloids/colloids_create/cluster.lmp) for examples.
+
+#### Building crystals from a CIF: non-cubic cells need `anisotropic_energy`
+
+`LatticeBuilder` reads a CIF and scales it until the colloids no longer overlap; with
+`optimize_energy: true` it then picks the scale that minimises the steric + electrostatic energy.
+That scale is **uniform**, so the cell keeps the axial ratios (`b/a`, `c/a`) written in the CIF.
+
+Those ratios come from the *atomic* crystal the CIF describes. The ideal ratios for a *colloidal*
+crystal of the same structure type depend on the ratio of the particle radii, so for anything that is
+not cubic they are generally wrong — and the failure is quiet. Uniform scaling stops as soon as the
+first pair of particles touches, so one sublattice jams while another is left too far apart to
+interact. If the pairs left apart are the oppositely charged (attractive) ones, the crystal loses its
+cohesion and can look repulsive, unstable, or non-existent, none of which is a real result.
+
+A worked case is in [`cookbook/Crystals/AlB2Anisotropic/`](cookbook/Crystals/AlB2Anisotropic):
+AlB2 built from 200 nm cations and 120 nm anions. The atomic `c/a = 1.0906` jams the small-anion
+honeycomb and leaves the attractive large–small pairs 21 nm apart, so the lattice comes out net
+repulsive (+8.5 NkT) and melts in NPT. Setting `anisotropic_energy: true` recovers `c/a ≈ 0.97`, a
+cohesive lattice, and a crystal stiffer than the cubic competitor it is being compared against.
+
+```yaml
+configuration_generator_parameters:
+  optimize_energy: true
+  anisotropic_energy: true    # relax each symmetry-distinct axis separately
+```
+
+The axes are grouped by the crystal system, so rescaling never lowers the symmetry of the cell:
+cubic keeps one free parameter (identical to the uniform scan), hexagonal, tetragonal and trigonal
+get two (`a = b`, `c`), and orthorhombic, monoclinic and triclinic get three. The space group is
+determined from the coordinates rather than read from the CIF header, so files written in `P1` — as
+symmetry-expanded CIFs usually are — still get the right grouping.
+
+Guidance:
+
+- **Cubic CIF** (CsCl, Th3P4, Cu3Au, …): nothing to do. Uniform scaling is exact, and the flag is a
+  no-op that produces a bit-identical configuration.
+- **Any non-cubic CIF** (hexagonal, tetragonal, orthorhombic, …): set `anisotropic_energy: true`
+  whenever the colloid radius ratio differs from the atomic one — which is essentially always.
+- **Check the build either way.** The tell-tale of a bad axial ratio is an as-built energy of ~0
+  (particles not in contact at all), often together with a warning that the energy minimum sits at
+  the boundary of the scan range. Compare the minimum centre-to-centre distance of each pair *type*
+  against the sum of the two effective radii (radius + brush + `radii_padding`): in a healthy
+  charge-ordered crystal the touching pair should be an oppositely charged one.
 
 ### `pacsim-analyze`
 

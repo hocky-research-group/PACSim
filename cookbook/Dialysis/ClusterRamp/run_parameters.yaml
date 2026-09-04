@@ -9,7 +9,7 @@ update_reporter_parameters:
     unit: nanometer
     value: 5.5
   final_update_step: 100000000
-  cluster_size: 20
+  cluster_size: 50
   cutoff_distance: !Quantity
     unit: nanometer
     value: 230.0

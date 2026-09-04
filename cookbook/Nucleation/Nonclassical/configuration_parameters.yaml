@@ -28,8 +28,4 @@ surface_potentials:
     value: -50.0
   "2": !Quantity
     unit: millivolt
-<<<<<<< HEAD
     value: 50.0
-=======
-    value: 50.0
->>>>>>> philipp/public_main

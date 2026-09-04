@@ -9,6 +9,16 @@ import colloids.update_reporters as update_reporters
 from colloids.units import energy_unit, length_unit, temperature_unit, time_unit, electric_potential_unit
 
 
+# The suffix appended to output_prefix to derive each output filename when output_prefix is given,
+# e.g. output_prefix "run1" gives "run1.trajectory.gsd", "run1.state.csv", "run1.chk", "run1.final.gsd".
+_OUTPUT_PREFIX_SUFFIXES = {
+    "state_data_filename": ".state.csv",
+    "trajectory_filename": ".trajectory.gsd",
+    "checkpoint_filename": ".chk",
+    "final_configuration_gsd_filename": ".final.gsd",
+}
+
+
 @dataclass(order=True, frozen=True)
 class RunParameters(Parameters):
     """
@@ -175,12 +185,27 @@ class RunParameters(Parameters):
         The filename must end with ".gsd".
         Defaults to "final_frame.gsd".
     :type final_configuration_gsd_filename: Optional[str]
+    :param output_prefix:
+        An optional common prefix for the output files. When given, any output filename that is
+        still at its default value is replaced by the prefix plus a fixed suffix, so that the four
+        output files do not have to be specified individually. For example, output_prefix "run1"
+        yields "run1.trajectory.gsd" (trajectory), "run1.state.csv" (state data), "run1.chk"
+        (checkpoint), and "run1.final.gsd" (final configuration). An output filename that is set
+        explicitly always takes precedence over the prefix (including final_configuration_gsd_filename
+        set to None to disable writing the final configuration). If None, the default (unprefixed)
+        filenames are used. The prefix may itself contain a directory, e.g. "results/run1".
+        Defaults to None.
+    :type output_prefix: Optional[str]
     :param wall_directions:
         A list of three booleans indicating whether the walls in the x, y, and z directions are active for
         closed-wall simulations with shifted Lennard-Jones potential walls.
         If any of the wall directions is active, epsilon and alpha must be specified.
         Defaults to [False, False, False].
     :type wall_directions: list[bool]
+    :param use_pbc:
+        If True, use periodic boundary conditions in the simulation.
+        Defaults to True.
+    :type use_pbc: bool
     :param epsilon:
         The unshifted Lennard-Jones potential well-depth for closed-wall simulations with shifted Lennard-Jones
         potential walls.
@@ -304,9 +329,11 @@ class RunParameters(Parameters):
     checkpoint_filename: str = "checkpoint.chk"
     minimize_energy_initially: bool = False
     final_configuration_gsd_filename: Optional[str] = "final_frame.gsd"
+    output_prefix: Optional[str] = None
     epsilon: Optional[unit.Quantity] = None
     alpha: Optional[float] = None
     wall_directions: list[bool] = field(default_factory=lambda: [False, False, False])
+    use_pbc: bool = True
     use_implicit_substrate: bool = False
     substrate_wall_charge: Optional[unit.Quantity] = None
     use_depletion: bool = False
@@ -323,6 +350,20 @@ class RunParameters(Parameters):
 
     def __post_init__(self) -> None:
         """Check if the parameters are valid after initialization."""
+        # Resolve the output filenames from a common prefix when output_prefix is given. Every output
+        # filename that is still at its default value is replaced by "<output_prefix><suffix>" (e.g.
+        # "<output_prefix>.trajectory.gsd"); a filename that was set explicitly (including
+        # final_configuration_gsd_filename set to None to disable writing the final configuration) is
+        # left untouched. This runs before the filename validations below so that they operate on the
+        # resolved names. It is idempotent, because a resolved (prefixed) filename no longer equals its
+        # default.
+        if self.output_prefix is not None:
+            if not isinstance(self.output_prefix, str) or self.output_prefix == "":
+                raise ValueError("The output prefix must be a non-empty string.")
+            for filename_field, suffix in _OUTPUT_PREFIX_SUFFIXES.items():
+                default_filename = type(self).__dataclass_fields__[filename_field].default
+                if getattr(self, filename_field) == default_filename:
+                    object.__setattr__(self, filename_field, f"{self.output_prefix}{suffix}")
         if not self.initial_configuration.endswith(".gsd"):
             raise ValueError("The filename of the initial configuration must end with '.gsd'.")
         if self.platform_name not in ["Reference", "CPU", "CUDA", "OpenCL"]:
@@ -416,8 +457,8 @@ class RunParameters(Parameters):
             if self.depletant_radius is not None:
                 raise ValueError("Depletant radius must not be specified if depletion potential is not on.")
         if self.use_implicit_substrate:
-            if not all(self.wall_directions):
-                raise ValueError("A substrate can only be used if all walls are active.")
+            if not self.wall_directions[-1]:
+                raise ValueError("The z wall must be active if using an implicit substrate.")
             if self.substrate_wall_charge is None:
                 raise ValueError("Substrate wall charge must be specified if using implicit substrate.")
             if not self.substrate_wall_charge.unit.is_compatible(electric_potential_unit):
@@ -446,9 +487,8 @@ class RunParameters(Parameters):
                 raise TypeError("The particle density must have a unit compatible with grams per centimeter cubed.")
             if self.particle_density <= 0.0 * (unit.gram / length_unit ** 3):
                 raise ValueError("The particle density must be greater than zero.")
-            if not all(self.wall_directions):
-                raise ValueError("Gravity can only be turned on if all walls are active and, hence, no periodic "
-                                 "boundary conditions are present.")
+            if not self.wall_directions[-1]:
+                raise ValueError("Gravity can only be turned on if z walls are active.")
         else:
             if self.gravitational_acceleration is not None:
                 raise ValueError("Gravitational acceleration must not be specified if gravity is not on.")

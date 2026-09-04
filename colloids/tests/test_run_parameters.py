@@ -51,7 +51,7 @@ class TestRunParameters(object):
     def test_run_parameters(self, parameters, yaml_parameters):
         # Because we cannot compare openmm quantities directly (see above), we have to compare all fields explicitly.
         # When new fields are added to the RunParameters dataclass, this test must be updated accordingly.
-        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 41
+        assert len(fields(parameters)) == len(fields(yaml_parameters)) == 43
         assert parameters.initial_configuration == yaml_parameters.initial_configuration
         assert parameters.frame_index == yaml_parameters.frame_index
         assert parameters.platform_name == yaml_parameters.platform_name
@@ -85,12 +85,14 @@ class TestRunParameters(object):
         assert parameters.checkpoint_filename == yaml_parameters.checkpoint_filename
         assert parameters.minimize_energy_initially == yaml_parameters.minimize_energy_initially
         assert parameters.final_configuration_gsd_filename == yaml_parameters.final_configuration_gsd_filename
+        assert parameters.output_prefix == yaml_parameters.output_prefix
         assert parameters.epsilon == yaml_parameters.epsilon
         assert parameters.alpha == yaml_parameters.alpha
         assert all(pw == yw for pw, yw in zip(parameters.wall_directions, yaml_parameters.wall_directions))
         assert parameters.use_depletion == yaml_parameters.use_depletion
         assert parameters.depletion_phi == yaml_parameters.depletion_phi
         assert parameters.use_implicit_substrate == yaml_parameters.use_implicit_substrate
+        assert parameters.use_pbc == yaml_parameters.use_pbc
         assert parameters.substrate_wall_charge == yaml_parameters.substrate_wall_charge
         assert parameters.depletant_radius == yaml_parameters.depletant_radius
         assert parameters.use_gravity == yaml_parameters.use_gravity
@@ -101,6 +103,66 @@ class TestRunParameters(object):
         assert parameters.update_reporter_parameters == yaml_parameters.update_reporter_parameters
         assert parameters.use_plumed == yaml_parameters.use_plumed
         assert parameters.plumed_script == yaml_parameters.plumed_script
+
+
+class TestOutputPrefix(object):
+    @pytest.fixture(autouse=True)
+    def change_test_dir(self, request, monkeypatch):
+        monkeypatch.chdir(request.fspath.dirname)
+
+    def test_no_prefix_keeps_defaults(self):
+        parameters = RunParameters(initial_configuration="first_frame.gsd")
+        assert parameters.output_prefix is None
+        assert parameters.state_data_filename == "state_data.csv"
+        assert parameters.trajectory_filename == "trajectory.gsd"
+        assert parameters.checkpoint_filename == "checkpoint.chk"
+        assert parameters.final_configuration_gsd_filename == "final_frame.gsd"
+
+    def test_prefix_resolves_all_default_filenames(self):
+        parameters = RunParameters(initial_configuration="first_frame.gsd", output_prefix="run1")
+        assert parameters.state_data_filename == "run1.state.csv"
+        assert parameters.trajectory_filename == "run1.trajectory.gsd"
+        assert parameters.checkpoint_filename == "run1.chk"
+        assert parameters.final_configuration_gsd_filename == "run1.final.gsd"
+
+    def test_explicit_filename_overrides_prefix(self):
+        parameters = RunParameters(initial_configuration="first_frame.gsd", output_prefix="run1",
+                                   trajectory_filename="custom.gsd")
+        # The explicitly set filename is untouched; the others are still derived from the prefix.
+        assert parameters.trajectory_filename == "custom.gsd"
+        assert parameters.state_data_filename == "run1.state.csv"
+        assert parameters.checkpoint_filename == "run1.chk"
+        assert parameters.final_configuration_gsd_filename == "run1.final.gsd"
+
+    def test_prefix_leaves_disabled_final_configuration_none(self):
+        parameters = RunParameters(initial_configuration="first_frame.gsd", output_prefix="run1",
+                                   final_configuration_gsd_filename=None)
+        # Explicitly disabling the final configuration takes precedence over the prefix.
+        assert parameters.final_configuration_gsd_filename is None
+        assert parameters.trajectory_filename == "run1.trajectory.gsd"
+
+    def test_prefix_may_contain_directory(self):
+        parameters = RunParameters(initial_configuration="first_frame.gsd",
+                                   output_prefix="results/run1")
+        assert parameters.trajectory_filename == "results/run1.trajectory.gsd"
+
+    def test_empty_prefix_raises(self):
+        with pytest.raises(ValueError):
+            RunParameters(initial_configuration="first_frame.gsd", output_prefix="")
+
+    def test_prefix_survives_yaml_round_trip(self):
+        parameters = RunParameters(initial_configuration="first_frame.gsd", output_prefix="run1")
+        parameters.to_yaml("test_prefix.yaml")
+        try:
+            yaml_parameters = RunParameters.from_yaml("test_prefix.yaml")
+        finally:
+            os.remove("test_prefix.yaml")
+        # Resolution is idempotent: reloading the already-resolved filenames does not prefix twice.
+        assert yaml_parameters.output_prefix == "run1"
+        assert yaml_parameters.trajectory_filename == "run1.trajectory.gsd"
+        assert yaml_parameters.state_data_filename == "run1.state.csv"
+        assert yaml_parameters.checkpoint_filename == "run1.chk"
+        assert yaml_parameters.final_configuration_gsd_filename == "run1.final.gsd"
 
 
 if __name__ == '__main__':

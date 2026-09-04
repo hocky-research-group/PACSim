@@ -6,7 +6,7 @@ integrator_parameters:
     value: 0.001574074286750681
   stepSize: !Quantity
     unit: picosecond
-    value: 0.00317647015905543
+    value: 0.317647015905543
   temperature: !Quantity
     unit: kelvin
     value: 298.0
@@ -42,6 +42,7 @@ checkpoint_filename: checkpoint.chk
 state_data_filename: state_data.csv
 trajectory_filename: trajectory.gsd
 platform_name: CUDA
+use_pbc: false
 minimize_energy_initially: false
 update_reporter: null
 update_reporter_parameters: null

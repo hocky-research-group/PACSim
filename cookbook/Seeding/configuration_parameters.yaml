@@ -9,7 +9,7 @@ final_modifiers_parameters:
     cluster_cutoff_distance: !Quantity
       unit: nanometer
       value: 230.0
-    #seed_fractional_position: [0.25, 0.25, 0.25]
+    seed_fractional_position: [0.25, 0.25, 0.25]
     seed_frame_index: -1
   - seed_filename: Th3P4.gsd
     overlap_distance: !Quantity
@@ -18,7 +18,7 @@ final_modifiers_parameters:
     cluster_cutoff_distance: !Quantity
       unit: nanometer
       value: 230.0
-    #seed_fractional_position: [0.75, 0.75, 0.75]
+    seed_fractional_position: [0.75, 0.75, 0.75]
     seed_frame_index: -1
 configuration_generator: ClusterGenerator
 configuration_generator_parameters:

@@ -60,3 +60,4 @@ water_density: !Quantity
 use_implicit_substrate: false
 substrate_wall_charge: null
 use_plumed: false
+use_pbc: false

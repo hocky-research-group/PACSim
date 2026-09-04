@@ -67,3 +67,4 @@ wall_directions:
 water_density: !Quantity
   unit: gram/(centimeter**3)
   value: 0.998
+use_pbc: false
